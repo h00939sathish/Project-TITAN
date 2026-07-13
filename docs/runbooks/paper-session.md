@@ -39,6 +39,23 @@ gate.trigger_kill_switch()
 2. Create BrokerPosition with intentional drift.
 3. Run ReconciliationEngine.compare() — verify drift detected.
 
+## Restarting a session
+
+```bash
+python -m titan.cli recovery restart
+```
+
+Expected output:
+```
+Recovering from event store...
+Reconciling...
+Reconciliation clean
+Drift count: 0
+System state: ACTIVE
+```
+
+If drift is detected, the system starts in HALTED. Investigate drift before releasing.
+
 ## Session end
 
 - Close all Python processes.

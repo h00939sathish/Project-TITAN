@@ -62,6 +62,26 @@ def dump():
     click.echo(get_registry().dump_json())
 
 
+@cli.group()
+def recovery():
+    """Recovery commands."""
+    pass
+
+
+@recovery.command()
+def restart():
+    """Restart from event store: replay, reconcile, transition."""
+    from titan.recovery.restart import recover_from_event_store, reconcile_on_boot, transition_on_boot
+    click.echo("Recovering from event store...")
+    state = recover_from_event_store()
+    click.echo("Reconciling...")
+    recon = reconcile_on_boot(state["portfolio"], state["adapter"], state["recon_engine"])
+    click.echo(f"Reconciliation {'clean' if not recon['has_drift'] else 'drift detected'}")
+    click.echo(f"Drift count: {recon['drift_count']}")
+    transition = transition_on_boot(recon, state["risk_gate"])
+    click.echo(f"System state: {transition}")
+
+
 @metrics.command()
 def health():
     """Assess system health from metrics."""

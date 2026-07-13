@@ -40,6 +40,17 @@ Incidents are detected through:
 4. Verify with health endpoint
 5. Resume normal operation
 
+### Event store loss recovery
+
+1. Identify the last known good backup of the event store file.
+2. Restore the backup to the expected event store path.
+3. Run recovery:
+   ```
+   python -m titan.cli recovery restart
+   ```
+4. Verify system starts in ACTIVE and reconciliation is clean.
+5. If no backup exists, start a fresh session and reconstruct state manually.
+
 ## Learning
 
 1. Document in `knowledge/incidents/<date>-<description>.md`
