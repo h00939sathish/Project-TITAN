@@ -12,3 +12,4 @@ Phase E total: 111 Python tests + 62 Rust tests = 173 all passing
 Task F1: complete (726225a F1: establish operations telemetry, incident runbook, and drill records, review clean)
 Task F2: complete (3a0fd36 feat: ORR Phase F assessment document, review clean)
 Task G1: complete (76371ec..195cb54, review clean, fix: apply_snapshot helper)
+Task G2: complete (195cb54..e6be7d8, review clean, fix: dead variable)
