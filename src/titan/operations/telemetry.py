@@ -89,7 +89,6 @@ class HealthReporter:
             checked_at=datetime.now(timezone.utc).isoformat(),
         )
         if logger is not None:
-            log_level = "WARNING" if issues else "INFO"
             logger.info("health_reporter", f"Health check: {summary}",
                         payload=h.to_dict())
         return h
