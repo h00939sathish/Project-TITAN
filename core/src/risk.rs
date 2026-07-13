@@ -415,25 +415,19 @@ impl RiskGate {
     }
 
     pub fn restore_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
-        let events = store.replay_by_type("RiskStateSnapshot")?;
-        if let Some(latest) = events.last() {
-            let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
-                PyRuntimeError::new_err(format!("Deserialize error: {}", e))
-            })?;
-            self.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
-                .unwrap_or(KillSwitchState::Triggered);
-            self.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
-                .unwrap_or(TradingState::Halted);
-        } else {
-            self.kill_switch = KillSwitchState::Triggered;
-            self.trading_state = TradingState::Halted;
-        }
-        Ok(())
+        Self::apply_snapshot(self, store)
     }
 
     #[staticmethod]
     pub fn load_or_default(config: RiskConfig, store: &event_store::EventStore) -> PyResult<RiskGate> {
         let mut gate = RiskGate::new(config);
+        Self::apply_snapshot(&mut gate, store)?;
+        Ok(gate)
+    }
+}
+
+impl RiskGate {
+    fn apply_snapshot(gate: &mut RiskGate, store: &event_store::EventStore) -> PyResult<()> {
         let events = store.replay_by_type("RiskStateSnapshot")?;
         if let Some(latest) = events.last() {
             let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
@@ -447,7 +441,7 @@ impl RiskGate {
             gate.kill_switch = KillSwitchState::Triggered;
             gate.trading_state = TradingState::Halted;
         }
-        Ok(gate)
+        Ok(())
     }
 }
 
