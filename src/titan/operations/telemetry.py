@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from titan.operations.logging import StructuredLogger
+
 
 class SystemState(str, Enum):
     ACTIVE = "ACTIVE"
@@ -75,14 +77,19 @@ class HealthReporter:
             last_check=datetime.now(timezone.utc).isoformat()
         )
 
-    def health(self, state: SystemState = SystemState.ACTIVE) -> SystemHealth:
+    def health(self, state: SystemState = SystemState.ACTIVE, logger: StructuredLogger | None = None) -> SystemHealth:
         uptime = (datetime.now(timezone.utc) - self._start_time).total_seconds()
         issues = [c for c in self._components.values() if c.status != "healthy"]
         summary = "All systems healthy" if not issues else f"{len(issues)} component(s) degraded/down"
-        return SystemHealth(
+        h = SystemHealth(
             state=state,
             uptime_seconds=uptime,
             components=dict(self._components),
             summary=summary,
             checked_at=datetime.now(timezone.utc).isoformat(),
         )
+        if logger is not None:
+            log_level = "WARNING" if issues else "INFO"
+            logger.info("health_reporter", f"Health check: {summary}",
+                        payload=h.to_dict())
+        return h

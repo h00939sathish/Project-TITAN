@@ -392,10 +392,142 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 ---
 
+## Phase G — Cross-Cutting Hardening (3–4 weeks)
+
+**Spec authority:** `specifications/ORR-checklist.md`, `specifications/PERFORMANCE_SPEC.md`, `specifications/FAILURE_MATRIX.md`, `specifications/Risk.spec.md`
+
+**Goal:** Close the highest-priority gaps identified in the Phase F ORR: state persistence, structured logging, metrics emission, FAILURE_MATRIX test coverage, recovery automation, and performance benchmarking.
+
+**Exit evidence:** All ORR-MON, ORR-REC, ORR-RISK-03, and ORR-TST-01 items resolved or explicitly deferred with ADR. Benchmark baselines recorded in `knowledge/benchmarks/`.
+
+### Task G1: Kill-switch and trading-state persistence
+
+**Files:**
+- Modify: `core/src/risk.rs`
+- Modify: `core/src/messages.rs`
+- Modify: `core/src/event_store.rs`
+- Create: `tests/risk/test_state_persistence.py`
+
+- [ ] Define `RiskStateSnapshot` event in messages.rs carrying kill-switch state, trading state, and timestamp.
+- [ ] Add `persist_state()` and `restore_state()` methods to `RiskGate` that write/read `RiskStateSnapshot` via the event store.
+- [ ] On restart, load persisted state before accepting any intents; if state is unreadable or missing, default to HALTED (fail-closed).
+- [ ] Add Rust tests for persist/restore lifecycle (trigger → persist → restart → verify halted).
+- [ ] Add Python integration test: trigger kill switch, simulate restart, verify routing blocked.
+- [ ] Document restart behavior in incident runbook.
+
+**Exit evidence:** Kill switch state survives Python process restart. HALTED default on unreadable state. Integration test passes.
+
+### Task G2: Structured logging wired into runtime
+
+**Files:**
+- Modify: `src/titan/operations/telemetry.py`
+- Create: `src/titan/operations/logging.py`
+- Modify: `src/titan/cli.py`
+- Create: `tests/operations/test_logging.py`
+
+- [ ] Add `LogEvent` dataclass with correlation_id, causation_id, component, severity, message, timestamp.
+- [ ] Add `StructuredLogger` that writes JSON lines to stdout with configurable minimum severity level.
+- [ ] Wire `StructuredLogger` into the risk gate call path (log each evaluate() call with verdict and reason).
+- [ ] Wire `StructuredLogger` into the adapter call path (log submit, fill, reject, timeout, cancel events).
+- [ ] Wire `StructuredLogger` into the reconciliation call path (log drift detection).
+- [ ] Wire `StructuredLogger` into the HealthReporter health() method.
+- [ ] Add pytest fixture that captures structured log output and verifies format.
+- [ ] Add tests for: correlation_id threading, severity filtering, JSON output format, missing-field handling.
+
+**Exit evidence:** Running the vertical slice integration test produces JSON-structured logs with correlation_ids tracing each intent through risk → execution → fill → reconciliation. Tests verify log format and content.
+
+### Task G3: Metrics emission from risk gate, execution, and portfolio
+
+**Files:**
+- Create: `src/titan/operations/metrics.py`
+- Modify: `src/titan/cli.py`
+- Create: `tests/operations/test_metrics.py`
+
+- [ ] Define metric types: Counter, Gauge, Histogram with name, value, tags, timestamp.
+- [ ] Add `MetricsRegistry` as a singleton that stores in-memory metric state and supports snapshot/dump.
+- [ ] Wire counter metrics into risk gate: `intents_evaluated`, `intents_rejected`, `kill_switch_triggered`, `trading_state_changed`.
+- [ ] Wire counter/gauge metrics into portfolio: `positions_open`, `gross_exposure`, `cash_balance` (via Python wrapper).
+- [ ] Wire counter metrics into execution: `orders_submitted`, `orders_filled`, `orders_rejected`, `orders_cancelled`, `orders_unknown`.
+- [ ] Wire gauge metrics into reconciliation: `drift_count_warning`, `drift_count_critical`, `last_reconciliation_age_seconds`.
+- [ ] Wire gauge metric into health reporter: `system_state` (ACTIVE/REDUCING/HALTED/DEGRADED as numeric).
+- [ ] Add `titan.cli metrics dump` command that prints all metrics as JSON.
+- [ ] Add `titan.cli metrics health` command that assesses system health from metrics (risk working? orders progressing? broker truth match?).
+- [ ] Add tests: counter increments, gauge updates, registry snapshot, CLI output format.
+
+**Exit evidence:** After running the vertical slice integration test, `titan.cli metrics dump` shows non-zero metrics for intents, fills, portfolio state, and reconciliation status. CLI health command reflects system state.
+
+### Task G4: FAILURE_MATRIX test coverage
+
+**Files:**
+- Create: `tests/failure_matrix/__init__.py`
+- Create: `tests/failure_matrix/test_broker_timeout_submit.py`
+- Create: `tests/failure_matrix/test_broker_timeout_cancel.py`
+- Create: `tests/failure_matrix/test_duplicate_fill.py`
+- Create: `tests/failure_matrix/test_event_store_write_failure.py`
+- Create: `tests/failure_matrix/test_event_store_corruption.py`
+- Create: `tests/failure_matrix/test_clock_drift.py`
+- Create: `tests/failure_matrix/test_config_load_failure.py`
+- Modify: `core/src/event_store.rs` (if needed for fault injection)
+
+Each test verifies the expected behavior and recovery from the FAILURE_MATRIX row.
+
+- [ ] **Broker timeout (submit):** Configure SimulatedAdapter with TIMEOUT quality; submit order; verify order transitions to UNKNOWN; verify reconcile resolves the state.
+- [ ] **Broker timeout (cancel):** Submit fillable order, cancel, inject timeout on cancel; verify no retry; verify reconcile resolves.
+- [ ] **Duplicate fill:** Send identical fill event twice via PortfolioEngine; verify portfolio projection is unchanged; verify duplicate-warning event emitted.
+- [ ] **Event store write failure:** Mock SQLite write to return error; verify command is rejected; verify error is not swallowed.
+- [ ] **Event store corruption:** Simulate corrupt SQLite file; verify detection fails closed; verify operator can diagnose.
+- [ ] **Clock drift:** Inject clock jump in test clock; verify new intents rejected during drift; verify halt; verify reconcile catches anomalies.
+- [ ] **Configuration load failure:** Deploy bad config file; verify startup failure with descriptive error.
+
+**Exit evidence:** `pytest tests/failure_matrix/ -v` passes all 7 tests. Each test verifies the expected failure behavior and recovery path. FAILURE_MATRIX.md coverage increases from 3/14 rows to 10/14 rows.
+
+### Task G5: Recovery automation — restart and reconcile
+
+**Files:**
+- Create: `src/titan/recovery/__init__.py`
+- Create: `src/titan/recovery/restart.py`
+- Create: `src/titan/recovery/reconcile_on_boot.py`
+- Create: `tests/recovery/test_restart.py`
+- Modify: `docs/runbooks/paper-session.md`
+- Modify: `docs/runbooks/incident.md`
+
+- [ ] Implement `recover_from_event_store()` that replays all events and rebuilds OrderStateMachine, PortfolioEngine, RiskGate state.
+- [ ] Implement `reconcile_on_boot(simulated_adapter, portfolio_engine, reconciliation_engine)` that compares rebuilt portfolio with adapter's open orders and fills, then reports drift.
+- [ ] Implement `transition_on_boot()` that moves system to ACTIVE only if reconciliation is clean (no critical drift); otherwise transitions to HALTED.
+- [ ] Add `titan.cli recovery restart` command that performs the full boot sequence.
+- [ ] Add integration test: record events in a session, simulate restart, run recovery, verify positions and risk state match pre-restart.
+- [ ] Add integration test: inject drift before restart, verify system starts in HALTED.
+- [ ] Update paper-session.md: add "Restarting a session" section covering recovery command and verification steps.
+- [ ] Update incident.md: add event store loss recovery procedure referencing recovery commands.
+
+**Exit evidence:** `titan.cli recovery restart` replays events, reconciles, and transitions to ACTIVE or HALTED based on drift. Integration tests verify both clean and drifted restarts.
+
+### Task G6: Benchmark harness and performance baselines
+
+**Files:**
+- Create: `scripts/bench.py`
+- Create: `knowledge/benchmarks/bench-risk-gate.md`
+- Create: `knowledge/benchmarks/bench-event-store.md`
+- Create: `knowledge/benchmarks/bench-replay.md`
+
+- [ ] Write `scripts/bench.py` as a reusable benchmark runner that measures p99 latency and throughput for a given subsystem.
+- [ ] **Risk gate benchmark:** Measure p99 evaluate() latency over 10,000 calls (50th-percentile arrival rate). Record result in `knowledge/benchmarks/bench-risk-gate.md`.
+- [ ] **Event store benchmark:** Measure sequential append throughput (target >50,000 events/s). Measure single-aggregate replay from 10k events (target <5 ms). Record in `knowledge/benchmarks/bench-event-store.md`.
+- [ ] **Replay benchmark:** Measure replay throughput for 100k bar-level events (target <15s for 1M). Record in `knowledge/benchmarks/bench-replay.md`.
+- [ ] For each benchmark, include: date, hardware spec, commit SHA, seed, dataset size, raw results, and comparison to PERFORMANCE_SPEC.md budget.
+- [ ] If any budget is not met, record the gap and estimate the optimization required.
+- [ ] Document benchmark reproduction steps.
+
+**Exit evidence:** Three benchmark documents in `knowledge/benchmarks/` with measured performance against all 12 budgets from PERFORMANCE_SPEC.md. Reproduction steps recorded. Any budget gaps identified for future optimization.
+
+### Solo-developer estimate addition
+
+Phase G adds approximately 3–4 weeks to the total plan at full time, or 6–8 weeks at 15–20 hours/week.
+
 ## Deferred work
 
-AI advisory, vector memory, additional brokers, ensemble allocation, Monte Carlo/optimization, order-book simulation, multi-account live trading, and restricted-live promotion follow only after Phase F. Their requirements remain in the handbook and in `specifications/` but are not MVP commitments.
+AI advisory, vector memory, additional brokers, ensemble allocation, Monte Carlo/optimization, order-book simulation, multi-account live trading, and restricted-live promotion follow only after Phase G. Their requirements remain in the handbook and in `specifications/` but are not MVP commitments.
 
 ## Solo-developer estimate
 
-At full time, Phases -1 through F are approximately 19–29 weeks. At 15–20 hours/week, plan for 12–18 months. Rust and spec-first discipline add front-loaded overhead that pays back in reduced rework and integration time. This estimate intentionally excludes live capital and broad AI/plug-in scope; adding them before the paper gate would invalidate the safety and time assumptions.
+At full time, Phases -1 through G are approximately 22–33 weeks. At 15–20 hours/week, plan for 14–20 months. Rust and spec-first discipline add front-loaded overhead that pays back in reduced rework and integration time. This estimate intentionally excludes live capital and broad AI/plug-in scope; adding them before the paper gate would invalidate the safety and time assumptions.
