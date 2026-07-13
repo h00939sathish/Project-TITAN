@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan/contracts/risk-decision-v1",
+  "title": "RiskDecision",
+  "description": "The deterministic result of evaluating a TradeIntent through the risk gate.",
+  "type": "object",
+  "required": [
+    "intent_id", "decision", "evaluated_at", "reason_codes"
+  ],
+  "properties": {
+    "intent_id": { "type": "string", "description": "Correlated TradeIntent message_id" },
+    "decision": {
+      "type": "string",
+      "enum": ["ACCEPTED", "REJECTED"]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ordered list of rejection reasons; empty for ACCEPTED"
+    },
+    "evaluated_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule_name": { "type": "string" },
+          "rule_version": { "type": "string" },
+          "result": { "type": "string", "enum": ["PASS", "FAIL", "SKIP"] }
+        }
+      }
+    },
+    "inputs_digest": { "type": "string" },
+    "limit_snapshot_digest": { "type": "string" }
+  },
+  "additionalProperties": false
+}

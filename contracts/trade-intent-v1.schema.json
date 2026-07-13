@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan/contracts/trade-intent-v1",
+  "title": "TradeIntent",
+  "description": "A typed intent emitted by a strategy proposing a trade. Not an order.",
+  "type": "object",
+  "required": [
+    "strategy_id", "strategy_package_digest", "account_id",
+    "instrument_id", "side", "quantity", "order_type", "time_in_force",
+    "market_data_timestamp", "risk_profile_version"
+  ],
+  "properties": {
+    "strategy_id": { "type": "string" },
+    "strategy_package_digest": { "type": "string" },
+    "account_id": { "type": "string" },
+    "instrument_id": { "type": "string" },
+    "side": { "type": "string", "enum": ["BUY", "SELL"] },
+    "quantity": { "type": "string" },
+    "price": { "type": "string" },
+    "stop_price": { "type": "string" },
+    "order_type": {
+      "type": "string",
+      "enum": ["MARKET", "LIMIT", "STOP", "STOP_LIMIT"]
+    },
+    "time_in_force": {
+      "type": "string",
+      "enum": ["DAY", "GTC", "IOC", "FOK", "GTX"]
+    },
+    "market_data_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "risk_profile_version": { "type": "string" },
+    "expiry": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan/contracts/approved-order-intent-v1",
+  "title": "ApprovedOrderIntent",
+  "description": "A TradeIntent that passed the risk gate, ready for execution.",
+  "type": "object",
+  "required": [
+    "risk_decision_id", "intent_id", "client_order_id",
+    "instrument_id", "side", "quantity", "order_type", "time_in_force"
+  ],
+  "properties": {
+    "risk_decision_id": { "type": "string" },
+    "intent_id": { "type": "string" },
+    "client_order_id": { "type": "string" },
+    "instrument_id": { "type": "string" },
+    "side": { "type": "string", "enum": ["BUY", "SELL"] },
+    "quantity": { "type": "string" },
+    "price": { "type": "string" },
+    "stop_price": { "type": "string" },
+    "order_type": {
+      "type": "string",
+      "enum": ["MARKET", "LIMIT", "STOP", "STOP_LIMIT"]
+    },
+    "time_in_force": {
+      "type": "string",
+      "enum": ["DAY", "GTC", "IOC", "FOK", "GTX"]
+    },
+    "risk_profile_version": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+{
+  "message_id": "0194f1c2-3a5b-7d8e-9f01-234567890abc",
+  "message_type": "order.submitted",
+  "schema_version": 100,
+  "occurred_at": "2026-07-13T12:00:00Z",
+  "correlation_id": "0194f1c2-3a5b-7d8e-9f01-234567890abd",
+  "causation_id": null,
+  "aggregate_type": "order",
+  "aggregate_id": "ORD-001",
+  "source": "execution",
+  "payload": {
+    "client_order_id": "ORD-001",
+    "instrument_id": "AAPL.NASDAQ",
+    "side": "BUY",
+    "quantity": "100"
+  },
+  "metadata": {
+    "config_digest": "abc123"
+  }
+}

@@ -1,0 +1,11 @@
+Task C1a: complete (risk types, 15 tests, clippy clean, report: task-C1a-report.md)
+Task C1b: complete (RiskGate pipeline, 13 tests)
+Task C2a: complete (PortfolioEngine, 22 tests)
+Task C1c: complete (Python risk layer, 20 tests, CLI)
+Task C2b: complete (ReconciliationEngine, 8 tests)
+Task C2c: complete (integration tests, 10 tests, 67 Python + 62 Rust = 127 total)
+Task D1: complete (data pipeline, 13 tests)
+Task D2: complete (replay/backtest, 7 tests, 87 Python total)
+Task E1: complete (strategy package, 16 tests)
+Task E2: complete (adapter contract, 11 tests)
+Phase E total: 111 Python tests + 62 Rust tests = 173 all passing

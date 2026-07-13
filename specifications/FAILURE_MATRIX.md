@@ -1,0 +1,25 @@
+# Failure Matrix
+
+> **Owner:** Reliability Engineering
+> **Status:** Active — Phase -1 baseline
+> **Last Review:** 2026-07-13
+> **Decision Authority:** Risk Owner
+
+Every row represents a failure mode that must be tested end-to-end. A control that is not exercised by a FAILURE_MATRIX test is not a control.
+
+| Failure mode | Trigger | Expected behavior | Recovery | Verification test |
+|---|---|---|---|---|
+| **Broker disconnect** | Adapter heartbeat timeout | Halt routing to adapter; reject new intents for affected instruments; preserve open order state; alert operator | On reconnect: reconcile broker state, resolve UNKNOWN orders, resume if drift is within threshold | Kill adapter network; verify routing blocked; verify reconnect + reconcile + resume |
+| **Broker timeout (submit)** | Adapter request exceeds timeout budget | Mark order UNKNOWN; persist timeout event; do not retry automatically; queue for reconciliation | Reconcile by querying broker order status; transition to ACKNOWLEDGED, FILLED, or REJECTED based on broker truth | Inject timeout in simulated adapter; verify UNKNOWN transition; verify reconcile resolution |
+| **Broker timeout (cancel)** | Cancel request exceeds timeout budget | Mark order state as-is; do not retry cancel blindly; queue for reconciliation | Reconcile: if order is filled/cancelled, update state; if still open, retry cancel with new idempotency key | Inject timeout on cancel; verify reconcile discovers and resolves |
+| **Duplicate fill** | Adapter sends same fill report twice | Deduplicate by broker execution id; second application is no-op; emit duplicate-warning metric | No recovery needed — idempotent by design; investigate root cause of duplicate | Send identical fill event twice; verify portfolio projection unchanged |
+| **Clock drift** | System clock jumps forward/backward >1s | Reject new intents; halt routing; alert operator; do not use drifted timestamps for economic decisions | Synchronize clock; reconcile all state that may have been affected by incorrect timestamps | Inject clock jump in test; verify halt; verify reconcile catches timestamp anomalies |
+| **Event store write failure** | SQLite write returns error | Fail the current command; do not proceed without a persisted event; do not swallow the error | On restart: replay from last known good event; reconcile with broker truth for any in-flight orders | Mock store write failure; verify command is rejected; verify restart replay is correct |
+| **Event store corruption** | SQLite checksum/ integrity failure | Detect on read; fail closed (halt); alert; do not use potentially corrupted data for decisions | Restore from backup; replay from last known good snapshot; reconcile with broker | Corrupt store file; verify detection; verify restore + replay produces correct state |
+| **Replay failure** | Replay clock encounters an illegal state transition | Halt replay; emit error with event id and illegal transition details; preserve partial results for debugging | Fix the data or state machine; re-run from the failing event with corrected code | Inject bad event in fixture; verify replay halts with descriptive error |
+| **Authentication expiry** | Broker session token expires | Detect on next adapter call; attempt refresh; if refresh fails, treat as broker disconnect | Reauthenticate; if successful, resume; if not, maintain halted routing | Expire token; verify refresh attempt; verify failure → disconnect behavior |
+| **Kill switch trigger** | Operator action, drift threshold, or circuit breaker | Immediate halt: block new order routing, cancel open orders where safe per policy, transition to HALTED, persist state, alert | Two-person authorization; reconcile; verify controls; release halt via audited interface | Trigger kill switch during active order; verify no new orders, verify cancel, verify HALTED, verify manual release |
+| **Reconciliation drift (critical)** | Broker position/balance differs from internal projection by >threshold | Halt routing; alert; preserve both snapshots for investigation | Operator investigates root cause; manual correction or replay from known good state; document in knowledge/incidents/ | Create intentional drift; verify halt; verify investigation artifacts |
+| **Reconciliation drift (warning)** | Broker position/balance differs by <threshold | Log warning; emit metric; do not halt | Periodic review; if trend worsens, escalate | Create small drift; verify warning but no halt |
+| **Stale market data** | Data feed age exceeds configured threshold for active instrument | Reject new intents for that instrument; alert; if no instrument has fresh data, halt | Wait for fresh data; verify data quality; resume on data quality gate pass | Freeze data feed; verify intents rejected; verify resume on fresh data |
+| **Configuration load failure** | Config file missing, unreadable, or fails validation | Do not start or transition to ACTIVE; emit descriptive error; exit non-zero | Fix configuration; restart | Deploy bad config; verify startup failure; verify error message identifies the issue |

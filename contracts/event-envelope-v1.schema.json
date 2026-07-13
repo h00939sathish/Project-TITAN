@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan/contracts/event-envelope-v1",
+  "title": "EventEnvelope",
+  "description": "Canonical event envelope for all TITAN domain events per SYSTEM_CONTRACTS.md",
+  "type": "object",
+  "required": [
+    "message_id", "message_type", "schema_version", "occurred_at",
+    "correlation_id", "aggregate_type", "aggregate_id", "source", "payload"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique message identifier"
+    },
+    "message_type": {
+      "type": "string",
+      "description": "Dotted event type, e.g. 'order.submitted'"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Major.minor encoded as integer (major*100 + minor)"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC timestamp"
+    },
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tracks a decision end to end"
+    },
+    "causation_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Direct predecessor event or command id"
+    },
+    "aggregate_type": {
+      "type": "string",
+      "description": "Domain aggregate, e.g. 'order', 'risk', 'portfolio'"
+    },
+    "aggregate_id": {
+      "type": "string",
+      "description": "Stable identity within the aggregate"
+    },
+    "source": {
+      "type": "string",
+      "description": "Service that emitted the event"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific event data"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "config_digest": { "type": "string" },
+        "strategy_digest": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

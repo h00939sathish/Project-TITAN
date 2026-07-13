@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+*.whl
+.venv/
+
+# Rust
+core/target/
+
+# Maturin
+*.so
+*.pyd
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Generated
+lake/
+artifacts/

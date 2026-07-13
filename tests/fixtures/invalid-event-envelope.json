@@ -1,0 +1,8 @@
+{
+  "message_id": 12345,
+  "message_type": "order.submitted",
+  "schema_version": "not-an-integer",
+  "occurred_at": "not-a-date",
+  "aggregate_type": "order",
+  "source": "execution"
+}
