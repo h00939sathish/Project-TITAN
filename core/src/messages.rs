@@ -300,3 +300,41 @@ impl ApprovedOrderIntent {
         format!("ApprovedOrder({}) {}", self.client_order_id, self.instrument_id)
     }
 }
+
+/// Snapshot of risk gate state for persistence across restarts.
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RiskStateSnapshot {
+    #[pyo3(get)]
+    pub message_id: String,
+    #[pyo3(get)]
+    pub kill_switch_state: String,
+    #[pyo3(get)]
+    pub trading_state: String,
+    #[pyo3(get)]
+    pub occurred_at: String,
+}
+
+#[pymethods]
+impl RiskStateSnapshot {
+    pub fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(self).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e))
+        })
+    }
+
+    #[staticmethod]
+    pub fn from_json(json: &str) -> PyResult<Self> {
+        serde_json::from_str(json).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Deserialization error: {}", e))
+        })
+    }
+
+    fn __str__(&self) -> String {
+        format!("RiskStateSnapshot({}, ks={}, ts={})", self.message_id, self.kill_switch_state, self.trading_state)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("RiskStateSnapshot(id={}, ks={}, ts={}, at={})", self.message_id, self.kill_switch_state, self.trading_state, self.occurred_at)
+    }
+}

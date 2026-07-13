@@ -1,7 +1,11 @@
-use crate::messages::TradeIntent;
+use crate::event_store;
+use crate::messages::{EventEnvelope, RiskStateSnapshot, TradeIntent};
 use crate::types::Money;
+use chrono::Utc;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 // ─── TradingState ────────────────────────────────────────────────────────────────
 
@@ -27,6 +31,10 @@ impl TradingState {
     fn is_active(&self) -> bool {
         self.accepts_intents()
     }
+
+    fn accepts_intents(&self) -> bool {
+        matches!(self, Self::Active)
+    }
 }
 
 impl TradingState {
@@ -45,10 +53,6 @@ impl TradingState {
         } else {
             Err(format!("Cannot transition from {:?} to {:?}", self, target))
         }
-    }
-
-    pub fn accepts_intents(&self) -> bool {
-        matches!(self, Self::Active)
     }
 }
 
@@ -150,10 +154,15 @@ impl RiskConfig {
             data_freshness_threshold_ms,
         }
     }
+
+    #[staticmethod]
+    pub fn default() -> Self {
+        Self::default_impl()
+    }
 }
 
-impl Default for RiskConfig {
-    fn default() -> Self {
+impl RiskConfig {
+    fn default_impl() -> Self {
         Self {
             instrument_eligibility: Vec::new(),
             max_order_notional: Money::new("1000000", "USD"),
@@ -164,6 +173,12 @@ impl Default for RiskConfig {
             max_daily_loss: Money::new("50000", "USD"),
             data_freshness_threshold_ms: 5_000,
         }
+    }
+}
+
+impl Default for RiskConfig {
+    fn default() -> Self {
+        Self::default_impl()
     }
 }
 
@@ -376,6 +391,63 @@ impl RiskGate {
         self.kill_switch
             .transition(KillSwitchState::Released)
             .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    pub fn persist_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
+        let snapshot = RiskStateSnapshot {
+            message_id: format!("snap-{}", Uuid::now_v7()),
+            kill_switch_state: format!("{:?}", self.kill_switch),
+            trading_state: format!("{:?}", self.trading_state),
+            occurred_at: Utc::now().to_rfc3339(),
+        };
+        let json = serde_json::to_string(&snapshot).map_err(|e| {
+            PyRuntimeError::new_err(format!("Serialize error: {}", e))
+        })?;
+        let envelope = EventEnvelope::new(
+            "RiskStateSnapshot".to_string(),
+            "RiskGate".to_string(),
+            "system".to_string(),
+            "titan_core".to_string(),
+            json,
+            None, None, None,
+        );
+        store.append(&envelope)
+    }
+
+    pub fn restore_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
+        let events = store.replay_by_type("RiskStateSnapshot")?;
+        if let Some(latest) = events.last() {
+            let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
+                PyRuntimeError::new_err(format!("Deserialize error: {}", e))
+            })?;
+            self.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
+                .unwrap_or(KillSwitchState::Triggered);
+            self.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
+                .unwrap_or(TradingState::Halted);
+        } else {
+            self.kill_switch = KillSwitchState::Triggered;
+            self.trading_state = TradingState::Halted;
+        }
+        Ok(())
+    }
+
+    #[staticmethod]
+    pub fn load_or_default(config: RiskConfig, store: &event_store::EventStore) -> PyResult<RiskGate> {
+        let mut gate = RiskGate::new(config);
+        let events = store.replay_by_type("RiskStateSnapshot")?;
+        if let Some(latest) = events.last() {
+            let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
+                PyRuntimeError::new_err(format!("Deserialize error: {}", e))
+            })?;
+            gate.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
+                .unwrap_or(KillSwitchState::Triggered);
+            gate.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
+                .unwrap_or(TradingState::Halted);
+        } else {
+            gate.kill_switch = KillSwitchState::Triggered;
+            gate.trading_state = TradingState::Halted;
+        }
+        Ok(gate)
     }
 }
 
@@ -787,5 +859,31 @@ mod tests {
 
         assert!(gate.release_completed().is_ok());
         assert_eq!(gate.kill_switch, KillSwitchState::Released);
+    }
+
+    #[test]
+    fn test_persist_and_restore_state() {
+        use crate::event_store::EventStore;
+        let store = EventStore::new(":memory:").unwrap();
+        let mut gate = RiskGate::new(RiskConfig::default());
+        assert_eq!(gate.trading_state, TradingState::Active);
+        assert_eq!(gate.kill_switch, KillSwitchState::Armed);
+        gate.trigger_kill_switch().unwrap();
+        gate.set_trading_state(TradingState::Halted).unwrap();
+        assert_eq!(gate.kill_switch, KillSwitchState::Triggered);
+        assert_eq!(gate.trading_state, TradingState::Halted);
+        gate.persist_state(&store).unwrap();
+        let restored = RiskGate::load_or_default(RiskConfig::default(), &store).unwrap();
+        assert_eq!(restored.kill_switch, KillSwitchState::Triggered);
+        assert_eq!(restored.trading_state, TradingState::Halted);
+    }
+
+    #[test]
+    fn test_restore_defaults_to_halted_when_no_state() {
+        use crate::event_store::EventStore;
+        let store = EventStore::new(":memory:").unwrap();
+        let gate = RiskGate::load_or_default(RiskConfig::default(), &store).unwrap();
+        assert_eq!(gate.kill_switch, KillSwitchState::Triggered);
+        assert_eq!(gate.trading_state, TradingState::Halted);
     }
 }

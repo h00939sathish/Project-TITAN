@@ -61,5 +61,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<risk::RiskVerdict>()?;
     m.add_class::<risk::RiskGate>()?;
 
+    // Risk state snapshot
+    m.add_class::<messages::RiskStateSnapshot>()?;
+
     Ok(())
 }
