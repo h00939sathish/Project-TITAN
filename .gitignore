@@ -13,6 +13,7 @@ core/target/
 *.so
 *.pyd
 *.dylib
+*.pdb
 
 # IDE
 .vscode/
