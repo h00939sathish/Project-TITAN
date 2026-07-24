@@ -1,25 +1,40 @@
 # Paper Session Runbook
 
-> **Purpose:** Operate a paper trading session using the SimulatedAdapter.
-> **No real capital is at risk.**
+> **Purpose:** Operate a paper trading session with multi-timeframe evaluation.
+> No real capital is at risk.
 
 ## Prerequisites
 
 - Python 3.14+ with titan package installed
-- No broker credentials required (SimulatedAdapter is in-memory)
+- For SimulatedAdapter: no broker credentials required
+- For IBKR paper: TWS or IB Gateway running with paper account configured (port 7497 or 8874)
 
 ## Starting a session
 
-```bash
-python -m titan.cli risk status
-# Expected: Trading state: Active, Kill switch: Armed
-```
-
-## Running the replay pipeline
+### Simulated (no broker)
 
 ```bash
-python -m pytest tests/integration/test_paper_vertical_slice.py -v
+python scripts/paper_session.py
 ```
+
+### IBKR paper
+
+```bash
+python scripts/ibkr_paper_session.py
+```
+
+## Multi-timeframe monitoring
+
+Each strategy declares its trigger timeframe. When a bar closes on timeframe T,
+only strategies triggered by T evaluate. Monitor per-timeframe metrics:
+
+- `evaluations.<timeframe>` — bars evaluated per timeframe
+- `proposals.<timeframe>` — proposals created per timeframe
+- `accepted.<timeframe>` — intents accepted per timeframe
+- `lag.<timeframe>` — event lag per timeframe
+
+Expected: every subscribed timeframe receives evaluations during regular
+session hours. Zero evaluations in an expected session triggers an alert.
 
 ## Kill switch drill
 
@@ -42,15 +57,11 @@ gate.trigger_kill_switch()
 ## Restarting a session
 
 ```bash
-python -m titan.cli recovery restart
+python scripts/paper_session.py
 ```
 
-Expected output:
+Expected output after warmup:
 ```
-Recovering from event store...
-Reconciling...
-Reconciliation clean
-Drift count: 0
 System state: ACTIVE
 ```
 
@@ -59,7 +70,7 @@ If drift is detected, the system starts in HALTED. Investigate drift before rele
 ## Session end
 
 - Close all Python processes.
-- Verify no state files remain.
+- Verify no state files remain (or archive them for audit).
 
 ## Incident response
 
