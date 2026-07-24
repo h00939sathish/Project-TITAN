@@ -77,6 +77,23 @@ stateDiagram-v2
 - Validation: p99 <5 μs
 - See `PERFORMANCE_SPEC.md` (validation is part of risk-gate budget).
 
+## Decision trace requirements
+
+Every TradeIntent emitted by a validated proposal must produce an append-only log through the following stages:
+
+| Stage | Source | Content |
+|---|---|---|
+| MarketEventReceived | RuntimeEvaluator | event message_id, event_type, instrument_id |
+| FeatureSnapshotCreated | RuntimeEvaluator | timeframe, feature_count |
+| StrategyEvaluated | RuntimeEvaluator | strategy_ids evaluated |
+| TradeProposalCreated | RuntimeEvaluator | proposal_id(s) |
+| ProposalValidated | RuntimeEvaluator | validation status |
+| RiskDecision | PaperTradingEngine | verdict accepted/rejected, reason |
+| ApprovedOrderIntent | PaperTradingEngine | risk_decision_id, client_order_id |
+| BrokerAcknowledgement | PaperTradingEngine | broker_order_id, accepted |
+
+All stages share a `correlation_id` that links the originating MarketEvent through to the broker acknowledgement. The trace is stored as EventEnvelope records with `aggregate_type="DecisionTrace"` in the EventStore.
+
 ## Failure behavior
 
 Stale data and expired intent are normal operational outcomes, not errors. See `FAILURE_MATRIX.md`.

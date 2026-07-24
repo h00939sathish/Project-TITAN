@@ -90,6 +90,16 @@ The engine does not silently repair data. Correction events are applied with lin
 | `replay.commission_bps` | float | 1.0 | Commission in basis points |
 | `replay.latency_ms` | integer | 10 | Simulated exchange latency |
 
+## Replay decision trace validation
+
+A replay run must reconstruct every DecisionTrace from the replayed event stream. The replayed trace must be byte-for-byte identical to the original trace for the same inputs:
+
+- Every trace entry stage (MarketEventReceived through BrokerAcknowledgement) must be present in order.
+- The correlation_id chain must link every entry from the originating event to its broker acknowledgement.
+- Configuration digest and portfolio snapshot ID must be recorded and match the run configuration.
+
+Trace entries are replayed from the same EventStore aggregate_type="DecisionTrace" records used in live operation.
+
 ## Performance budget
 
 - Throughput: 1M events replayed in <15s (bar-conservative fill model)
