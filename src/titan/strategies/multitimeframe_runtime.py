@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime
 
 from titan.runtime.events import MarketEvent, TradeProposal, StrategyDefinition
 from titan.strategies.registry import get_registry
 from titan.strategies.timeframes import Timeframe
+
+log = logging.getLogger("titan.runtime")
 
 
 class MultiTimeframeRuntime:
@@ -56,6 +59,9 @@ class MultiTimeframeRuntime:
 
             registration = self._reg.get(d.strategy_id)
             if not registration.is_qualified_for(tf, d.params):
+                log.info(
+                    f"[gate] SKIP: {d.strategy_id} ({tf}) — not qualified"
+                )
                 continue
 
             if self._last_timestamps.get(key) == close_ts:

@@ -7,10 +7,12 @@ Architecture:
   No strategy or script calls submit_order directly.
 """
 
+import logging
 import os
+import sys
 import threading
 import time
-import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 
 import titan.strategies.registrations  # noqa: F401
@@ -30,12 +32,15 @@ from nautilus_trader.model.data import Bar, BarType
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.trading.strategy import Strategy
 
-from titan._core import ContractType, Instrument as CoreInstrument, InstrumentId as CoreInstrumentId, Money, RiskConfig, TradeIntent
+from titan._core import Money, RiskConfig, TradeIntent
 from titan.execution.engine import PaperConfig, PaperTradingEngine
 from titan.runtime.events import MarketEvent, StrategyDefinition, TriggerSpec
 from titan.runtime.evaluator import RuntimeEvaluator
 from titan.strategies.multitimeframe_runtime import MultiTimeframeRuntime
+from titan.strategies.registry import get_registry
 from titan.strategies.timeframes import Timeframe
+
+log = logging.getLogger("titan.paper")
 
 # ---------- config ----------
 
@@ -80,6 +85,32 @@ def _bar_type_str(inst_id: str, timeframe: str, price_type: str) -> str:
     return f"{inst_id}-{timeframe}-{price_type}-EXTERNAL"
 
 
+# ---------- startup summary ----------
+
+def _print_qualification_summary():
+    reg = get_registry()
+    qualified: dict[str, list[str]] = defaultdict(list)
+    for sid in STRATEGY_IDS:
+        try:
+            r = reg.get(sid)
+            for tf, _ in r.qualified_variants:
+                qualified[tf.value].append(sid)
+        except KeyError:
+            pass
+
+    print("\n========== TITAN Paper Qualification Summary ==========")
+    for tf_name in ("1d", "1h", "15m", "5m"):
+        strs = qualified.get(tf_name, [])
+        label = {"1d": "Daily", "1h": "1 Hour", "15m": "15 Minute", "5m": "5 Minute"}.get(tf_name, tf_name)
+        if strs:
+            print(f"  Qualified  [{label}]: {', '.join(sorted(strs))}")
+        else:
+            print(f"  BLOCKED    [{label}]: (none qualified)")
+    print("========================================================\n")
+
+
+# ---------- nautilus strategy (data ingress only) ----------
+
 class DataIngestConfig(StrategyConfig, kw_only=True, frozen=True):
     pass
 
@@ -96,6 +127,9 @@ class DataIngestStrategy(Strategy):
         self._evaluator: RuntimeEvaluator | None = None
         self._engine: PaperTradingEngine | None = None
         self._counter = 0
+        self._counts = {"qualified": 0, "blocked": 0, "submitted": 0, "filled": 0}
+        self._last_bar_time: dict[str, float] = {}
+        self._stale_warn_secs = 300
 
     def set_titan(self, evaluator: RuntimeEvaluator, engine: PaperTradingEngine) -> None:
         self._evaluator = evaluator
@@ -111,7 +145,7 @@ class DataIngestStrategy(Strategy):
             for tf in cfg["timeframes"]:
                 bt = BarType.from_str(_bar_type_str(inst_id, tf, cfg["price_type"]))
                 self.subscribe_bars(bt)
-                self.log.info(f"Subscribed {bt}")
+                self.log.info(f"[ingress] subscribed {bt}")
 
     def on_bar(self, bar: Bar) -> None:
         if self._evaluator is None or self._engine is None:
@@ -119,21 +153,24 @@ class DataIngestStrategy(Strategy):
 
         inst_id = str(bar.bar_type.instrument_id)
         tf_raw = str(bar.bar_type.spec.timedelta)
-        close = float(bar.close.as_double())
 
         titan_tf = self._nautilus_tf_to_titan(bar)
         if titan_tf is None:
-            self.log.warning(f"Unsupported timeframe: {tf_raw}")
+            self.log.warning(f"[ingress] unsupported timeframe: {tf_raw}")
             return
 
+        now = time.time()
+        self._last_bar_time[f"{inst_id}/{titan_tf.value}"] = now
+
         self._counter += 1
-        now = datetime.now(timezone.utc)
+        ts = datetime.now(timezone.utc)
+        close = float(bar.close.as_double())
         event = MarketEvent(
             message_id=f"bar-{self._counter}",
             causation_id=f"bar-{inst_id}-{titan_tf.value}",
             correlation_id=f"corr-{self._counter}",
-            occurred_at=now,
-            received_at=now,
+            occurred_at=ts,
+            received_at=ts,
             schema_version=1,
             source="ibkr",
             event_type="BarClosed",
@@ -152,6 +189,7 @@ class DataIngestStrategy(Strategy):
         result = self._evaluator.on_market_event(event)
 
         for proposal in result.proposals:
+            self._counts["qualified"] += 1
             intent = TradeIntent(
                 strategy_id=proposal.strategy_id,
                 strategy_package_digest="",
@@ -167,15 +205,17 @@ class DataIngestStrategy(Strategy):
             )
             order_result = self._engine.submit_intent(intent, correlation_id=event.correlation_id)
             if order_result.accepted:
+                self._counts["submitted"] += 1
+                bid = str(order_result.broker_order_id.id) if order_result.broker_order_id else "?"
                 self.log.info(
-                    f"[{proposal.instrument_id}/{proposal.timeframe}] "
-                    f"{proposal.side} {proposal.quantity} @ {proposal.price} "
-                    f"| accepted"
+                    f"[order] {proposal.strategy_id} | {proposal.timeframe} "
+                    f"| {proposal.side} {proposal.quantity} @ {proposal.price} "
+                    f"| ib_order_id={bid}"
                 )
             else:
                 self.log.info(
-                    f"[{proposal.instrument_id}/{proposal.timeframe}] "
-                    f"{proposal.side} rejected: {order_result.rejection_reason}"
+                    f"[order] {proposal.strategy_id} | {proposal.timeframe} "
+                    f"| {proposal.side} rejected: {order_result.rejection_reason}"
                 )
 
     @staticmethod
@@ -198,8 +238,9 @@ def _timedelta_matches(td, titan_tf: Timeframe) -> bool:
     return td == mapping.get(titan_tf)
 
 
+# ---------- TITAN runtime setup ----------
+
 def _build_titan_runtime():
-    """Build the TITAN evaluator, producers, and paper engine."""
     risk_config = RiskConfig(
         list(INSTRUMENT_CONFIG.keys()),
         Money("50000", "USD"),
@@ -213,10 +254,10 @@ def _build_titan_runtime():
     try:
         from titan.execution.ibkr_adapter import IBKRPaperAdapter
         adapter = IBKRPaperAdapter()
+        log.info("adapter: IBKRPaperAdapter (live IBKR paper)")
     except Exception:
         from titan.execution.simulated_adapter import SimulatedAdapter
-        import logging
-        logging.warning("IBKR adapter unavailable; using SimulatedAdapter")
+        log.warning("adapter: IBKR unavailable, using SimulatedAdapter")
         adapter = SimulatedAdapter()
 
     engine = PaperTradingEngine(
@@ -251,7 +292,17 @@ def _build_titan_runtime():
     return evaluator, engine, multirt
 
 
+# ---------- main ----------
+
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        stream=sys.stdout,
+    )
+
+    _print_qualification_summary()
+
     inst_provider = InteractiveBrokersInstrumentProviderConfig(
         symbology_method=SymbologyMethod.IB_SIMPLIFIED,
         load_ids=frozenset(INSTRUMENT_CONFIG.keys()),
@@ -295,6 +346,10 @@ def main():
     if AUTO_STOP_SECS > 0:
         def stop():
             time.sleep(AUTO_STOP_SECS)
+            log.info(f"Counts: qualified={strategy._counts['qualified']} "
+                     f"blocked={strategy._counts['blocked']} "
+                     f"submitted={strategy._counts['submitted']} "
+                     f"filled={strategy._counts['filled']}")
             node.stop()
         threading.Thread(target=stop, daemon=True).start()
 
