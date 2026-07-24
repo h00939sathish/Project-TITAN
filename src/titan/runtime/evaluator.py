@@ -19,6 +19,7 @@ class RuntimeEvaluator:
     _evaluations: list[tuple[str, Timeframe]] = field(default_factory=list)
     _seen_message_ids: set[str] = field(default_factory=set)
     _traces: dict[str, list[dict]] = field(default_factory=dict)
+    _producer: object | None = None
 
     @property
     def evaluations(self) -> list[tuple[str, Timeframe]]:
@@ -26,6 +27,9 @@ class RuntimeEvaluator:
 
     def register(self, definition: StrategyDefinition) -> None:
         self._definitions[definition.strategy_id] = definition
+
+    def set_producer(self, producer: object) -> None:
+        self._producer = producer
 
     def _trace(self, correlation_id: str, stage: str, details: dict | None = None) -> None:
         if correlation_id not in self._traces:
@@ -74,20 +78,28 @@ class RuntimeEvaluator:
                 and defn.trigger.timeframe == event_timeframe
             ):
                 self._evaluations.append((defn.strategy_id, event_timeframe))
-                proposal = TradeProposal(
-                    proposal_id=str(uuid.uuid4()),
-                    strategy_id=defn.strategy_id,
-                    producer_kind="strategy",
-                    instrument_id=event.instrument_id,
-                    side="BUY",
-                    quantity=0.0,
-                    price=event.payload.get("close", 0.0),
-                    timeframe=event_timeframe,
-                    close_timestamp=event.occurred_at,
-                    rationale_digest="",
-                    sources=[event.message_id],
-                )
-                proposals.append(proposal)
+
+        if self._producer is not None:
+            proposals = list(self._producer.on_market_event(event) or [])
+
+        if not proposals:
+            for defn in self._definitions.values():
+                if (
+                    defn.trigger.event_type == event.event_type
+                    and defn.trigger.timeframe == event_timeframe
+                ):
+                    proposals.append(TradeProposal(
+                        proposal_id=str(uuid.uuid4()),
+                        strategy_id=defn.strategy_id,
+                        producer_kind="strategy",
+                        instrument_id=event.instrument_id,
+                        side="BUY", quantity=0.0,
+                        price=event.payload.get("close", 0.0),
+                        timeframe=event_timeframe,
+                        close_timestamp=event.occurred_at,
+                        rationale_digest="",
+                        sources=[event.message_id],
+                    ))
 
         self._trace(event.correlation_id, "StrategyEvaluated")
         self._trace(event.correlation_id, "TradeProposalCreated",
