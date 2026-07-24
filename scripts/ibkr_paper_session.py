@@ -9,6 +9,7 @@ Architecture:
 
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -87,26 +88,41 @@ def _bar_type_str(inst_id: str, timeframe: str, price_type: str) -> str:
 
 # ---------- startup summary ----------
 
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+    except Exception:
+        return "?"
+
+
 def _print_qualification_summary():
     reg = get_registry()
     qualified: dict[str, list[str]] = defaultdict(list)
+    total_qf = 0
     for sid in STRATEGY_IDS:
         try:
             r = reg.get(sid)
             for tf, _ in r.qualified_variants:
                 qualified[tf.value].append(sid)
+                total_qf += 1
         except KeyError:
             pass
 
-    print("\n========== TITAN Paper Qualification Summary ==========")
+    print(f"\n========== TITAN Runtime — Paper Session ==========")
+    print(f"  Git SHA:       {_git_sha()}")
+    print(f"  Account:       {ACCOUNT_ID}")
+    print(f"  Instruments:   {', '.join(INSTRUMENT_CONFIG.keys())}")
+    print(f"  Strategies:    {len(STRATEGY_IDS)} registered, {total_qf} qualified variants")
+    print("")
     for tf_name in ("1d", "1h", "15m", "5m"):
         strs = qualified.get(tf_name, [])
         label = {"1d": "Daily", "1h": "1 Hour", "15m": "15 Minute", "5m": "5 Minute"}.get(tf_name, tf_name)
         if strs:
-            print(f"  Qualified  [{label}]: {', '.join(sorted(strs))}")
+            for s in sorted(strs):
+                print(f"  {s:25s} [{label:10s}] QUALIFIED")
         else:
-            print(f"  BLOCKED    [{label}]: (none qualified)")
-    print("========================================================\n")
+            print(f"  {'(none)':25s} [{label:10s}] BLOCKED")
+    print("====================================================\n")
 
 
 # ---------- nautilus strategy (data ingress only) ----------
