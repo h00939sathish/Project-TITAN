@@ -1,6 +1,6 @@
 """Recovery automation — restart from event store, reconcile, transition."""
 
-from typing import Any, Optional
+from typing import Any
 
 from titan._core import (
     EventStore, RiskGate, RiskConfig, PortfolioEngine,
@@ -10,25 +10,21 @@ from titan._core import (
 from titan.execution.simulated_adapter import SimulatedAdapter
 
 
-def recover_from_event_store(store_path: str = ":memory:",
-                              adapter: Optional[Any] = None) -> dict[str, Any]:
+def recover_from_event_store(store_path: str = ":memory:") -> dict:
     """Rebuild system state from event store replay.
 
     Returns a dict with:
         store: EventStore instance
         risk_gate: RiskGate with restored state
         portfolio: PortfolioEngine (empty — full replay is deferred)
-        adapter: SimulatedAdapter or injected adapter
+        adapter: SimulatedAdapter (no persisted state)
         recon_engine: ReconciliationEngine
-        store_was_empty: True if store had no prior state
     """
     store = EventStore(store_path)
-    had_state_before_load = store.count() > 0
     config = RiskConfig.default()
     risk_gate = RiskGate.load_or_default(config, store)
-    was_empty = not had_state_before_load and store.count() == 0
     portfolio = PortfolioEngine("USD", Money("100000", "USD"))
-    adapter = adapter or SimulatedAdapter()
+    adapter = SimulatedAdapter()
     recon_engine = ReconciliationEngine(
         ReconciliationConfig(
             critical_drift_fraction=0.05,
@@ -41,7 +37,6 @@ def recover_from_event_store(store_path: str = ":memory:",
         "portfolio": portfolio,
         "adapter": adapter,
         "recon_engine": recon_engine,
-        "store_was_empty": was_empty,
     }
 
 
@@ -84,24 +79,14 @@ def reconcile_on_boot(portfolio: PortfolioEngine, adapter: Any,
     }
 
 
-def transition_on_boot(recon_result: dict[str, Any], risk_gate: RiskGate,
-                       store_was_empty: bool = False) -> str:
-    """Transition system based on recovery state.
-
-    Rules:
-      - Drift detected -> HALTED (reconciliation required)
-      - Store was empty (state loss) -> remain HALTED (fail-closed)
-      - Clean and store had state -> ACTIVE
-    """
+def transition_on_boot(recon_result: dict[str, Any], risk_gate: RiskGate) -> str:
+    """Transition system to ACTIVE if clean, HALTED if drift or fetch failure."""
     if recon_result.get("snapshot_fetch_failed"):
         risk_gate.set_trading_state(TradingState.Halted)
         return "HALTED (broker truth unavailable)"
     if recon_result["has_drift"]:
         risk_gate.set_trading_state(TradingState.Halted)
         return "HALTED (drift)"
-    if store_was_empty:
-        risk_gate.set_trading_state(TradingState.Halted)
-        return "HALTED (state loss)"
     if risk_gate.trading_state != TradingState.Active:
         risk_gate.set_trading_state(TradingState.Active)
     return "ACTIVE"
