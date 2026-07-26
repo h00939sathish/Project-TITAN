@@ -1,0 +1,675 @@
+"""Full pipeline tests for PaperTradingEngine using SimulatedAdapter."""
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from titan._core import (
+    BrokerPosition,
+    ContractType,
+    Instrument,
+    InstrumentId,
+    Money,
+    PortfolioEngine,
+    ReconciliationConfig,
+    ReconciliationDriftSeverity,
+    RiskConfig,
+    TradeIntent,
+    TradingState,
+)
+from titan.execution import (
+    BrokerBalanceSnapshot,
+    BrokerPositionSnapshot,
+    EngineStatus,
+    PaperConfig,
+    PaperTradingEngine,
+    SimFillQuality,
+    SimulatedAdapter,
+)
+
+
+def _default_config() -> PaperConfig:
+    risk_config = RiskConfig(
+        ["AAPL", "MSFT"],
+        Money("50000", "USD"),
+        1000,
+        5000,
+        Money("100000", "USD"),
+        0.10,
+        Money("5000", "USD"),
+        5000,
+        100,
+    )
+    return PaperConfig(
+        risk_config=risk_config,
+        reconciliation_config=ReconciliationConfig(),
+        currency="USD",
+        starting_capital="100000",
+        account_id="test-1",
+        state_path="",
+    )
+
+
+def _make_intent(instrument="AAPL", side="BUY", quantity="100", price=None) -> TradeIntent:
+    from datetime import datetime, timezone
+    return TradeIntent(
+        "test-strat", "test-pkg", "test-1",
+        instrument, side, quantity, "MARKET", "DAY", "1.0",
+        datetime.now(timezone.utc).isoformat(),
+        price=price,
+    )
+
+
+class _DivergingAdapter(SimulatedAdapter):
+    """An adapter that reports different positions than what was filled."""
+    def positions(self, account_id: str) -> BrokerPositionSnapshot:
+        return BrokerPositionSnapshot(
+            account_id=account_id,
+            positions=[BrokerPosition("MSFT", "LONG", 999)],
+            timestamp="2026-01-01T00:00:00Z",
+        )
+
+    def holdings(self, account_id: str) -> BrokerBalanceSnapshot:
+        return BrokerBalanceSnapshot(
+            account_id=account_id,
+            currency="USD",
+            cash=Money("999999", "USD"),
+            portfolio_value=Money("999999", "USD"),
+            buying_power=Money("999999", "USD"),
+            equity=Money("999999", "USD"),
+            timestamp="2026-01-01T00:00:00Z",
+        )
+
+
+class TestPaperTradingEngineConstruction:
+    def test_engine_creates_with_defaults(self):
+        config = _default_config()
+        adapter = SimulatedAdapter()
+        engine = PaperTradingEngine(config, adapter)
+        assert engine.config.account_id == "test-1"
+
+    def test_engine_starts_without_auth(self):
+        config = _default_config()
+        adapter = SimulatedAdapter()
+        engine = PaperTradingEngine(config, adapter)
+        try:
+            engine.start()
+        except Exception:
+            pass
+
+    def test_engine_status_before_start(self):
+        config = _default_config()
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        status = engine.status()
+        assert isinstance(status, EngineStatus)
+        assert status.cash_balance.amount == "100000"
+
+    def test_engine_config_uses_supplied_instruments(self):
+        config = _default_config()
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        assert "AAPL" in engine.config.risk_config.instrument_eligibility
+        assert "MSFT" in engine.config.risk_config.instrument_eligibility
+
+
+class TestPaperTradingEngineSubmitIntent:
+    def setup_method(self):
+        self.config = _default_config()
+        self.adapter = SimulatedAdapter()
+        self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
+        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+
+    def test_submit_market_buy_fills_immediately(self):
+        result = self.engine.submit_intent(_make_intent())
+        assert result.accepted is True
+        assert result.broker_order_id is not None
+        assert len(result.fills) > 0
+
+    def test_submit_updates_portfolio(self):
+        result = self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="150")
+        )
+        assert result.accepted
+        pos = self.engine.portfolio.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 100
+
+    def test_submit_updates_cash_balance(self):
+        result = self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="50", price="100")
+        )
+        assert result.accepted
+        cash = self.engine.portfolio.get_cash_balance()
+        assert cash.amount == "95000"
+
+    def test_submit_sell_reduces_position(self):
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="100")
+        )
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", side="SELL", quantity="40", price="150")
+        )
+        pos = self.engine.portfolio.get_position("AAPL")
+        assert pos.quantity == 60
+
+    def test_submit_multiple_instruments(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        self.engine.submit_intent(_make_intent(instrument="MSFT", quantity="50", price="400"))
+        aapl = self.engine.portfolio.get_position("AAPL")
+        msft = self.engine.portfolio.get_position("MSFT")
+        assert aapl.quantity == 100
+        assert msft.quantity == 50
+
+    def test_submit_returns_position_and_cash(self):
+        result = self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="75", price="200")
+        )
+        assert result.position is not None
+        assert result.position.quantity == 75
+        assert result.cash_balance is not None
+
+    def test_current_gross_exposure_returns_dollar_value(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        exposure = self.engine._current_gross_exposure()
+        assert exposure.amount == "15000"
+        assert exposure.currency == "USD"
+
+    def test_current_gross_exposure_multi_instrument(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        self.engine.submit_intent(_make_intent(instrument="MSFT", quantity="50", price="400"))
+        exposure = self.engine._current_gross_exposure()
+        assert exposure.amount == "35000"
+        assert exposure.currency == "USD"
+
+    def test_current_gross_exposure_empty_portfolio(self):
+        exposure = self.engine._current_gross_exposure()
+        assert exposure.amount == "0"
+        assert exposure.currency == "USD"
+
+
+class TestPaperTradingEngineRisk:
+    def setup_method(self):
+        self.config = _default_config()
+        self.adapter = SimulatedAdapter()
+        self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
+        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+
+    def test_unknown_instrument_rejected(self):
+        result = self.engine.submit_intent(_make_intent(instrument="GOOGL"))
+        assert result.accepted is False
+        assert result.rejection_reason is not None
+
+    def test_kill_switch_blocks_intents(self):
+        self.engine.trigger_kill_switch()
+        result = self.engine.submit_intent(_make_intent())
+        assert result.accepted is False
+
+    def test_kill_switch_release_allows_intents(self):
+        self.engine.trigger_kill_switch()
+        self.engine.release_kill_switch()
+        result = self.engine.submit_intent(_make_intent())
+        assert result.accepted is True
+
+    def test_rejected_intent_returns_reason(self):
+        result = self.engine.submit_intent(_make_intent(instrument="GOOGL"))
+        assert result.accepted is False
+        assert len(result.rejection_reason) > 0
+
+    def test_rejected_intent_does_not_affect_portfolio(self):
+        self.engine.submit_intent(_make_intent(instrument="GOOGL"))
+        pos = self.engine.portfolio.get_position("GOOGL")
+        assert pos is None
+
+
+class TestPaperTradingEngineReconcile:
+    def setup_method(self):
+        self.config = _default_config()
+        self.adapter = SimulatedAdapter()
+        self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
+        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine.start()
+
+    def test_reconcile_empty_portfolio(self):
+        result = self.engine.reconcile()
+        assert result.severity is not None
+
+    def test_reconcile_after_trades(self):
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="150")
+        )
+        result = self.engine.reconcile()
+        assert result.severity is not None
+
+    def test_reconcile_multiple_positions(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="50", price="100"))
+        self.engine.submit_intent(_make_intent(instrument="MSFT", quantity="30", price="200"))
+        result = self.engine.reconcile()
+        assert result.position_drifts is not None
+
+
+class TestPaperTradingEngineStatus:
+    def setup_method(self):
+        self.config = _default_config()
+        self.adapter = SimulatedAdapter()
+        self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
+        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+
+    def test_status_reports_active_trading_state(self):
+        status = self.engine.status()
+        assert status.trading_state is not None
+
+    def test_status_reports_positions(self):
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="150")
+        )
+        status = self.engine.status()
+        assert len(status.positions) >= 1
+
+    def test_status_reports_cash(self):
+        self.engine.submit_intent(
+            _make_intent(instrument="MSFT", quantity="10", price="400")
+        )
+        status = self.engine.status()
+        assert float(status.cash_balance.amount) < 100000
+
+    def test_status_after_multiple_trades(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        self.engine.submit_intent(_make_intent(instrument="MSFT", quantity="50", price="400"))
+        status = self.engine.status()
+        assert len(status.positions) == 2
+
+    def test_trigger_kill_switch_updates_status(self):
+        self.engine.trigger_kill_switch()
+        status = self.engine.status()
+        assert status.kill_switch is not None
+
+    def test_release_kill_switch_updates_status(self):
+        self.engine.trigger_kill_switch()
+        self.engine.release_kill_switch()
+        status = self.engine.status()
+        assert status.kill_switch is not None
+
+
+class TestPaperTradingEngineFullPipeline:
+    """End-to-end: buy → sell → reconcile, matching the vertical slice test pattern."""
+
+    def setup_method(self):
+        self.config = _default_config()
+        self.adapter = SimulatedAdapter()
+        self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
+        self.engine = PaperTradingEngine(self.config, self.adapter)
+
+    def test_full_buy_sell_reconcile_cycle(self):
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+
+        buy_result = self.engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="150")
+        )
+        assert buy_result.accepted
+
+        sell_result = self.engine.submit_intent(
+            _make_intent(instrument="AAPL", side="SELL", quantity="50", price="160")
+        )
+        assert sell_result.accepted
+
+        pos = self.engine.portfolio.get_position("AAPL")
+        assert pos.quantity == 50
+
+        result = self.engine.reconcile()
+        assert result.severity == ReconciliationDriftSeverity.InSync
+        assert all(d.quantity_drift == 0 for d in result.position_drifts)
+
+    def test_critical_drift_triggers_kill_switch(self):
+        """Diverging adapter data triggers critical drift and kill switch."""
+        config = _default_config()
+        adapter = _DivergingAdapter()
+        engine = PaperTradingEngine(config, adapter)
+        engine.start()
+        for sym in ("AAPL", "MSFT"):
+            engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        result = engine.reconcile()
+        assert result.severity == ReconciliationDriftSeverity.Critical
+        assert engine.risk_gate.kill_switch.blocks_routing()
+
+    def test_multiple_buys_accumulate(self):
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="50", price="100"))
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="50", price="150"))
+        pos = self.engine.portfolio.get_position("AAPL")
+        assert pos.quantity == 100
+
+    def test_full_sell_closes_position(self):
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", side="SELL", quantity="100", price="160")
+        )
+        pos = self.engine.portfolio.get_position("AAPL")
+        assert pos is None or pos.quantity == 0
+
+    def test_status_after_full_cycle(self):
+        self.engine.start()
+        for sym in ("AAPL", "MSFT"):
+            self.engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        self.engine.submit_intent(
+            _make_intent(instrument="AAPL", side="SELL", quantity="50", price="160")
+        )
+        status = self.engine.status()
+        assert len(status.positions) > 0 or float(status.cash_balance.amount) > 0
+
+    def test_reconcile_with_no_trades(self):
+        self.engine.start()
+        result = self.engine.reconcile()
+        assert len(result.position_drifts) == 0
+
+
+class TestPaperTradingEngineStatePersistence:
+    def test_save_and_load_state(self, tmp_path):
+        state_file = tmp_path / "state.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        engine.submit_intent(
+            _make_intent(instrument="AAPL", quantity="100", price="150")
+        )
+
+        cash_before = engine.portfolio.get_cash_balance().amount
+        pos_before = engine.portfolio.get_position("AAPL")
+        assert pos_before is not None
+        assert pos_before.quantity == 100
+
+        engine2 = PaperTradingEngine(config, SimulatedAdapter())
+        engine2.start(sync_from_broker=False)
+        engine2.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        assert engine2.portfolio.get_cash_balance().amount == cash_before
+        pos_after = engine2.portfolio.get_position("AAPL")
+        assert pos_after is not None
+        assert pos_after.quantity == 100
+
+    def test_load_non_existent_state_uses_starting_capital(self, tmp_path):
+        state_file = tmp_path / "nonexistent.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start(sync_from_broker=False)
+        assert engine.portfolio.get_cash_balance().amount == "100000"
+        assert engine.portfolio.get_position("AAPL") is None
+
+    def test_save_after_submit_intent_persists(self, tmp_path):
+        state_file = tmp_path / "state2.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("MSFT", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        engine.submit_intent(
+            _make_intent(instrument="MSFT", quantity="50", price="400")
+        )
+
+        loaded = json.loads(state_file.read_text())
+        assert loaded["portfolio"]["cash"]["amount"] is not None
+        assert "MSFT" in loaded["portfolio"]["positions"]
+        assert loaded["portfolio"]["positions"]["MSFT"]["quantity"] == 50
+
+    def test_save_and_load_with_multiple_instruments(self, tmp_path):
+        state_file = tmp_path / "state3.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        for sym in ("AAPL", "MSFT"):
+            engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+        engine.submit_intent(_make_intent(instrument="MSFT", quantity="50", price="400"))
+
+        engine2 = PaperTradingEngine(config, SimulatedAdapter())
+        engine2.start(sync_from_broker=False)
+        for sym in ("AAPL", "MSFT"):
+            engine2.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+        assert engine2.portfolio.get_position("AAPL").quantity == 100
+        assert engine2.portfolio.get_position("MSFT").quantity == 50
+        assert float(engine2.portfolio.get_cash_balance().amount) < 100000
+
+    def test_empty_state_path_skips_persistence(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        config = _default_config()
+        config.state_path = ""
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        engine.submit_intent(_make_intent(instrument="AAPL", quantity="10", price="100"))
+        assert engine.portfolio.get_position("AAPL").quantity == 10
+        assert not Path(".titan_state.json").exists()
+
+    def test_corrupt_order_count_triggers_kill_switch(self, tmp_path):
+        """Corrupt order_count in persisted state must halt routing on restart."""
+        from titan.execution.alpaca_adapter import AlpacaAdapter
+
+        state_file = tmp_path / "state.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
+        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
+            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
+                client = MagicMock()
+                mock_order = MagicMock()
+                mock_order.id = "order-1"
+                client.submit_order.return_value = mock_order
+                mock_tc.return_value = client
+
+                engine = PaperTradingEngine(config, adapter)
+                engine.start()
+                engine.register_instrument(
+                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+                )
+
+                intent = TradeIntent(
+                    strategy_id="test", strategy_package_digest="",
+                    account_id="paper-1", instrument_id="AAPL", side="BUY",
+                    quantity="10", order_type="MARKET", time_in_force="DAY",
+                    risk_profile_version="1.0",
+                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                for _ in range(3):
+                    result = engine.submit_intent(intent)
+                    assert result.accepted
+
+        assert state_file.exists()
+        saved = json.loads(state_file.read_text())
+        assert "order_count" in saved
+        assert not engine.risk_gate.kill_switch.blocks_routing()
+
+        # Corrupt the order_count value
+        saved["order_count"] = "corrupted_string_not_a_dict"
+        state_file.write_text(json.dumps(saved, indent=2))
+
+        adapter2 = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
+        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
+            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc2:
+                client2 = MagicMock()
+                mock_tc2.return_value = client2
+
+                engine2 = PaperTradingEngine(config, adapter2)
+                engine2.start()
+                engine2.register_instrument(
+                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+                )
+
+                assert engine2.risk_gate.kill_switch.blocks_routing(), \
+                    "Corrupt order_count must trigger kill switch"
+
+                intent2 = TradeIntent(
+                    strategy_id="test", strategy_package_digest="",
+                    account_id="paper-1", instrument_id="AAPL", side="BUY",
+                    quantity="1", order_type="MARKET", time_in_force="DAY",
+                    risk_profile_version="1.0",
+                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                result2 = engine2.submit_intent(intent2)
+                assert not result2.accepted
+                assert "Kill switch" in result2.rejection_reason or "blocking" in result2.rejection_reason
+
+    def test_truncated_state_file_triggers_kill_switch(self, tmp_path):
+        """Truncated/corrupt state file must halt routing on restart, not silently reset."""
+        from titan.execution.alpaca_adapter import AlpacaAdapter
+
+        state_file = tmp_path / "state.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
+        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
+            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
+                client = MagicMock()
+                mock_order = MagicMock()
+                mock_order.id = "order-1"
+                client.submit_order.return_value = mock_order
+                mock_tc.return_value = client
+
+                engine = PaperTradingEngine(config, adapter)
+                engine.start()
+                engine.register_instrument(
+                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+                )
+
+                intent = TradeIntent(
+                    strategy_id="test", strategy_package_digest="",
+                    account_id="paper-1", instrument_id="AAPL", side="BUY",
+                    quantity="10", order_type="MARKET", time_in_force="DAY",
+                    risk_profile_version="1.0",
+                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                result = engine.submit_intent(intent)
+                assert result.accepted
+
+        assert state_file.exists()
+
+        # Truncate the state file — incomplete JSON
+        state_file.write_text('{"portfolio": {"cash": {"amount": "9')
+
+        adapter2 = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
+        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
+            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc2:
+                mock_tc2.return_value = MagicMock()
+
+                engine2 = PaperTradingEngine(config, adapter2)
+                engine2.start()
+                engine2.register_instrument(
+                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+                )
+
+                assert engine2.risk_gate.kill_switch.blocks_routing(), \
+                    "Truncated state file must trigger kill switch"
+
+                intent2 = TradeIntent(
+                    strategy_id="test", strategy_package_digest="",
+                    account_id="paper-1", instrument_id="AAPL", side="BUY",
+                    quantity="1", order_type="MARKET", time_in_force="DAY",
+                    risk_profile_version="1.0",
+                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                result2 = engine2.submit_intent(intent2)
+                assert not result2.accepted
+
+    def test_garbage_state_file_triggers_kill_switch(self, tmp_path):
+        """Garbage (non-JSON) state file must halt routing on restart."""
+        from titan.execution.alpaca_adapter import AlpacaAdapter
+
+        state_file = tmp_path / "state.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        # Write garbage right away — no prior session needed
+        state_file.write_text("this is not json {{{")
+
+        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
+        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
+            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
+                mock_tc.return_value = MagicMock()
+
+                engine = PaperTradingEngine(config, adapter)
+                engine.start()
+
+                assert engine.risk_gate.kill_switch.blocks_routing(), \
+                    "Garbage state file must trigger kill switch"
+
+    def test_restart_restores_order_state(self, tmp_path):
+        """Order state machines must be correctly reconstructed from EventStore on restart."""
+        state_file = tmp_path / "state.json"
+        config = _default_config()
+        config.state_path = str(state_file)
+
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        result = engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
+
+        orig_states = {oid: sm.current for oid, sm in engine.order_states.items()}
+
+        engine._event_store.close()
+
+        engine2 = PaperTradingEngine(config, SimulatedAdapter())
+        engine2.start(sync_from_broker=False)
+        engine2.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+
+        assert len(engine2.order_states) == len(orig_states)
+        for oid, expected in orig_states.items():
+            assert oid in engine2.order_states
+            assert engine2.order_states[oid].current == expected, \
+                f"Order {oid}: expected {expected}, got {engine2.order_states[oid].current}"

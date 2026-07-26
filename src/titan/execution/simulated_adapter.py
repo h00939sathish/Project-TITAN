@@ -68,7 +68,7 @@ class SimulatedAdapter(BrokerAdapter):
         return AdapterHealth(connected=True, session_state=AdapterSessionState.CONNECTED)
 
     def place_order(self, intent: ApprovedOrderIntent) -> BrokerOrderAcknowledgement:
-        price = str(intent.price.amount) if intent.price else "0"
+        price = str(getattr(intent.price, 'amount', intent.price)) if intent.price else "0"
         order = self.submit_order(
             order_id=str(intent.client_order_id) if intent.client_order_id else str(uuid.uuid4()),
             instrument_id=str(intent.instrument_id),
