@@ -54,6 +54,10 @@ gate.trigger_kill_switch()
 2. Create BrokerPosition with intentional drift.
 3. Run ReconciliationEngine.compare() — verify drift detected.
 
+## Reconciliation readiness gate
+
+Before enabling a paper strategy, record a successful reconciliation whose position and cash snapshots come from the configured adapter. A missing or failed snapshot is a HALTED condition; do not replace it with portfolio state.
+
 ## Restarting a session
 
 ```bash

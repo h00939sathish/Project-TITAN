@@ -39,6 +39,7 @@ An ORR is required before transitioning from paper operation to any scope decisi
 ## Recovery
 
 - [ ] Restart: load state from event store, reconcile with broker, transition to ACTIVE only on clean reconciliation.
+- [ ] Adapter truth check: an executed simulated fill reconciles InSync; a snapshot fetch failure and critical divergence both leave routing HALTED.
 - [ ] Event store loss: restore from backup, replay, reconcile.
 - [ ] Broker disconnect: detect, halt routing, reconcile on reconnect, resume within drift threshold.
 - [ ] Reconciliation drift: critical drift halts; warning drift alerts.

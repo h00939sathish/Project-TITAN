@@ -40,6 +40,7 @@ A broker adapter is the boundary between TITAN's deterministic core and an exter
 - Adapter contract tests: every method returns expected types for valid and invalid inputs.
 - Sandbox tests: authentication expiry, heartbeat, reconnect, rate-limit, partial-fill, restart, reconciliation.
 - 14-day paper session with daily reconciliation review and incident log.
+- Reconciliation readiness gate: before enabling a paper strategy, the adapter must produce a successful reconciliation; a snapshot fetch failure is a HALTED condition.
 - No live capital until the Phase F2 gate and a subsequent ADR.
 
 ## Approval
