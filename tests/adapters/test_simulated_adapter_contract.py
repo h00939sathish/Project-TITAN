@@ -1,8 +1,6 @@
 """Contract tests for the SimulatedAdapter — proves it meets Broker.spec.md requirements."""
 
-import pytest
 from titan.execution.simulated_adapter import SimulatedAdapter, SimFillQuality
-from titan.execution._broker_types import AdapterError
 
 
 class TestSimulatedAdapterContract:
@@ -34,8 +32,8 @@ class TestSimulatedAdapterContract:
 
     def test_timeout_simulated(self):
         self.adapter.set_default_fill_quality(SimFillQuality.TIMEOUT)
-        with pytest.raises(AdapterError, match="timeout"):
-            self.adapter.submit_order("ord-4", "AAPL", "buy", 100, "150.00")
+        order = self.adapter.submit_order("ord-4", "AAPL", "buy", 100, "150.00")
+        assert order.status == "pending"
 
     def test_never_fill(self):
         self.adapter.set_default_fill_quality(SimFillQuality.NEVER_FILL)

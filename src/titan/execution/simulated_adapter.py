@@ -11,7 +11,6 @@ from titan._core import ApprovedOrderIntent, BrokerPosition, Money
 
 from ._broker_adapter import BrokerAdapter
 from ._broker_types import (
-    AdapterError,
     AdapterHealth,
     AdapterSessionState,
     BrokerBalanceSnapshot,
@@ -69,7 +68,7 @@ class SimulatedAdapter(BrokerAdapter):
         return AdapterHealth(connected=True, session_state=AdapterSessionState.CONNECTED)
 
     def place_order(self, intent: ApprovedOrderIntent) -> BrokerOrderAcknowledgement:
-        price = str(intent.price) if intent.price else "0"
+        price = str(intent.price.amount) if intent.price else "0"
         order = self.submit_order(
             order_id=str(intent.client_order_id) if intent.client_order_id else str(uuid.uuid4()),
             instrument_id=str(intent.instrument_id),
@@ -161,10 +160,7 @@ class SimulatedAdapter(BrokerAdapter):
         elif quality == SimFillQuality.PARTIAL_THEN_FULL:
             self._apply_fill(state, quantity // 2)
         elif quality == SimFillQuality.TIMEOUT:
-            raise AdapterError(
-                f"Simulated timeout submitting order {order_id} after 5000ms",
-                "timeout",
-            )
+            state.status = "pending"
 
         self._orders[order_id] = state
         return state
