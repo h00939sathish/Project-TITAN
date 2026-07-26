@@ -457,23 +457,6 @@ impl RiskGate {
             }
         }
 
-        // l. Correlation check
-        if let Some(scores) = correlation_scores {
-            if !scores.is_empty() {
-                let mean_corr: f64 = scores.iter().sum::<f64>() / (scores.len() as f64);
-                if mean_corr > self.config.max_correlated_exposure {
-                    return RiskVerdict {
-                        accepted: false,
-                        reason: Some(RiskReasonCode::CorrelatedExposureExceeded),
-                        reason_detail: format!(
-                            "Mean correlation {:.2} exceeds max {}",
-                            mean_corr, self.config.max_correlated_exposure
-                        ),
-                    };
-                }
-            }
-        }
-
         RiskVerdict {
             accepted: true,
             reason: None,
