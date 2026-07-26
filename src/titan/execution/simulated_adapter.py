@@ -1,7 +1,26 @@
 """Simulated broker adapter for deterministic paper trading."""
 
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
+from typing import Any
+
+from titan._core import ApprovedOrderIntent, BrokerPosition, Money
+
+from ._broker_adapter import BrokerAdapter
+from ._broker_types import (
+    AdapterError,
+    AdapterHealth,
+    AdapterSessionState,
+    BrokerBalanceSnapshot,
+    BrokerOrderAcknowledgement,
+    BrokerOrderId,
+    BrokerPositionSnapshot,
+    CancellationAcknowledgement,
+    Session,
+)
 
 
 class SimFillQuality(Enum):
@@ -23,29 +42,102 @@ class SimOrderState:
     price: str
     status: str
     filled_quantity: int = 0
-    fills: list = None
-
-    def __post_init__(self):
-        self.fills = self.fills or []
+    fills: list[Any] = field(default_factory=list)
 
 
-class SimulatedAdapter:
+class SimulatedAdapter(BrokerAdapter):
     """A deterministic simulated broker adapter for paper trading.
 
     Never connects to an external system. Controlled entirely by test code
     via `set_fill_quality()` and `tick()`.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._orders: dict[str, SimOrderState] = {}
         self._fill_quality: dict[str, SimFillQuality] = {}
         self._default_fill_quality = SimFillQuality.IMMEDIATE_FULL
         self._current_time = "2026-01-01T00:00:00Z"
 
-    def set_default_fill_quality(self, quality: SimFillQuality):
+    def authenticate(self) -> Session:
+        return Session(
+            session_id=str(uuid.uuid4()),
+            state=AdapterSessionState.CONNECTED,
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def heartbeat(self) -> AdapterHealth:
+        return AdapterHealth(connected=True, session_state=AdapterSessionState.CONNECTED)
+
+    def place_order(self, intent: ApprovedOrderIntent) -> BrokerOrderAcknowledgement:
+        price = str(intent.price) if intent.price else "0"
+        order = self.submit_order(
+            order_id=str(intent.client_order_id) if intent.client_order_id else str(uuid.uuid4()),
+            instrument_id=str(intent.instrument_id),
+            side=str(intent.side).lower(),
+            quantity=int(str(intent.quantity)),
+            price=price,
+        )
+        return BrokerOrderAcknowledgement(
+            accepted=order.status != "rejected",
+            broker_order_id=BrokerOrderId(id=order.order_id),
+            rejection_reason="Simulated rejection" if order.status == "rejected" else None,
+            fill_price=price if order.status == "filled" else None,
+            fill_quantity=str(order.filled_quantity) if order.filled_quantity > 0 else None,
+            order_status=order.status,
+        )
+
+    def positions(self, account_id: str) -> BrokerPositionSnapshot:
+        net: dict[str, int] = {}
+        for o in self._orders.values():
+            if o.filled_quantity <= 0:
+                continue
+            qty = o.filled_quantity if o.side == "buy" else -o.filled_quantity
+            net[o.instrument_id] = net.get(o.instrument_id, 0) + qty
+        positions = [
+            BrokerPosition(
+                instrument_id=inst,
+                side="LONG" if qty > 0 else "SHORT",
+                quantity=abs(qty),
+            )
+            for inst, qty in net.items()
+            if qty != 0
+        ]
+        return BrokerPositionSnapshot(
+            account_id=account_id,
+            positions=positions,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def holdings(self, account_id: str) -> BrokerBalanceSnapshot:
+        cash = Decimal("100000")
+        for o in self._orders.values():
+            if o.filled_quantity <= 0:
+                continue
+            price = Decimal(str(o.price))
+            total = price * o.filled_quantity
+            if o.side == "buy":
+                cash -= total
+            else:
+                cash += total
+        cash_money = Money(str(cash), "USD")
+        return BrokerBalanceSnapshot(
+            account_id=account_id,
+            currency="USD",
+            cash=cash_money,
+            portfolio_value=cash_money,
+            buying_power=cash_money,
+            equity=cash_money,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def cancel(self, order_id: BrokerOrderId) -> CancellationAcknowledgement:
+        success = self.cancel_order(order_id.id)
+        return CancellationAcknowledgement(accepted=success, broker_order_id=order_id)
+
+    def set_default_fill_quality(self, quality: SimFillQuality) -> None:
         self._default_fill_quality = quality
 
-    def set_fill_quality(self, order_id: str, quality: SimFillQuality):
+    def set_fill_quality(self, order_id: str, quality: SimFillQuality) -> None:
         self._fill_quality[order_id] = quality
 
     def submit_order(self, order_id: str, instrument_id: str, side: str,
@@ -69,9 +161,10 @@ class SimulatedAdapter:
         elif quality == SimFillQuality.PARTIAL_THEN_FULL:
             self._apply_fill(state, quantity // 2)
         elif quality == SimFillQuality.TIMEOUT:
-            state.status = "pending"
-        elif quality == SimFillQuality.NEVER_FILL:
-            state.status = "pending"
+            raise AdapterError(
+                f"Simulated timeout submitting order {order_id} after 5000ms",
+                "timeout",
+            )
 
         self._orders[order_id] = state
         return state
@@ -102,7 +195,7 @@ class SimulatedAdapter:
             return True
         return False
 
-    def _apply_fill(self, state: SimOrderState, quantity: int):
+    def _apply_fill(self, state: SimOrderState, quantity: int) -> None:
         state.filled_quantity += quantity
         fill_price = float(state.price) if state.price else 0.0
         state.fills.append({
@@ -122,3 +215,9 @@ class SimulatedAdapter:
     @property
     def filled_orders(self) -> list[SimOrderState]:
         return [o for o in self._orders.values() if o.status == "filled"]
+
+    def save_order_count_state(self) -> dict:
+        return {}
+
+    def restore_order_count_state(self, state: dict) -> None:
+        pass

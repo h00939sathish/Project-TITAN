@@ -1,6 +1,8 @@
 """Contract tests for the SimulatedAdapter — proves it meets Broker.spec.md requirements."""
 
+import pytest
 from titan.execution.simulated_adapter import SimulatedAdapter, SimFillQuality
+from titan.execution._broker_types import AdapterError
 
 
 class TestSimulatedAdapterContract:
@@ -32,8 +34,8 @@ class TestSimulatedAdapterContract:
 
     def test_timeout_simulated(self):
         self.adapter.set_default_fill_quality(SimFillQuality.TIMEOUT)
-        order = self.adapter.submit_order("ord-4", "AAPL", "buy", 100, "150.00")
-        assert order.status == "pending"
+        with pytest.raises(AdapterError, match="timeout"):
+            self.adapter.submit_order("ord-4", "AAPL", "buy", 100, "150.00")
 
     def test_never_fill(self):
         self.adapter.set_default_fill_quality(SimFillQuality.NEVER_FILL)
@@ -79,3 +81,14 @@ class TestSimulatedAdapterContract:
         self.adapter.tick("m2")
         assert self.adapter.get_order("m1").status == "filled"
         assert self.adapter.get_order("m2").status == "filled"
+
+    def test_snapshots_reflect_filled_buy_and_sell(self):
+        self.adapter.submit_order("buy-1", "AAPL", "buy", 100, "150.00")
+        self.adapter.submit_order("sell-1", "AAPL", "sell", 40, "155.00")
+        positions = self.adapter.positions("paper-1").positions
+        balance = self.adapter.holdings("paper-1")
+        assert len(positions) == 1
+        assert positions[0].instrument_id == "AAPL"
+        assert str(positions[0].side).upper() == "LONG"
+        assert positions[0].quantity == 60
+        assert balance.cash.amount == "91200.00"
