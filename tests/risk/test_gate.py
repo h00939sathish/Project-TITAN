@@ -14,9 +14,11 @@ from titan._core import (
 
 
 def make_intent(instrument="AAPL", side="BUY", quantity="100", price="150") -> TradeIntent:
+    from datetime import datetime, timezone
     return TradeIntent(
         "strat-v1", "abc123", "acct-1", instrument,
         side, quantity, "LIMIT", "DAY", "1.0",
+        datetime.now(timezone.utc).isoformat(),
         price=price,
     )
 
@@ -24,7 +26,7 @@ def make_intent(instrument="AAPL", side="BUY", quantity="100", price="150") -> T
 def make_default_gate() -> RiskGate:
     config = RiskConfig(
         [], Money("1000000", "USD"), 10000, 50000,
-        Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000,
+        Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100,
     )
     return RiskGate(config)
 
@@ -32,21 +34,21 @@ def make_default_gate() -> RiskGate:
 class TestRiskGate:
     def test_accepts_valid_intent(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert verdict.accepted
         assert verdict.reason is None
 
     def test_rejects_when_kill_switch_triggered(self):
         gate = make_default_gate()
         gate.trigger_kill_switch()
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.KillSwitchTriggered
 
     def test_rejects_when_trading_halted(self):
         gate = make_default_gate()
         gate.set_trading_state(TradingState.Halted)
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.TradingHalted
 
@@ -54,10 +56,10 @@ class TestRiskGate:
         gate = RiskGate(
             RiskConfig(
                 ["MSFT"], Money("1000000", "USD"), 10000, 50000,
-                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000,
+                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100,
             )
         )
-        verdict = gate.evaluate(make_intent(instrument="AAPL"), None, None, None, None)
+        verdict = gate.evaluate(make_intent(instrument="AAPL"), None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.InstrumentNotEligible
 
@@ -65,10 +67,10 @@ class TestRiskGate:
         gate = RiskGate(
             RiskConfig(
                 [], Money("100", "USD"), 10000, 50000,
-                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000,
+                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100,
             )
         )
-        verdict = gate.evaluate(make_intent(quantity="10", price="50"), None, None, None, None)
+        verdict = gate.evaluate(make_intent(quantity="10", price="50"), None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.OrderNotionalExceeded
 
@@ -76,34 +78,40 @@ class TestRiskGate:
         gate = RiskGate(
             RiskConfig(
                 [], Money("1000000", "USD"), 10, 50000,
-                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000,
+                Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100,
             )
         )
-        verdict = gate.evaluate(make_intent(quantity="100"), None, None, None, None)
+        verdict = gate.evaluate(make_intent(quantity="100"), None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.OrderQuantityExceeded
 
     def test_rejects_position_size_exceeded(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), 60000, None, None, None)
+        verdict = gate.evaluate(make_intent(), 60000, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.PositionLimitExceeded
 
     def test_rejects_gross_exposure_exceeded(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), None, Money("20000000", "USD"), None, None)
+        verdict = gate.evaluate(make_intent(), None, Money("20000000", "USD"), None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.GrossExposureExceeded
 
     def test_rejects_drawdown_exceeded(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), None, None, 0.50, None)
+        verdict = gate.evaluate(make_intent(), None, None, 0.50, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.DrawdownExceeded
 
     def test_rejects_daily_loss_exceeded(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), None, None, None, Money("100000", "USD"))
+        verdict = gate.evaluate(make_intent(), None, None, None, Money("100000", "USD"), None)
+        assert not verdict.accepted
+        assert verdict.reason == RiskReasonCode.DailyLossExceeded
+
+    def test_rejects_negative_daily_loss(self):
+        gate = make_default_gate()
+        verdict = gate.evaluate(make_intent(), None, None, None, Money("-80000", "USD"), None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.DailyLossExceeded
 
@@ -116,7 +124,7 @@ class TestRiskGate:
         assert gate.kill_switch == KillSwitchState.Releasing
         gate.release_completed()
         assert gate.kill_switch == KillSwitchState.Released
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert verdict.accepted
 
     def test_trading_state_lifecycle(self):
@@ -129,13 +137,13 @@ class TestRiskGate:
 
     def test_portfolio_checks_skipped_when_none(self):
         gate = make_default_gate()
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert verdict.accepted
 
     def test_risk_verdict_has_correct_fields(self):
         gate = make_default_gate()
         gate.trigger_kill_switch()
-        verdict = gate.evaluate(make_intent(), None, None, None, None)
+        verdict = gate.evaluate(make_intent(), None, None, None, None, None)
         assert hasattr(verdict, "accepted")
         assert hasattr(verdict, "reason")
         assert hasattr(verdict, "reason_detail")
@@ -148,11 +156,14 @@ class TestRiskGate:
         portfolio = PortfolioEngine("USD", Money("100000", "USD"))
         portfolio.apply_fill("AAPL", "buy", 100, Money("150", "USD"))
         snapshot = portfolio.get_snapshot()
+        pos = portfolio.get_position("AAPL")
+        pos_side = str(pos.side) if pos is not None else None
         verdict = gate.evaluate(
             make_intent(quantity="50", price="160"),
             snapshot.position_size,
             snapshot.gross_exposure,
             snapshot.drawdown_fraction,
             snapshot.daily_realized_loss,
+            pos_side,
         )
         assert verdict.accepted

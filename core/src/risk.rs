@@ -1,9 +1,11 @@
+use std::str::FromStr;
 use crate::event_store;
 use crate::messages::{EventEnvelope, RiskStateSnapshot, TradeIntent};
 use crate::types::Money;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -127,12 +129,22 @@ pub struct RiskConfig {
     pub max_daily_loss: Money,
     #[pyo3(get, set)]
     pub data_freshness_threshold_ms: u64,
+    #[pyo3(get, set)]
+    pub clock_skew_tolerance_ms: u64,
+    #[pyo3(get, set)]
+    pub max_correlated_exposure: f64,
 }
 
 #[pymethods]
 impl RiskConfig {
     #[new]
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        instrument_eligibility, max_order_notional, max_order_quantity, max_position_size,
+        max_gross_exposure, max_drawdown_fraction, max_daily_loss,
+        data_freshness_threshold_ms, clock_skew_tolerance_ms,
+        max_correlated_exposure = 0.70,
+    ))]
     pub fn new(
         instrument_eligibility: Vec<String>,
         max_order_notional: Money,
@@ -142,6 +154,8 @@ impl RiskConfig {
         max_drawdown_fraction: f64,
         max_daily_loss: Money,
         data_freshness_threshold_ms: u64,
+        clock_skew_tolerance_ms: u64,
+        max_correlated_exposure: f64,
     ) -> Self {
         Self {
             instrument_eligibility,
@@ -152,33 +166,32 @@ impl RiskConfig {
             max_drawdown_fraction,
             max_daily_loss,
             data_freshness_threshold_ms,
+            clock_skew_tolerance_ms,
+            max_correlated_exposure,
         }
     }
 
     #[staticmethod]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
-        Self::default_impl()
-    }
-}
-
-impl RiskConfig {
-    fn default_impl() -> Self {
-        Self {
-            instrument_eligibility: Vec::new(),
-            max_order_notional: Money::new("1000000", "USD"),
-            max_order_quantity: 10_000,
-            max_position_size: 50_000,
-            max_gross_exposure: Money::new("10000000", "USD"),
-            max_drawdown_fraction: 0.10,
-            max_daily_loss: Money::new("50000", "USD"),
-            data_freshness_threshold_ms: 5_000,
-        }
+        <RiskConfig as Default>::default()
     }
 }
 
 impl Default for RiskConfig {
     fn default() -> Self {
-        Self::default_impl()
+        Self {
+            instrument_eligibility: Vec::new(),
+            max_order_notional: Money::new("1000000", "USD"),
+            max_order_quantity: 5_000,
+            max_position_size: 50_000,
+            max_gross_exposure: Money::new("10000000", "USD"),
+            max_drawdown_fraction: 0.10,
+            max_daily_loss: Money::new("50000", "USD"),
+            data_freshness_threshold_ms: 5_000,
+            clock_skew_tolerance_ms: 100,
+            max_correlated_exposure: 0.70,
+        }
     }
 }
 
@@ -187,7 +200,6 @@ impl Default for RiskConfig {
 #[pyclass(eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum RiskReasonCode {
-    NotRoutable,
     InstrumentNotEligible,
     DataStale,
     OrderNotionalExceeded,
@@ -199,6 +211,9 @@ pub enum RiskReasonCode {
     TradingHalted,
     KillSwitchTriggered,
     InternalError,
+    SellExceedsPosition,
+    BuyExceedsShortPosition,
+    CorrelatedExposureExceeded,
 }
 
 #[pymethods]
@@ -250,6 +265,11 @@ impl RiskGate {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        intent, current_position_size=None, current_gross_exposure=None,
+        current_drawdown=None, current_daily_loss=None, current_position_side=None,
+        correlation_scores=None,
+    ))]
     pub fn evaluate(
         &self,
         intent: &TradeIntent,
@@ -257,6 +277,8 @@ impl RiskGate {
         current_gross_exposure: Option<&Money>,
         current_drawdown: Option<f64>,
         current_daily_loss: Option<&Money>,
+        current_position_side: Option<String>,
+        correlation_scores: Option<Vec<f64>>,
     ) -> RiskVerdict {
         // a. Kill switch check
         if self.kill_switch.blocks_routing() {
@@ -276,7 +298,33 @@ impl RiskGate {
             };
         }
 
-        // c. Instrument eligibility
+        // c. Data freshness / clock drift check
+        let threshold_ms = self.config.data_freshness_threshold_ms as i64
+            + self.config.clock_skew_tolerance_ms as i64;
+        if let Ok(market_ts) = intent.market_data_timestamp.parse::<DateTime<Utc>>() {
+            let drift = (Utc::now() - market_ts).num_milliseconds().abs();
+            if drift > threshold_ms {
+                return RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::DataStale),
+                    reason_detail: format!(
+                        "Market data timestamp {} is {}ms from system clock (threshold: {}ms)",
+                        intent.market_data_timestamp, drift, threshold_ms,
+                    ),
+                };
+            }
+        } else {
+            return RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::DataStale),
+                reason_detail: format!(
+                    "Market data timestamp '{}' is not a valid RFC 3339 timestamp",
+                    intent.market_data_timestamp,
+                ),
+            };
+        }
+
+        // d. Instrument eligibility
         if !self.config.instrument_eligibility.is_empty()
             && !self.config.instrument_eligibility.contains(&intent.instrument_id)
         {
@@ -287,34 +335,42 @@ impl RiskGate {
             };
         }
 
-        // d. Order limits — notional
-        let qty: i64 = intent.quantity.parse().unwrap_or(0);
-        let px: i64 = intent
-            .price
-            .as_ref()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(0);
-        let notional = qty * px;
-        let max_notional: i64 = self.config.max_order_notional.amount.parse().unwrap_or(0);
-        if notional > max_notional {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::OrderNotionalExceeded),
-                reason_detail: format!("Order notional {} exceeds max {}", notional, max_notional),
-            };
-        }
+        // e. Order limits — notional
+        let qty = match (
+            Decimal::from_str(&intent.quantity),
+            intent.price.as_ref().map(|p| Decimal::from_str(p)).transpose(),
+        ) {
+            (Ok(q), Ok(Some(p))) => {
+                let notional = q * p;
+                if notional > self.config.max_order_notional.amount {
+                    return RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::OrderNotionalExceeded),
+                        reason_detail: format!("Order notional {} exceeds max {}", notional, self.config.max_order_notional.amount),
+                    };
+                }
+                q
+            }
+            (Ok(q), Ok(None)) => q,
+            _ => {
+                return RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::InternalError),
+                    reason_detail: "Invalid decimal in intent quantity or price".to_string(),
+                };
+            }
+        };
 
-        // e. Order limits — quantity
-        let qi: u64 = intent.quantity.parse().unwrap_or(0);
-        if qi > self.config.max_order_quantity {
+        // f. Order limits — quantity
+        if qty > Decimal::from(self.config.max_order_quantity) {
             return RiskVerdict {
                 accepted: false,
                 reason: Some(RiskReasonCode::OrderQuantityExceeded),
-                reason_detail: format!("Order quantity {} exceeds max {}", qi, self.config.max_order_quantity),
+                reason_detail: format!("Order quantity {} exceeds max {}", qty, self.config.max_order_quantity),
             };
         }
 
-        // f. Position/exposure limits
+        // g. Position/exposure limits
         if let Some(pos) = current_position_size
             && pos > self.config.max_position_size
         {
@@ -325,20 +381,18 @@ impl RiskGate {
             };
         }
 
-        // g. Gross exposure check
-        if let Some(exp) = current_gross_exposure {
-            let exp_amt: i64 = exp.amount.parse().unwrap_or(0);
-            let max_exp: i64 = self.config.max_gross_exposure.amount.parse().unwrap_or(0);
-            if exp_amt > max_exp {
-                return RiskVerdict {
-                    accepted: false,
-                    reason: Some(RiskReasonCode::GrossExposureExceeded),
-                    reason_detail: format!("Gross exposure {} exceeds max {}", exp_amt, max_exp),
-                };
-            }
+        // h. Gross exposure check
+        if let Some(exp) = current_gross_exposure
+            && exp.amount > self.config.max_gross_exposure.amount
+        {
+            return RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::GrossExposureExceeded),
+                reason_detail: format!("Gross exposure {} exceeds max {}", exp.amount, self.config.max_gross_exposure.amount),
+            };
         }
 
-        // h. Drawdown check
+        // i. Drawdown check
         if let Some(dd) = current_drawdown
             && dd > self.config.max_drawdown_fraction
         {
@@ -349,16 +403,74 @@ impl RiskGate {
             };
         }
 
-        // i. Daily loss check
-        if let Some(dl) = current_daily_loss {
-            let dl_amt: i64 = dl.amount.parse().unwrap_or(0);
-            let max_dl: i64 = self.config.max_daily_loss.amount.parse().unwrap_or(0);
-            if dl_amt > max_dl {
+        // j. Daily loss check
+        if let Some(dl) = current_daily_loss
+            && dl.amount.abs() > self.config.max_daily_loss.amount
+        {
+            return RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::DailyLossExceeded),
+                reason_detail: format!("Daily loss {} exceeds max {}", dl.amount, self.config.max_daily_loss.amount),
+            };
+        }
+
+        // k. Side validation — don't trade more than we hold
+        if let (Some(side), Some(qty)) = (&current_position_side, current_position_size) {
+            let side_upper = side.to_uppercase();
+            let intent_qty = Decimal::from_str(&intent.quantity).unwrap_or(Decimal::ZERO);
+            if intent.side == "SELL" && side_upper == "LONG" && intent_qty > Decimal::from(qty) {
                 return RiskVerdict {
                     accepted: false,
-                    reason: Some(RiskReasonCode::DailyLossExceeded),
-                    reason_detail: format!("Daily loss {} exceeds max {}", dl_amt, max_dl),
+                    reason: Some(RiskReasonCode::SellExceedsPosition),
+                    reason_detail: format!(
+                        "Sell {} exceeds long position of {}",
+                        intent_qty, qty
+                    ),
                 };
+            }
+            if intent.side == "BUY" && side_upper == "SHORT" && intent_qty > Decimal::from(qty) {
+                return RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::BuyExceedsShortPosition),
+                    reason_detail: format!(
+                        "Buy-to-cover {} exceeds short position of {}",
+                        intent_qty, qty
+                    ),
+                };
+            }
+        }
+
+        // l. Correlation check
+        if let Some(scores) = &correlation_scores {
+            if !scores.is_empty() {
+                let mean: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
+                if mean > self.config.max_correlated_exposure {
+                    return RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::CorrelatedExposureExceeded),
+                        reason_detail: format!(
+                            "Mean correlation {:.4} exceeds max {:.2}",
+                            mean, self.config.max_correlated_exposure,
+                        ),
+                    };
+                }
+            }
+        }
+
+        // l. Correlation check
+        if let Some(scores) = correlation_scores {
+            if !scores.is_empty() {
+                let mean_corr: f64 = scores.iter().sum::<f64>() / (scores.len() as f64);
+                if mean_corr > self.config.max_correlated_exposure {
+                    return RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::CorrelatedExposureExceeded),
+                        reason_detail: format!(
+                            "Mean correlation {:.2} exceeds max {}",
+                            mean_corr, self.config.max_correlated_exposure
+                        ),
+                    };
+                }
             }
         }
 
@@ -415,7 +527,16 @@ impl RiskGate {
     }
 
     pub fn restore_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
-        Self::apply_snapshot(self, store)
+        let events = store.replay_by_type("RiskStateSnapshot")?;
+        if let Some(latest) = events.last() {
+            if let Ok(snapshot) = serde_json::from_str::<RiskStateSnapshot>(&latest.payload) {
+                self.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
+                    .unwrap_or(KillSwitchState::Triggered);
+                self.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
+                    .unwrap_or(TradingState::Halted);
+            }
+        }
+        Ok(())
     }
 
     #[staticmethod]
@@ -582,12 +703,13 @@ mod tests {
         let cfg = RiskConfig::default();
         assert!(cfg.instrument_eligibility.is_empty());
         assert_eq!(cfg.max_order_notional.to_string(), "1000000 USD");
-        assert_eq!(cfg.max_order_quantity, 10_000);
+        assert_eq!(cfg.max_order_quantity, 5_000);
         assert_eq!(cfg.max_position_size, 50_000);
         assert_eq!(cfg.max_gross_exposure.to_string(), "10000000 USD");
         assert!((cfg.max_drawdown_fraction - 0.10).abs() < f64::EPSILON);
         assert_eq!(cfg.max_daily_loss.to_string(), "50000 USD");
         assert_eq!(cfg.data_freshness_threshold_ms, 5_000);
+        assert_eq!(cfg.clock_skew_tolerance_ms, 100);
     }
 
     #[test]
@@ -601,6 +723,8 @@ mod tests {
             0.05,
             Money::new("25000", "USD"),
             2000,
+            200,
+            0.70,
         );
         assert_eq!(cfg.instrument_eligibility, vec!["AAPL"]);
         assert_eq!(cfg.max_order_notional.to_string(), "500000 USD");
@@ -612,7 +736,6 @@ mod tests {
     #[test]
     fn test_risk_reason_code_variants() {
         let codes = vec![
-            RiskReasonCode::NotRoutable,
             RiskReasonCode::InstrumentNotEligible,
             RiskReasonCode::DataStale,
             RiskReasonCode::OrderNotionalExceeded,
@@ -624,24 +747,34 @@ mod tests {
             RiskReasonCode::TradingHalted,
             RiskReasonCode::KillSwitchTriggered,
             RiskReasonCode::InternalError,
+            RiskReasonCode::SellExceedsPosition,
+            RiskReasonCode::BuyExceedsShortPosition,
+            RiskReasonCode::CorrelatedExposureExceeded,
         ];
-        assert_eq!(codes.len(), 12);
+        assert_eq!(codes.len(), 14);
     }
 
     // ── RiskGate ──
 
     fn make_intent(instrument_id: &str, quantity: &str, price: Option<&str>) -> TradeIntent {
+        make_intent_with_side(instrument_id, quantity, price, "BUY")
+    }
+
+    fn make_intent_with_side(instrument_id: &str, quantity: &str, price: Option<&str>, side: &str) -> TradeIntent {
+        let now = Utc::now().to_rfc3339();
         TradeIntent::new(
             "strat1".to_string(),
             "digest1".to_string(),
             "acc1".to_string(),
             instrument_id.to_string(),
-            "BUY".to_string(),
+            side.to_string(),
             quantity.to_string(),
             "LIMIT".to_string(),
             "DAY".to_string(),
             "v1".to_string(),
+            now,
             price.map(|p| p.to_string()),
+            None,
             None,
         )
     }
@@ -651,10 +784,34 @@ mod tests {
         let config = RiskConfig::default();
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("50000"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(verdict.accepted);
         assert!(verdict.reason.is_none());
         assert!(verdict.reason_detail.is_empty());
+    }
+
+    #[test]
+    fn test_gate_rejects_stale_data() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = TradeIntent::new(
+            "strat1".to_string(),
+            "digest1".to_string(),
+            "acc1".to_string(),
+            "AAPL".to_string(),
+            "BUY".to_string(),
+            "10".to_string(),
+            "LIMIT".to_string(),
+            "DAY".to_string(),
+            "v1".to_string(),
+            "2020-01-01T00:00:00Z".to_string(),
+            Some("100".to_string()),
+            None,
+            None,
+        );
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
+        assert!(!verdict.accepted);
+        assert_eq!(verdict.reason, Some(RiskReasonCode::DataStale));
     }
 
     #[test]
@@ -663,7 +820,7 @@ mod tests {
         let mut gate = RiskGate::new(config);
         gate.trigger_kill_switch().unwrap();
         let intent = make_intent("AAPL", "10", Some("50000"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::KillSwitchTriggered));
     }
@@ -674,7 +831,7 @@ mod tests {
         let mut gate = RiskGate::new(config);
         gate.set_trading_state(TradingState::Halted).unwrap();
         let intent = make_intent("AAPL", "10", Some("50000"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::TradingHalted));
     }
@@ -690,10 +847,12 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("50000"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::InstrumentNotEligible));
     }
@@ -709,10 +868,12 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "1000", Some("100"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::OrderNotionalExceeded));
     }
@@ -728,10 +889,12 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "200", Some("100"));
-        let verdict = gate.evaluate(&intent, None, None, None, None);
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::OrderQuantityExceeded));
     }
@@ -747,10 +910,12 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("100"));
-        let verdict = gate.evaluate(&intent, Some(150), None, None, None);
+        let verdict = gate.evaluate(&intent, Some(150), None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::PositionLimitExceeded));
     }
@@ -766,11 +931,13 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("100"));
         let exp = Money::new("2000000", "USD");
-        let verdict = gate.evaluate(&intent, None, Some(&exp), None, None);
+        let verdict = gate.evaluate(&intent, None, Some(&exp), None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::GrossExposureExceeded));
     }
@@ -786,10 +953,12 @@ mod tests {
             0.05,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("100"));
-        let verdict = gate.evaluate(&intent, None, None, Some(0.10), None);
+        let verdict = gate.evaluate(&intent, None, None, Some(0.10), None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::DrawdownExceeded));
     }
@@ -805,13 +974,84 @@ mod tests {
             0.10,
             Money::new("50000", "USD"),
             5_000,
+            100,
+            0.70,
         );
         let gate = RiskGate::new(config);
         let intent = make_intent("AAPL", "10", Some("100"));
         let dl = Money::new("75000", "USD");
-        let verdict = gate.evaluate(&intent, None, None, None, Some(&dl));
+        let verdict = gate.evaluate(&intent, None, None, None, Some(&dl), None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::DailyLossExceeded));
+    }
+
+    #[test]
+    fn test_gate_rejects_sell_exceeds_long_position() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent_with_side("AAPL", "200", Some("100"), "SELL");
+        let verdict = gate.evaluate(&intent, Some(100), None, None, None, Some("Long".to_string()), None);
+        assert!(!verdict.accepted);
+        assert_eq!(verdict.reason, Some(RiskReasonCode::SellExceedsPosition));
+    }
+
+    #[test]
+    fn test_gate_accepts_sell_within_long_position() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent_with_side("AAPL", "50", Some("100"), "SELL");
+        let verdict = gate.evaluate(&intent, Some(100), None, None, None, Some("Long".to_string()), None);
+        assert!(verdict.accepted);
+    }
+
+    #[test]
+    fn test_gate_rejects_buy_exceeds_short_position() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent_with_side("AAPL", "200", Some("100"), "BUY");
+        let verdict = gate.evaluate(&intent, Some(100), None, None, None, Some("Short".to_string()), None);
+        assert!(!verdict.accepted);
+        assert_eq!(verdict.reason, Some(RiskReasonCode::BuyExceedsShortPosition));
+    }
+
+
+    #[test]
+    fn test_gate_accepts_sell_without_position_side() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent("AAPL", "10", Some("100"));
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
+        assert!(verdict.accepted);
+    }
+
+    #[test]
+    fn test_gate_rejects_high_correlation() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent("AAPL", "10", Some("100"));
+        let scores = vec![0.95, 0.88, 0.92];
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, Some(scores));
+        assert!(!verdict.accepted);
+        assert_eq!(verdict.reason, Some(RiskReasonCode::CorrelatedExposureExceeded));
+    }
+
+    #[test]
+    fn test_gate_accepts_low_correlation() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent("AAPL", "10", Some("100"));
+        let scores = vec![0.3, 0.2, 0.4];
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, Some(scores));
+        assert!(verdict.accepted);
+    }
+
+    #[test]
+    fn test_gate_accepts_no_correlation_data() {
+        let config = RiskConfig::default();
+        let gate = RiskGate::new(config);
+        let intent = make_intent("AAPL", "10", Some("100"));
+        let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
+        assert!(verdict.accepted);
     }
 
     #[test]
