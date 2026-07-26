@@ -1,7 +1,10 @@
 import json
+import math
 import os
 import time
 import uuid
+import threading
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +46,7 @@ from titan.operations._metrics_integration import (
     positions_open,
     cash_balance,
     gross_exposure,
+    drawdown_fraction,
 )
 from titan.operations._logging_integration import log_risk_decision, log_adapter_event
 
@@ -66,6 +70,9 @@ class PaperConfig:
     account_id: str = "paper-1"
     client_order_prefix: str = "tit-paper-"
     state_path: str = ".titan_state.json"
+    use_twap: bool = False
+    twap_slice_count: int = 5
+    twap_duration_seconds: int = 60
 
 
 @dataclass
@@ -90,7 +97,7 @@ class PaperTradingEngine:
         self.config = config
         self.adapter = adapter
         self.logger = logger
-        store_path = config.state_path.replace(".json", ".db") if config.state_path else ".titan_state.db"
+        store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
         self.risk_gate = RiskGate(config.risk_config)
         try:
@@ -109,43 +116,55 @@ class PaperTradingEngine:
         self._health_cache: Optional[tuple[float, bool]] = None
         self._health_cache_ttl = 5.0
         self._last_prices: dict[str, str] = {}
+        self._price_history: dict[str, deque[float]] = {}
         self._order_metadata: dict[str, dict] = {}
         self._order_filled_quantity: dict[str, int] = {}
         self._decision_traces: dict[str, list[dict]] = {}
+        
+        self._lock = threading.RLock()
+        self._poller_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def _restore_order_states(self) -> None:
         try:
             events = self._event_store.replay_by_type("OrderTransition")
-            state_map = {
-                "New": OrderState.New,
-                "Validated": OrderState.Validated,
-                "Submitted": OrderState.Submitted,
-                "Acknowledged": OrderState.Acknowledged,
-                "PartiallyFilled": OrderState.PartiallyFilled,
-                "Filled": OrderState.Filled,
-                "Cancelled": OrderState.Cancelled,
-                "Rejected": OrderState.Rejected,
-                "Expired": OrderState.Expired,
-                "Unknown": OrderState.Unknown,
-            }
-            for ev in events:
+        except Exception as e:
+            if self.logger:
+                self.logger.error("engine", f"Failed to replay OrderTransition events: {e}")
+            return
+
+        state_map = {
+            "New": OrderState.New,
+            "Validated": OrderState.Validated,
+            "Submitted": OrderState.Submitted,
+            "Acknowledged": OrderState.Acknowledged,
+            "PartiallyFilled": OrderState.PartiallyFilled,
+            "Filled": OrderState.Filled,
+            "Cancelled": OrderState.Cancelled,
+            "Rejected": OrderState.Rejected,
+            "Expired": OrderState.Expired,
+            "Unknown": OrderState.Unknown,
+        }
+        for ev in events:
+            try:
                 payload = json.loads(ev.payload)
-                order_id = payload["order_id"]
-                to_state_str = payload["to_state"]
-                if order_id not in self.order_states:
-                    self.order_states[order_id] = OrderStateMachine()
-                target = state_map.get(to_state_str)
-                if target is not None:
-                    try:
-                        self.order_states[order_id].transition(target)
-                    except Exception:
-                        self.order_states[order_id].reset_to(target)
-        except Exception:
-            pass
+            except Exception as e:
+                if self.logger:
+                    self.logger.error("engine", f"Failed to parse OrderTransition payload: {e}")
+                continue
+            order_id = payload.get("order_id")
+            to_state_str = payload.get("to_state")
+            if not order_id or not to_state_str:
+                continue
+            if order_id not in self.order_states:
+                self.order_states[order_id] = OrderStateMachine()
+            target = state_map.get(to_state_str)
+            if target is not None:
+                self.order_states[order_id].reset_to(target)
 
     def start(self, sync_from_broker: bool = False) -> Session:
         self._session = self.adapter.authenticate()
-        loaded = self._load_state()
+        loaded = self._replay_state_from_events() or self._load_state()
         self._restore_order_states()
         if sync_from_broker:
             self._sync_from_broker()
@@ -154,7 +173,19 @@ class PaperTradingEngine:
             self.logger.info("engine", "Session started",
                              payload={"account_id": self.config.account_id,
                                       "state_loaded": "synced" if sync_from_broker else str(loaded)})
+        self._stop_event.clear()
+        self._poller_thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._poller_thread.start()
         return self._session
+
+    def _poll_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                self.poll_fills()
+            except Exception as e:
+                if self.logger:
+                    self.logger.error("engine", f"Background poll failed: {e}")
+            self._stop_event.wait(1.0)
 
     def _sync_from_broker(self) -> None:
         broker_cash = None
@@ -187,12 +218,70 @@ class PaperTradingEngine:
                 price=Money(entry_price, self.config.currency),
             )
 
-    def _save_state(self) -> None:
-        if not self.config.state_path:
-            return
-        path = Path(self.config.state_path)
-        tmp = path.with_suffix(".tmp")
-        state = {
+    def _replay_state_from_events(self) -> bool:
+        try:
+            all_events = self._event_store.replay_all()
+        except Exception:
+            return False
+        if not all_events:
+            return False
+        all_events.sort(key=lambda e: e.occurred_at)
+
+        has_position_data = False
+        for ev in all_events:
+            if ev.message_type in ("PositionOpened", "PositionChanged", "PositionClosed"):
+                has_position_data = True
+                try:
+                    payload = json.loads(ev.payload)
+                    instr = payload.get("instrument_id", "")
+                    side = payload.get("side", "buy")
+                    qty = int(payload.get("quantity", 0))
+                    price = Money(str(payload.get("price", "0")), self.config.currency)
+                    self.portfolio.apply_fill(instr, side, qty, price)
+                except Exception:
+                    continue
+
+        for ev in all_events:
+            try:
+                payload = json.loads(ev.payload)
+            except Exception:
+                continue
+            if ev.message_type == "OrderSubmitted":
+                coid = payload.get("client_order_id", "")
+                self._order_metadata[coid] = {
+                    "instrument_id": payload.get("instrument_id", ""),
+                    "side": payload.get("side", ""),
+                    "quantity": int(payload.get("quantity", 0)),
+                }
+            elif ev.message_type == "OrderFilled":
+                coid = payload.get("client_order_id", "")
+                instr = payload.get("instrument_id", "")
+                price = payload.get("fill_price", "")
+                if coid:
+                    self._order_filled_quantity[coid] = int(payload.get("filled_quantity", 0))
+                if instr and price:
+                    self._last_prices[instr] = price
+                    try:
+                        self.portfolio.update_market_price(instr, price)
+                    except Exception:
+                        pass
+
+        for ev in reversed(all_events):
+            if ev.message_type == "PortfolioState":
+                try:
+                    payload = json.loads(ev.payload)
+                    self._intent_counter = payload.get("intent_counter", 0)
+                    oc = payload.get("order_count")
+                    if isinstance(oc, dict):
+                        self.adapter.restore_order_count_state(oc)
+                except Exception:
+                    pass
+                break
+
+        return has_position_data
+
+    def _build_state_dict(self) -> dict:
+        return {
             "version": 1,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "portfolio": {
@@ -217,42 +306,28 @@ class PaperTradingEngine:
                     for instr, pos in self.portfolio.positions.items()
                 },
             },
-
             "intent_counter": self._intent_counter,
             "last_prices": dict(self._last_prices),
             "order_count": self.adapter.save_order_count_state(),
-
         }
-        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    def _append_state_snapshot(self) -> None:
+        state = self._build_state_dict()
+        self._event_store.append(EventEnvelope(
+            "PortfolioState", "Portfolio", "system", "titan_python",
+            json.dumps(state),
+        ))
+
+    def _read_latest_portfolio_snapshot(self) -> dict | None:
         try:
-            with open(tmp, "r+b") as f:
-                os.fsync(f.fileno())
-        except OSError as e:
-            if self.logger:
-                self.logger.error("engine", f"State persistence fsync failed: {e}")
-            if not self.risk_gate.kill_switch.blocks_routing():
-                self.risk_gate.trigger_kill_switch()
-            return
-        os.replace(str(tmp), str(path))
-        try:
-            self.risk_gate.persist_state(self._event_store)
+            events = self._event_store.replay_by_type("PortfolioState")
+            if events:
+                return json.loads(events[-1].payload)
         except Exception:
             pass
+        return None
 
-    def _load_state(self) -> bool:
-        if not self.config.state_path:
-            return False
-        path = Path(self.config.state_path)
-        if not path.exists():
-            return False
-        try:
-            state = json.loads(path.read_text())
-        except (json.JSONDecodeError, KeyError):
-            if self.logger:
-                self.logger.error("engine", "Corrupt state file — halting routing")
-            self.risk_gate.trigger_kill_switch()
-            return True  # state was loaded (halted)
-
+    def _apply_state_snapshot(self, state: dict) -> None:
         pf = state["portfolio"]
         self.portfolio = PortfolioEngine(
             pf["cash"]["currency"],
@@ -264,11 +339,12 @@ class PaperTradingEngine:
                 continue
             side = pos_data.get("side", "")
             fill_side = "buy" if side == "Long" else "sell"
+            cost = pos_data.get("cost_basis", {})
             self.portfolio.apply_fill(
                 instrument_id=pos_data["instrument_id"],
                 side=fill_side,
                 quantity=qty,
-                price=Money("0", pf["cash"]["currency"]),
+                price=Money(cost.get("amount", "0"), cost.get("currency", pf["cash"]["currency"])),
             )
 
         self._intent_counter = state.get("intent_counter", 0)
@@ -281,12 +357,12 @@ class PaperTradingEngine:
 
         oc = state.get("order_count")
         if oc is not None:
-            if not isinstance(oc, dict):
+            if isinstance(oc, dict):
+                self.adapter.restore_order_count_state(oc)
+            else:
                 if self.logger:
                     self.logger.error("engine", "Corrupt order_count state — halting routing")
                 self.risk_gate.trigger_kill_switch()
-            else:
-                self.adapter.restore_order_count_state(oc)
 
         saved_pnl = pf.get("realized_pnl", {})
         if saved_pnl and saved_pnl["amount"] != self.portfolio.realized_pnl.amount:
@@ -294,9 +370,52 @@ class PaperTradingEngine:
                 Money(saved_pnl["amount"], saved_pnl["currency"])
             )
 
-        return True
+    def _save_state(self) -> None:
+        if not self.config.state_path:
+            return
+
+        state = self._build_state_dict()
+        path = Path(self.config.state_path)
+        try:
+            with self._lock:
+                path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+        self._append_state_snapshot()
+        try:
+            self.risk_gate.persist_state(self._event_store)
+        except Exception:
+            pass
+
+    def _load_state(self) -> bool:
+        if not self.config.state_path:
+            return False
+
+        path = Path(self.config.state_path)
+        if path.exists():
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+                self._apply_state_snapshot(state)
+                return True
+            except Exception:
+                if self.logger:
+                    self.logger.error("engine", "Corrupt state file — halting routing")
+                self.risk_gate.trigger_kill_switch()
+                return True
+
+        snapshot = self._read_latest_portfolio_snapshot()
+        if snapshot is not None:
+            self._apply_state_snapshot(snapshot)
+            return True
+
+        return False
+
 
     def stop(self) -> None:
+        if self._poller_thread:
+            self._stop_event.set()
+            self._poller_thread.join(timeout=2.0)
         self._save_state()
         try:
             self.adapter.heartbeat()
@@ -344,18 +463,51 @@ class PaperTradingEngine:
             {"stage": stage, **(details or {})}
         )
 
+    def update_price(self, instrument_id: str, price: str | float) -> None:
+        """Update market price for an instrument and trigger portfolio M2M valuation."""
+        price_str = str(price)
+        self._last_prices[instrument_id] = price_str
+        price_f = float(price_str)
+        if instrument_id not in self._price_history:
+            self._price_history[instrument_id] = deque(maxlen=60)
+        self._price_history[instrument_id].append(price_f)
+        try:
+            self.portfolio.update_market_price(instrument_id, price_str)
+        except Exception:
+            pass
+
+    def _rejection_payload(self, intent: TradeIntent, reason: str) -> dict:
+        return {
+            "side": intent.side,
+            "reason": reason,
+            "mode": "paper",
+            "strategy": intent.strategy_id,
+            "manifest": intent.strategy_package_digest,
+            "instrument": str(intent.instrument_id),
+            "account": str(intent.account_id),
+        }
+
     def submit_intent(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
-        if not self._check_adapter_health():
-            return OrderResult(accepted=False, rejection_reason="Adapter unhealthy — trading halted")
+        with self._lock:
+            if not self._check_adapter_health():
+                payload = self._rejection_payload(intent, "ADAPTER_UNHEALTHY")
+                if self.logger:
+                    self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
+                                        correlation_id=correlation_id, payload=payload)
+                return OrderResult(accepted=False, rejection_reason=f"Adapter unhealthy — trading halted")
 
         if not TradingState.Active.accepts_intents():
+            payload = self._rejection_payload(intent, "TRADING_HALTED")
             if self.logger:
-                self.logger.warning("engine", "Intent rejected: trading not active")
+                self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
+                                    correlation_id=correlation_id, payload=payload)
             return OrderResult(accepted=False, rejection_reason="Trading state is not active")
 
         if self.risk_gate.kill_switch.blocks_routing():
+            payload = self._rejection_payload(intent, "SAFETY_KILL_SWITCH")
             if self.logger:
-                self.logger.warning("engine", "Intent rejected: kill switch blocking")
+                self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
+                                    correlation_id=correlation_id, payload=payload)
             return OrderResult(accepted=False, rejection_reason="Kill switch is blocking routing")
 
         instr_id = str(intent.instrument_id)
@@ -379,6 +531,21 @@ class PaperTradingEngine:
         snapshot = self.portfolio.get_snapshot()
         pos = self.portfolio.get_position(str(intent.instrument_id))
         pos_side = str(pos.side) if pos is not None else None
+
+        # Correlation check — compute pairwise Pearson r with held positions
+        correlation_scores = None
+        cand_prices = self._price_history.get(str(intent.instrument_id))
+        if cand_prices and len(cand_prices) >= 10:
+            scores = []
+            for held_id in self.portfolio.positions:
+                held_prices = self._price_history.get(held_id)
+                if held_prices and len(held_prices) >= 10:
+                    r = _pearson_correlation(list(cand_prices), list(held_prices))
+                    if r is not None:
+                        scores.append(r)
+            if scores:
+                correlation_scores = scores
+
         verdict = self.risk_gate.evaluate(
             intent,
             self._current_position_size(intent.instrument_id),
@@ -386,6 +553,7 @@ class PaperTradingEngine:
             snapshot.drawdown_fraction,
             snapshot.daily_realized_loss,
             pos_side,
+            correlation_scores,
         )
 
         if not verdict.accepted:
@@ -431,21 +599,48 @@ class PaperTradingEngine:
         sm.persist_transition(self._event_store, client_order_id, OrderState.Validated, OrderState.Submitted, "order_submitted_to_broker")
         self.order_states[client_order_id] = sm
 
+        self._event_store.append(EventEnvelope(
+            "OrderSubmitted", "Execution", client_order_id, "titan_python",
+            json.dumps({
+                "client_order_id": client_order_id,
+                "instrument_id": str(intent.instrument_id),
+                "side": str(intent.side),
+                "quantity": str(intent.quantity),
+                "price": str(intent.price) if intent.price else "0",
+            }),
+        ))
+
         orders_submitted.inc()
-        try:
-            acknowledgement = self.adapter.place_order(approved)
-        except Exception as e:
-            sm.transition(OrderState.Rejected)
-            sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_error: {e}")
-            if self.logger:
-                self.logger.error("engine", f"Broker submit failed: {e}")
-            orders_rejected.inc()
-            if not self.risk_gate.kill_switch.blocks_routing():
-                self.trigger_kill_switch()
+
+        # TWAP: split large orders into slices
+        qty = int(intent.quantity)
+        if self.config.use_twap and qty > 50:
+            from titan.execution.twap import TWAPExecutor, TWAPConfig
+            twap_config = TWAPConfig(slices=self.config.twap_slice_count, duration_seconds=self.config.twap_duration_seconds)
+            twap = TWAPExecutor(self, twap_config)
+            twap.execute(approved)
+            # The background thread handles child order submissions and tracking.
+            # Mark the parent order as acknowledged conceptually.
+            sm.transition(OrderState.Acknowledged)
             return OrderResult(
-                accepted=False,
-                rejection_reason=f"Broker submit failed: {e}",
+                accepted=True,
+                rejection_reason="",
             )
+        else:
+            try:
+                acknowledgement = self.adapter.place_order(approved)
+            except Exception as e:
+                sm.transition(OrderState.Rejected)
+                sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_error: {e}")
+                if self.logger:
+                    self.logger.error("engine", f"Broker submit failed: {e}")
+                orders_rejected.inc()
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.trigger_kill_switch()
+                return OrderResult(
+                    accepted=False,
+                    rejection_reason=f"Broker submit failed: {e}",
+                )
         if not acknowledgement.accepted:
             sm.transition(OrderState.Rejected)
             sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_rejected: {acknowledgement.rejection_reason}")
@@ -462,6 +657,14 @@ class PaperTradingEngine:
         broker_id = acknowledgement.broker_order_id
         sm.transition(OrderState.Acknowledged)
         sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Acknowledged, "order_acknowledged_by_broker")
+        self._event_store.append(EventEnvelope(
+            "OrderAcknowledged", "Execution", client_order_id, "titan_python",
+            json.dumps({
+                "client_order_id": client_order_id,
+                "broker_order_id": str(broker_id.id) if broker_id else "",
+                "instrument_id": str(intent.instrument_id),
+            }),
+        ))
         self._trace_decision(correlation_id, "BrokerAcknowledgement",
                              {"broker_order_id": str(broker_id.id) if broker_id else None,
                               "client_order_id": client_order_id,
@@ -485,7 +688,7 @@ class PaperTradingEngine:
                     quantity=qty,
                     price=Money(fill.price, self.config.currency),
                 )
-                self._last_prices[fill.instrument_id] = fill.price
+                self.update_price(fill.instrument_id, fill.price)
                 orders_filled.inc()
 
                 new_pos = self.portfolio.get_position(fill.instrument_id)
@@ -507,6 +710,16 @@ class PaperTradingEngine:
                         "price": fill.price,
                     }),
                 ))
+                self._event_store.append(EventEnvelope(
+                    "OrderFilled", "Execution", client_order_id, "titan_python",
+                    json.dumps({
+                        "client_order_id": client_order_id,
+                        "instrument_id": fill.instrument_id,
+                        "side": fill.side,
+                        "filled_quantity": qty,
+                        "fill_price": fill.price,
+                    }),
+                ))
 
             total_qty = int(str(approved.quantity))
             self._order_metadata[client_order_id] = {
@@ -515,11 +728,12 @@ class PaperTradingEngine:
                 "quantity": total_qty,
             }
             self._order_filled_quantity[client_order_id] = total_filled
-            sm.transition(OrderState.PartiallyFilled)
-            sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.PartiallyFilled, "partial_fill")
-            if total_filled >= total_qty:
+            if total_filled < total_qty:
+                sm.transition(OrderState.PartiallyFilled)
+                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.PartiallyFilled, "partial_fill")
+            else:
                 sm.transition(OrderState.Filled)
-                sm.persist_transition(self._event_store, client_order_id, OrderState.PartiallyFilled, OrderState.Filled, "full_fill")
+                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Filled, "full_fill")
         else:
             sm.transition(OrderState.Rejected)
             sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Rejected, "no_fill_quantity")
@@ -527,6 +741,7 @@ class PaperTradingEngine:
                 log_adapter_event(self.logger, "fill_failed", client_order_id,
                                   instrument_id=str(intent.instrument_id),
                                   payload={"reason": "no_fill_quantity"})
+
 
         self._save_state()
         if fills and self.logger:
@@ -549,13 +764,20 @@ class PaperTradingEngine:
         Should be called periodically (e.g. on every market-data tick).
         """
         import copy
-        for order_id, sm in list(self.order_states.items()):
-            if sm.current not in (OrderState.Acknowledged, OrderState.PartiallyFilled):
-                self._order_metadata.pop(order_id, None)
-                self._order_filled_quantity.pop(order_id, None)
-                continue
+        with self._lock:
+            open_orders = list(self.order_states.items())
 
-            meta = self._order_metadata.get(order_id)
+        for order_id, sm in open_orders:
+            with self._lock:
+                if sm.current not in (OrderState.Acknowledged, OrderState.PartiallyFilled):
+                    self._order_metadata.pop(order_id, None)
+                    self._order_filled_quantity.pop(order_id, None)
+                    continue
+
+                meta = self._order_metadata.get(order_id)
+                already_filled = self._order_filled_quantity.get(order_id, 0)
+                from_state = copy.deepcopy(sm.current)
+
             if meta is None:
                 continue
 
@@ -566,7 +788,6 @@ class PaperTradingEngine:
             if result is None:
                 continue
 
-            already_filled = self._order_filled_quantity.get(order_id, 0)
             new_qty = result.filled_quantity - already_filled
             if new_qty <= 0:
                 continue
@@ -584,120 +805,128 @@ class PaperTradingEngine:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
-            old_pos = self.portfolio.get_position(fill.instrument_id)
-            old_side = str(old_pos.side) if old_pos else "None"
-            old_qty = old_pos.quantity if old_pos else 0
+            with self._lock:
+                old_pos = self.portfolio.get_position(fill.instrument_id)
+                old_side = str(old_pos.side) if old_pos else "None"
+                old_qty = old_pos.quantity if old_pos else 0
 
-            self.portfolio.apply_fill(
-                instrument_id=fill.instrument_id,
-                side=fill.side.lower(),
-                quantity=int(fill.quantity),
-                price=Money(fill.price, self.config.currency),
-            )
-            self._last_prices[fill.instrument_id] = fill.price
-            orders_filled.inc()
+                self.portfolio.apply_fill(
+                    instrument_id=fill.instrument_id,
+                    side=fill.side.lower(),
+                    quantity=int(fill.quantity),
+                    price=Money(fill.price, self.config.currency),
+                )
+                self._last_prices[fill.instrument_id] = fill.price
+                orders_filled.inc()
 
-            new_pos = self.portfolio.get_position(fill.instrument_id)
-            if old_pos is None or old_pos.quantity == 0:
-                evt_type = "PositionOpened"
-            elif new_pos is not None and new_pos.quantity == 0:
-                evt_type = "PositionClosed"
-            else:
-                evt_type = "PositionChanged"
-            self._event_store.append(EventEnvelope(
-                evt_type, "Portfolio", fill.instrument_id, "titan_python",
-                json.dumps({
-                    "instrument_id": fill.instrument_id,
-                    "old_side": old_side,
-                    "old_quantity": old_qty,
-                    "side": fill.side,
-                    "quantity": int(fill.quantity),
-                    "price": fill.price,
-                }),
-            ))
+                new_pos = self.portfolio.get_position(fill.instrument_id)
+                if old_pos is None or old_pos.quantity == 0:
+                    evt_type = "PositionOpened"
+                elif new_pos is not None and new_pos.quantity == 0:
+                    evt_type = "PositionClosed"
+                else:
+                    evt_type = "PositionChanged"
+                self._event_store.append(EventEnvelope(
+                    evt_type, "Portfolio", fill.instrument_id, "titan_python",
+                    json.dumps({
+                        "instrument_id": fill.instrument_id,
+                        "old_side": old_side,
+                        "old_quantity": old_qty,
+                        "side": fill.side,
+                        "quantity": int(fill.quantity),
+                        "price": fill.price,
+                    }),
+                ))
 
-            self._order_filled_quantity[order_id] = result.filled_quantity
-            total_qty = meta.get("quantity", 0)
-            from_state = copy.deepcopy(sm.current)
+                self._order_filled_quantity[order_id] = result.filled_quantity
+                total_qty = meta.get("quantity", 0)
 
-            sm.transition(OrderState.Filled)
-            sm.persist_transition(self._event_store, order_id, from_state, OrderState.Filled, "full_fill_from_poll")
-            if self.logger:
-                log_adapter_event(self.logger, "filled_from_poll", order_id,
-                                  instrument_id=fill.instrument_id,
-                                  payload={"new_qty": new_qty, "total": result.filled_quantity})
+                if result.filled_quantity < total_qty:
+                    if from_state == OrderState.Acknowledged:
+                        sm.transition(OrderState.PartiallyFilled)
+                        sm.persist_transition(self._event_store, order_id, from_state, OrderState.PartiallyFilled, "partial_fill_from_poll")
+                else:
+                    sm.transition(OrderState.Filled)
+                    sm.persist_transition(self._event_store, order_id, from_state, OrderState.Filled, "full_fill_from_poll")
+                if self.logger:
+                    log_adapter_event(self.logger, "filled_from_poll", order_id,
+                                      instrument_id=fill.instrument_id,
+                                      payload={"new_qty": new_qty, "total": result.filled_quantity})
 
     def reconcile(self) -> ReconciliationResult:
-        broker_positions = []
-        try:
-            pos_snapshot = self.adapter.positions(self.config.account_id)
-            broker_positions = pos_snapshot.positions
-        except Exception as e:
-            if self.logger:
-                self.logger.warning("engine", f"Reconcile: position fetch failed: {e}")
+        with self._lock:
+            broker_positions = []
+            try:
+                pos_snapshot = self.adapter.positions(self.config.account_id)
+                broker_positions = pos_snapshot.positions
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning("engine", f"Reconcile: position fetch failed: {e}")
 
-        broker_cash = Money("0", self.config.currency)
-        try:
-            bal_snapshot = self.adapter.holdings(self.config.account_id)
-            broker_cash = bal_snapshot.cash
-        except Exception as e:
-            if self.logger:
-                self.logger.warning("engine", f"Reconcile: holdings fetch failed: {e}")
+            broker_cash = Money("0", self.config.currency)
+            try:
+                bal_snapshot = self.adapter.holdings(self.config.account_id)
+                broker_cash = bal_snapshot.cash
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning("engine", f"Reconcile: holdings fetch failed: {e}")
 
-        result = self.reconciler.compare(
-            self.portfolio,
-            broker_positions,
-            broker_cash,
-        )
-        if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
-            if self.logger:
+            result = self.reconciler.compare(
+                self.portfolio,
+                broker_positions,
+                broker_cash,
+            )
+            if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
+                if self.logger:
+                    from titan.operations._logging_integration import log_reconciliation
+                    log_reconciliation(self.logger, {"has_drift": len(result.position_drifts) > 0,
+                                                      "drift_count": len(result.position_drifts),
+                                                      "severity": str(result.severity),
+                                                      "action": "trigger_kill_switch"})
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.risk_gate.trigger_kill_switch()
+                    kill_switch_triggered.inc()
+                self._save_state()
+            elif self.logger:
                 from titan.operations._logging_integration import log_reconciliation
-                log_reconciliation(self.logger, {"has_drift": len(result.position_drifts) > 0,
-                                                  "drift_count": len(result.position_drifts),
-                                                  "severity": str(result.severity),
-                                                  "action": "trigger_kill_switch"})
-            if not self.risk_gate.kill_switch.blocks_routing():
-                self.risk_gate.trigger_kill_switch()
-                kill_switch_triggered.inc()
-            self._save_state()
-        elif self.logger:
-            from titan.operations._logging_integration import log_reconciliation
-            drift_count = len(result.position_drifts)
-            log_reconciliation(self.logger, {"has_drift": drift_count > 0,
-                                              "drift_count": drift_count,
-                                              "severity": str(result.severity)})
-        return result
+                drift_count = len(result.position_drifts)
+                log_reconciliation(self.logger, {"has_drift": drift_count > 0,
+                                                  "drift_count": drift_count,
+                                                  "severity": str(result.severity)})
+            return result
 
     def status(self) -> EngineStatus:
-        positions = []
-        for instr in self.config.risk_config.instrument_eligibility:
-            pos = self.portfolio.get_position(instr)
-            if pos is not None:
-                positions.append(pos)
+        with self._lock:
+            positions = []
+            for instr in self.config.risk_config.instrument_eligibility:
+                pos = self.portfolio.get_position(instr)
+                if pos is not None:
+                    positions.append(pos)
 
-        cash = self.portfolio.get_cash_balance()
-        pv = self._calculate_portfolio_value(positions, cash)
-        open_count = len(self.order_states)
+            cash = self.portfolio.get_cash_balance()
+            pv = self._calculate_portfolio_value(positions, cash)
+            open_count = len(self.order_states)
 
-        positions_open.set(float(len(positions)))
-        cash_balance.set(float(cash.amount))
-        gross_exposure.set(float(sum(abs(p.quantity) for p in positions)))
+            positions_open.set(float(len(positions)))
+            cash_balance.set(float(cash.amount))
+            gross_exposure.set(float(self.portfolio.total_gross_exposure().amount))
+            drawdown_fraction.set(self.portfolio.drawdown_fraction())
 
-        health = None
-        try:
-            health = self.adapter.heartbeat()
-        except Exception:
-            pass
+            health = None
+            try:
+                health = self.adapter.heartbeat()
+            except Exception:
+                pass
 
-        return EngineStatus(
-            trading_state=self.risk_gate.trading_state,
-            kill_switch=self.risk_gate.kill_switch,
-            positions=positions,
-            cash_balance=cash,
-            portfolio_value=pv,
-            open_orders=open_count,
-            adapter_health=health,
-        )
+            return EngineStatus(
+                trading_state=self.risk_gate.trading_state,
+                kill_switch=self.risk_gate.kill_switch,
+                positions=positions,
+                cash_balance=cash,
+                portfolio_value=pv,
+                open_orders=open_count,
+                adapter_health=health,
+            )
 
     def trigger_kill_switch(self) -> None:
         self.risk_gate.trigger_kill_switch()
@@ -716,6 +945,8 @@ class PaperTradingEngine:
             )
         self.risk_gate.release_initiated()
         self.risk_gate.release_completed()
+        if self.risk_gate.trading_state != TradingState.Active:
+            self.risk_gate.set_trading_state(TradingState.Active)
         self._save_state()
         if self.logger:
             self.logger.info("engine", "Kill switch released")
@@ -749,13 +980,8 @@ class PaperTradingEngine:
         pos = self.portfolio.get_position(instrument_id)
         return pos.quantity if pos is not None else None
 
-    def _current_gross_exposure(self) -> Optional[Money]:
-        total = 0
-        for instr in self.config.risk_config.instrument_eligibility:
-            pos = self.portfolio.get_position(instr)
-            if pos is not None:
-                total += abs(pos.quantity)
-        return Money(str(total), self.config.currency)
+    def _current_gross_exposure(self) -> Money:
+        return self.portfolio.total_gross_exposure()
 
     def _calculate_portfolio_value(self, positions: list[Position], cash: Money) -> Money:
         from decimal import Decimal
@@ -773,3 +999,20 @@ class PaperTradingEngine:
             except (Exception):
                 pass
         return Money(str(total), self.config.currency)
+
+
+def _pearson_correlation(a: list[float], b: list[float]) -> float | None:
+    if len(a) != len(b) or len(a) < 3:
+        return None
+    ra = [(a[i] - a[i-1]) / a[i-1] for i in range(1, len(a))]
+    rb = [(b[i] - b[i-1]) / b[i-1] for i in range(1, len(b))]
+    n = len(ra)
+    sum_x = sum(ra)
+    sum_y = sum(rb)
+    sum_xy = sum(x * y for x, y in zip(ra, rb))
+    sum_x2 = sum(x * x for x in ra)
+    sum_y2 = sum(y * y for y in rb)
+    denom = math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y))
+    if abs(denom) < 1e-15:
+        return None
+    return max(-1.0, min(1.0, (n * sum_xy - sum_x * sum_y) / denom))
