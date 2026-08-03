@@ -1,0 +1,12 @@
+{
+  "message_id": "not-a-uuid",
+  "message_type": "order.submitted",
+  "schema_version": 100,
+  "occurred_at": "2026-07-13T23:12:00Z",
+  "correlation_id": "018f0a0d-1234-7890-abcd-ef0123456789",
+  "causation_id": null,
+  "aggregate_type": "order",
+  "aggregate_id": "order-123",
+  "source": "execution-engine",
+  "payload": "{}"
+}

@@ -1,0 +1,589 @@
+[
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "bollinger",
+    "best_params": {
+      "window": 30,
+      "std_dev_multiplier": 1.5
+    },
+    "is_sharpe": 1.1493,
+    "oos_sharpe": 0.5492,
+    "wf_mean_sharpe": 0.9769,
+    "total_return_pct": 0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 8 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "dual-ma",
+    "best_params": {
+      "fast": 3,
+      "slow": 20
+    },
+    "is_sharpe": -0.1835,
+    "oos_sharpe": -0.4508,
+    "wf_mean_sharpe": -1.0064,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe -0.18 < 0.5",
+      "WF sharpe -1.01 < -0.1 (overfit)",
+      "OOS sharpe -0.45 < 0.0",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "ma-crossover",
+    "best_params": {
+      "fast": 10,
+      "slow": 15
+    },
+    "is_sharpe": 0.0,
+    "oos_sharpe": -1.433,
+    "wf_mean_sharpe": -1.585,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.00 < 0.5",
+      "WF sharpe -1.58 < -0.1 (overfit)",
+      "OOS sharpe -1.43 < 0.0",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "mean-reversion",
+    "best_params": {
+      "window": 10,
+      "entry_z": -2.0,
+      "exit_z": -0.8
+    },
+    "is_sharpe": 1.0214,
+    "oos_sharpe": -1.0646,
+    "wf_mean_sharpe": -1.4026,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -1.40 < -0.1 (overfit)",
+      "OOS sharpe -1.06 < 0.0",
+      "OOS trades 8 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "rsi",
+    "best_params": {
+      "window": 21,
+      "oversold": 35,
+      "overbought": 75
+    },
+    "is_sharpe": 0.857,
+    "oos_sharpe": 0.6411,
+    "wf_mean_sharpe": -0.0441,
+    "total_return_pct": 0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 1 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "time-series-momentum",
+    "best_params": {
+      "lookback": 20
+    },
+    "is_sharpe": 0.0904,
+    "oos_sharpe": 0.2113,
+    "wf_mean_sharpe": -1.1597,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.09 < 0.5",
+      "WF sharpe -1.16 < -0.1 (overfit)",
+      "OOS PF 0.14 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "1h",
+    "asset_class": "forex",
+    "strategy_id": "volatility-regime",
+    "best_params": {
+      "vol_window": 20,
+      "median_window": 60,
+      "vol_multiple": 0.75
+    },
+    "is_sharpe": 1.3367,
+    "oos_sharpe": -0.7076,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": -0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS sharpe -0.71 < 0.0",
+      "OOS trades 2 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "bollinger",
+    "best_params": {
+      "window": 20,
+      "std_dev_multiplier": 2.5
+    },
+    "is_sharpe": 1.6093,
+    "oos_sharpe": 0.0,
+    "wf_mean_sharpe": -0.3398,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -0.34 < -0.1 (overfit)",
+      "OOS trades 4 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "dual-ma",
+    "best_params": {
+      "fast": 8,
+      "slow": 50
+    },
+    "is_sharpe": 0.3373,
+    "oos_sharpe": 0.182,
+    "wf_mean_sharpe": -1.021,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.34 < 0.5",
+      "WF sharpe -1.02 < -0.1 (overfit)",
+      "OOS trades 5 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "ma-crossover",
+    "best_params": {
+      "fast": 10,
+      "slow": 40
+    },
+    "is_sharpe": 0.7212,
+    "oos_sharpe": 0.5106,
+    "wf_mean_sharpe": 0.5752,
+    "total_return_pct": 0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 5 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "mean-reversion",
+    "best_params": {
+      "window": 20,
+      "entry_z": -2.5,
+      "exit_z": -0.5
+    },
+    "is_sharpe": 1.6939,
+    "oos_sharpe": -1.921,
+    "wf_mean_sharpe": -0.3398,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -0.34 < -0.1 (overfit)",
+      "OOS sharpe -1.92 < 0.0",
+      "OOS trades 4 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "rsi",
+    "best_params": {
+      "window": 14,
+      "oversold": 25,
+      "overbought": 70
+    },
+    "is_sharpe": 1.1755,
+    "oos_sharpe": 2.2004,
+    "wf_mean_sharpe": 1.2311,
+    "total_return_pct": 0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 6 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "time-series-momentum",
+    "best_params": {
+      "lookback": 30
+    },
+    "is_sharpe": 0.0427,
+    "oos_sharpe": 1.3306,
+    "wf_mean_sharpe": 0.4677,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.04 < 0.5",
+      "OOS trades 9 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "15m",
+    "asset_class": "forex",
+    "strategy_id": "volatility-regime",
+    "best_params": {
+      "vol_window": 10,
+      "median_window": 80,
+      "vol_multiple": 0.75
+    },
+    "is_sharpe": 0.7104,
+    "oos_sharpe": -1.0714,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": -0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS sharpe -1.07 < 0.0",
+      "OOS trades 2 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "bollinger",
+    "best_params": {
+      "window": 30,
+      "std_dev_multiplier": 2.5
+    },
+    "is_sharpe": 0.389,
+    "oos_sharpe": -1.2411,
+    "wf_mean_sharpe": -0.7974,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.39 < 0.5",
+      "WF sharpe -0.80 < -0.1 (overfit)",
+      "OOS sharpe -1.24 < 0.0",
+      "OOS trades 4 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "dual-ma",
+    "best_params": {
+      "fast": 5,
+      "slow": 15
+    },
+    "is_sharpe": 0.5191,
+    "oos_sharpe": 1.0605,
+    "wf_mean_sharpe": 0.6496,
+    "total_return_pct": 0.0,
+    "status": "QUALIFIED",
+    "confidence": "Medium",
+    "reasons": [
+      "All criteria met"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "ma-crossover",
+    "best_params": {
+      "fast": 5,
+      "slow": 15
+    },
+    "is_sharpe": 0.5191,
+    "oos_sharpe": 1.0605,
+    "wf_mean_sharpe": 0.4702,
+    "total_return_pct": 0.0,
+    "status": "QUALIFIED",
+    "confidence": "Medium",
+    "reasons": [
+      "All criteria met"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "mean-reversion",
+    "best_params": {
+      "window": 30,
+      "entry_z": -2.5,
+      "exit_z": -0.3
+    },
+    "is_sharpe": 0.3961,
+    "oos_sharpe": -0.8345,
+    "wf_mean_sharpe": -0.7575,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.40 < 0.5",
+      "WF sharpe -0.76 < -0.1 (overfit)",
+      "OOS sharpe -0.83 < 0.0",
+      "OOS trades 4 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "rsi",
+    "best_params": {
+      "window": 14,
+      "oversold": 25,
+      "overbought": 75
+    },
+    "is_sharpe": 0.6302,
+    "oos_sharpe": 0.3968,
+    "wf_mean_sharpe": -0.186,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -0.19 < -0.1 (overfit)",
+      "OOS trades 4 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "time-series-momentum",
+    "best_params": {
+      "lookback": 100
+    },
+    "is_sharpe": 0.2863,
+    "oos_sharpe": 0.5148,
+    "wf_mean_sharpe": 0.2684,
+    "total_return_pct": 0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.29 < 0.5",
+      "OOS trades 9 < 10"
+    ]
+  },
+  {
+    "symbol": "EURUSD",
+    "timeframe": "5m",
+    "asset_class": "forex",
+    "strategy_id": "volatility-regime",
+    "best_params": {
+      "vol_window": 30,
+      "median_window": 80,
+      "vol_multiple": 1.25
+    },
+    "is_sharpe": 0.7025,
+    "oos_sharpe": -0.6683,
+    "wf_mean_sharpe": -0.3755,
+    "total_return_pct": -0.0,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -0.38 < -0.1 (overfit)",
+      "OOS sharpe -0.67 < 0.0",
+      "OOS trades 3 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "bollinger",
+    "best_params": {
+      "window": 30,
+      "std_dev_multiplier": 2.0
+    },
+    "is_sharpe": 2.7988,
+    "oos_sharpe": 2.3835,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": 0.07,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 3 < 10"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "dual-ma",
+    "best_params": {
+      "fast": 3,
+      "slow": 30
+    },
+    "is_sharpe": -0.7229,
+    "oos_sharpe": -3.6557,
+    "wf_mean_sharpe": -1.3537,
+    "total_return_pct": -0.08,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe -0.72 < 0.5",
+      "WF sharpe -1.35 < -0.1 (overfit)",
+      "OOS sharpe -3.66 < 0.0",
+      "OOS trades 2 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "ma-crossover",
+    "best_params": {
+      "fast": 5,
+      "slow": 30
+    },
+    "is_sharpe": 0.1573,
+    "oos_sharpe": -3.2863,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": -0.07,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe 0.16 < 0.5",
+      "OOS sharpe -3.29 < 0.0",
+      "OOS trades 2 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "mean-reversion",
+    "best_params": {
+      "window": 30,
+      "entry_z": -2.0,
+      "exit_z": -0.3
+    },
+    "is_sharpe": 2.7988,
+    "oos_sharpe": 2.3835,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": 0.07,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 3 < 10"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "rsi",
+    "best_params": {
+      "window": 14,
+      "oversold": 30,
+      "overbought": 75
+    },
+    "is_sharpe": 3.0429,
+    "oos_sharpe": -1.4082,
+    "wf_mean_sharpe": -0.167,
+    "total_return_pct": -0.11,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "WF sharpe -0.17 < -0.1 (overfit)",
+      "OOS sharpe -1.41 < 0.0",
+      "OOS trades 1 < 10"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "time-series-momentum",
+    "best_params": {
+      "lookback": 30
+    },
+    "is_sharpe": -0.8416,
+    "oos_sharpe": -2.0852,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": -0.13,
+    "status": "FAILED",
+    "confidence": "High",
+    "reasons": [
+      "IS sharpe -0.84 < 0.5",
+      "OOS sharpe -2.09 < 0.0",
+      "OOS trades 2 < 10",
+      "OOS PF 0.00 < 1.0"
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "timeframe": "1h",
+    "asset_class": "equity",
+    "strategy_id": "volatility-regime",
+    "best_params": {
+      "vol_window": 20,
+      "median_window": 40,
+      "vol_multiple": 0.75
+    },
+    "is_sharpe": 0.5133,
+    "oos_sharpe": 0.0,
+    "wf_mean_sharpe": 0.0,
+    "total_return_pct": 0.0,
+    "status": "WATCHLIST",
+    "confidence": "Low",
+    "reasons": [
+      "OOS trades 0 < 10"
+    ]
+  }
+]

@@ -1,0 +1,65 @@
+{
+  "experiment_id": "EXP-00011",
+  "canonical_research_question": "RQ-002",
+  "hypothesis": "Volatility compression precedes clean directional expansion > 55% in OOS",
+  "economic_mechanism": "Liquidity drying -> order accumulation -> thin orderbook sweep",
+  "instruments": [
+    "SPY",
+    "EURUSD"
+  ],
+  "governance_checks": {
+    "SPY_oos_success_gt_55pct": false,
+    "SPY_oos_binomial_p_lt_0.05": false,
+    "SPY_oos_whipsaw_lt_30pct": true,
+    "SPY_train_oos_consistent": true,
+    "EURUSD_oos_success_gt_55pct": false,
+    "EURUSD_oos_binomial_p_lt_0.05": false,
+    "EURUSD_oos_whipsaw_lt_30pct": true,
+    "EURUSD_train_oos_consistent": true,
+    "cross_asset_consistent": false
+  },
+  "decision": "REJECTED",
+  "results": {
+    "SPY": {
+      "instrument": "SPY",
+      "total_events": 238,
+      "train_metrics": {
+        "n_events": 142,
+        "successes": 9,
+        "success_rate_pct": 6.3,
+        "whipsaw_rate_pct": 23.2,
+        "mean_expansion_ratio": 0.65,
+        "binomial_p_value": 1.0
+      },
+      "oos_metrics": {
+        "n_events": 96,
+        "successes": 26,
+        "success_rate_pct": 27.1,
+        "whipsaw_rate_pct": 27.1,
+        "mean_expansion_ratio": 1.13,
+        "binomial_p_value": 1.0
+      }
+    },
+    "EURUSD": {
+      "instrument": "EURUSD",
+      "total_events": 158,
+      "train_metrics": {
+        "n_events": 94,
+        "successes": 4,
+        "success_rate_pct": 4.3,
+        "whipsaw_rate_pct": 33.0,
+        "mean_expansion_ratio": 0.47,
+        "binomial_p_value": 1.0
+      },
+      "oos_metrics": {
+        "n_events": 64,
+        "successes": 5,
+        "success_rate_pct": 7.8,
+        "whipsaw_rate_pct": 25.0,
+        "mean_expansion_ratio": 0.64,
+        "binomial_p_value": 1.0
+      }
+    }
+  },
+  "execution_timestamp": "2026-07-30T21:05:18.688418"
+}

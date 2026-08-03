@@ -1,0 +1,65 @@
+{
+  "bollinger": {
+    "bollinger": 1.0,
+    "dual-ma": 0.031,
+    "ma-crossover": 0.9165,
+    "mean-reversion": 0.9698,
+    "rsi": 0.9443,
+    "time-series-momentum": 0.8536,
+    "volatility-regime": 0.9212
+  },
+  "dual-ma": {
+    "bollinger": 0.031,
+    "dual-ma": 1.0,
+    "ma-crossover": 0.0692,
+    "mean-reversion": 0.035,
+    "rsi": 0.0151,
+    "time-series-momentum": 0.0899,
+    "volatility-regime": 0.0438
+  },
+  "ma-crossover": {
+    "bollinger": 0.9165,
+    "dual-ma": 0.0692,
+    "ma-crossover": 1.0,
+    "mean-reversion": 0.9133,
+    "rsi": 0.9252,
+    "time-series-momentum": 0.8504,
+    "volatility-regime": 0.9029
+  },
+  "mean-reversion": {
+    "bollinger": 0.9698,
+    "dual-ma": 0.035,
+    "ma-crossover": 0.9133,
+    "mean-reversion": 1.0,
+    "rsi": 0.9419,
+    "time-series-momentum": 0.8512,
+    "volatility-regime": 0.9204
+  },
+  "rsi": {
+    "bollinger": 0.9443,
+    "dual-ma": 0.0151,
+    "ma-crossover": 0.9252,
+    "mean-reversion": 0.9419,
+    "rsi": 1.0,
+    "time-series-momentum": 0.8576,
+    "volatility-regime": 0.9372
+  },
+  "time-series-momentum": {
+    "bollinger": 0.8536,
+    "dual-ma": 0.0899,
+    "ma-crossover": 0.8504,
+    "mean-reversion": 0.8512,
+    "rsi": 0.8576,
+    "time-series-momentum": 1.0,
+    "volatility-regime": 0.8417
+  },
+  "volatility-regime": {
+    "bollinger": 0.9212,
+    "dual-ma": 0.0438,
+    "ma-crossover": 0.9029,
+    "mean-reversion": 0.9204,
+    "rsi": 0.9372,
+    "time-series-momentum": 0.8417,
+    "volatility-regime": 1.0
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "experiment_id": "EXP-00014",
+  "canonical_rq": "RQ-004",
+  "title": "Intraday Sector Leadership & Index Lead-Lag Predictability",
+  "timestamp": "2026-08-03T19:18:11.403110+00:00",
+  "decision": "REJECTED",
+  "results": {
+    "SPY_5m": {
+      "instrument": "SPY (5m)",
+      "total_signals": 1303,
+      "correct_signals": 628,
+      "directional_accuracy": 0.482
+    },
+    "EURUSD_5m": {
+      "instrument": "EURUSD (5m)",
+      "total_signals": 36,
+      "correct_signals": 12,
+      "directional_accuracy": 0.3333
+    }
+  }
+}

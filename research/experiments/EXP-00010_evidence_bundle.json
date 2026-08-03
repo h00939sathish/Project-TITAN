@@ -1,0 +1,137 @@
+{
+  "experiment_id": "EXP-00010",
+  "predecessors": [
+    "EXP-00008",
+    "EXP-00009"
+  ],
+  "canonical_research_question": "RQ-001",
+  "hypothesis": "MAE > MFE is a durable unconditional structural property of intraday sessions",
+  "economic_mechanism": "Opening auction creates directional displacement; session mean-reverts as liquidity providers absorb the imbalance",
+  "instruments": [
+    "SPY",
+    "EURUSD"
+  ],
+  "timeframe": "15m",
+  "governance_checks": {
+    "SPY_oos_mae_mfe_gt_1": true,
+    "SPY_oos_wilcoxon_p_lt_0.05": false,
+    "SPY_train_oos_consistent": true,
+    "SPY_oos_majority_mae_gt_mfe": true,
+    "EURUSD_oos_mae_mfe_gt_1": true,
+    "EURUSD_oos_wilcoxon_p_lt_0.05": false,
+    "EURUSD_train_oos_consistent": true,
+    "EURUSD_oos_majority_mae_gt_mfe": true,
+    "cross_instrument_consistent": true
+  },
+  "decision": "REFINED",
+  "instrument_results": {
+    "SPY": {
+      "total_sessions": 37,
+      "train_period": {
+        "start": "2026-06-05",
+        "end": "2026-07-08"
+      },
+      "oos_period": {
+        "start": "2026-07-09",
+        "end": "2026-07-29"
+      },
+      "train_metrics": {
+        "sessions": 22,
+        "mean_mae_pct": 0.718,
+        "mean_mfe_pct": 0.473,
+        "mae_mfe_ratio": 1.518,
+        "mae_gt_mfe_count": 13,
+        "mae_gt_mfe_pct": 59.1,
+        "wilcoxon_p": 0.2274,
+        "sign_test_p": 0.2612,
+        "morning_mae_gt_count": 13,
+        "morning_wilcoxon_p": 0.0743,
+        "afternoon_mae_gt_count": 10,
+        "afternoon_wilcoxon_p": 0.2227,
+        "gap_sessions": 20,
+        "gap_mae_mfe_ratio": 1.7466,
+        "nogap_sessions": 2,
+        "nogap_mae_mfe_ratio": 0.0983,
+        "small_or_mae_mfe_ratio": 0.3729,
+        "large_or_mae_mfe_ratio": 2.2256
+      },
+      "oos_metrics": {
+        "sessions": 15,
+        "mean_mae_pct": 0.4896,
+        "mean_mfe_pct": 0.3372,
+        "mae_mfe_ratio": 1.4518,
+        "mae_gt_mfe_count": 10,
+        "mae_gt_mfe_pct": 66.7,
+        "wilcoxon_p": 0.0957,
+        "sign_test_p": 0.1508,
+        "morning_mae_gt_count": 11,
+        "morning_wilcoxon_p": 0.0559,
+        "afternoon_mae_gt_count": 8,
+        "afternoon_wilcoxon_p": 0.3666,
+        "gap_sessions": 14,
+        "gap_mae_mfe_ratio": 1.2917,
+        "nogap_sessions": 1,
+        "nogap_mae_mfe_ratio": 27.8459,
+        "small_or_mae_mfe_ratio": 2.7263,
+        "large_or_mae_mfe_ratio": 0.7834
+      }
+    },
+    "EURUSD": {
+      "total_sessions": 8,
+      "train_period": {
+        "start": "2026-07-17",
+        "end": "2026-07-22"
+      },
+      "oos_period": {
+        "start": "2026-07-23",
+        "end": "2026-07-29"
+      },
+      "train_metrics": {
+        "sessions": 4,
+        "mean_mae_pct": 0.1626,
+        "mean_mfe_pct": 0.0858,
+        "mae_mfe_ratio": 1.8956,
+        "mae_gt_mfe_count": 3,
+        "mae_gt_mfe_pct": 75.0,
+        "wilcoxon_p": 1.0,
+        "sign_test_p": 0.3085,
+        "morning_mae_gt_count": 3,
+        "morning_wilcoxon_p": 1.0,
+        "afternoon_mae_gt_count": 3,
+        "afternoon_wilcoxon_p": 1.0,
+        "gap_sessions": 2,
+        "gap_mae_mfe_ratio": 1.0534,
+        "nogap_sessions": 2,
+        "nogap_mae_mfe_ratio": 3.1589,
+        "small_or_mae_mfe_ratio": 8.4672,
+        "large_or_mae_mfe_ratio": 0.1252
+      },
+      "oos_metrics": {
+        "sessions": 4,
+        "mean_mae_pct": 0.2842,
+        "mean_mfe_pct": 0.0541,
+        "mae_mfe_ratio": 5.2513,
+        "mae_gt_mfe_count": 3,
+        "mae_gt_mfe_pct": 75.0,
+        "wilcoxon_p": 1.0,
+        "sign_test_p": 0.3085,
+        "morning_mae_gt_count": 4,
+        "morning_wilcoxon_p": 1.0,
+        "afternoon_mae_gt_count": 3,
+        "afternoon_wilcoxon_p": 1.0,
+        "gap_sessions": 2,
+        "gap_mae_mfe_ratio": 23.9327,
+        "nogap_sessions": 2,
+        "nogap_mae_mfe_ratio": 1.7466,
+        "small_or_mae_mfe_ratio": 46.8684,
+        "large_or_mae_mfe_ratio": 12.4649
+      }
+    }
+  },
+  "preregistered_thresholds": {
+    "wilcoxon_alpha": 0.05,
+    "mae_mfe_ratio_min": 1.0,
+    "majority_threshold": 50.0
+  },
+  "execution_timestamp": "2026-07-31T10:30:13.630836"
+}

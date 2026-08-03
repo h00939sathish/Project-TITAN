@@ -1,0 +1,13 @@
+{
+  "risk_decision_id": "018f0a0d-1234-7890-abcd-ef0123456780",
+  "intent_id": "018f0a0d-1234-7890-abcd-ef0123456789",
+  "client_order_id": "018f0a0d-1234-7890-abcd-ef0123456781",
+  "instrument_id": "BTCUSD.COINBASE",
+  "side": "BUY",
+  "quantity": "1.5",
+  "price": "50000.00",
+  "stop_price": null,
+  "order_type": "LIMIT",
+  "time_in_force": "GTC",
+  "risk_profile_version": "v1.2"
+}

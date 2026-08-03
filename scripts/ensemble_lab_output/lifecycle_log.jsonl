@@ -1,0 +1,7 @@
+{"date": "2020-01-02", "strategy": "bollinger", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "dual-ma", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "ma-crossover", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "mean-reversion", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "rsi", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "time-series-momentum", "from": null, "to": "CANDIDATE"}
+{"date": "2020-01-02", "strategy": "volatility-regime", "from": null, "to": "CANDIDATE"}

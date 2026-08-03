@@ -1,0 +1,165 @@
+{
+  "experiment": {
+    "id": "EXP-00001",
+    "question": "Does volatility contraction followed by strong relative strength predict positive 20-day returns?",
+    "features": [
+      "atr_percentile_20",
+      "relative_strength_60d"
+    ],
+    "target": "forward_return_20d"
+  },
+  "per_instrument": {
+    "SPY": {
+      "filter_hits": 129,
+      "total_rows": 1301,
+      "ic": -0.6838,
+      "p_value": 0.0,
+      "sample_size": 129,
+      "bootstrap": {
+        "median_ic": -0.6821729087632716,
+        "ci_lower": -0.7699792567210595,
+        "ci_upper": -0.5756146175130598,
+        "pct_positive": 0.0,
+        "n_iterations": 1000
+      },
+      "temporal": [
+        {
+          "period": 0,
+          "start_idx": 0,
+          "end_idx": 43,
+          "n": 43,
+          "ic": -0.530016302501424
+        },
+        {
+          "period": 1,
+          "start_idx": 43,
+          "end_idx": 86,
+          "n": 43,
+          "ic": -0.3612978418647564
+        },
+        {
+          "period": 2,
+          "start_idx": 86,
+          "end_idx": 129,
+          "n": 43,
+          "ic": 0.0
+        }
+      ],
+      "checks": {
+        "Sample size sufficient": true,
+        "IC statistically significant": true,
+        "Bootstrap CI same sign": true,
+        "Temporal consistency": true,
+        "Survives transaction costs": "Net spread -0.0412 <= 0 after 10.0 bps"
+      }
+    },
+    "QQQ": {
+      "filter_hits": 72,
+      "total_rows": 1301,
+      "ic": 0.3515,
+      "p_value": 0.0017,
+      "sample_size": 72,
+      "bootstrap": {
+        "median_ic": 0.3480191558211033,
+        "ci_lower": 0.1741658699253579,
+        "ci_upper": 0.5113518358355736,
+        "pct_positive": 1.0,
+        "n_iterations": 1000
+      },
+      "temporal": [
+        {
+          "period": 0,
+          "start_idx": 0,
+          "end_idx": 24,
+          "n": 24,
+          "ic": 0.2741994797425325
+        },
+        {
+          "period": 1,
+          "start_idx": 24,
+          "end_idx": 48,
+          "n": 24,
+          "ic": 0.0
+        },
+        {
+          "period": 2,
+          "start_idx": 48,
+          "end_idx": 72,
+          "n": 24,
+          "ic": 0.24499371790354776
+        }
+      ],
+      "checks": {
+        "Sample size sufficient": "Sample size 72 < min 100",
+        "IC statistically significant": true,
+        "Bootstrap CI same sign": true,
+        "Temporal consistency": "Sign flips 2/2 periods",
+        "Survives transaction costs": "No split possible"
+      }
+    },
+    "TLT": {
+      "filter_hits": 61,
+      "total_rows": 1301,
+      "ic": 0.2064,
+      "p_value": 0.1053,
+      "sample_size": 61,
+      "bootstrap": {
+        "median_ic": 0.20243517353215648,
+        "ci_lower": -0.022578068633063917,
+        "ci_upper": 0.4123138998304401,
+        "pct_positive": 0.956,
+        "n_iterations": 1000
+      },
+      "temporal": [
+        {
+          "period": 0,
+          "start_idx": 0,
+          "end_idx": 20,
+          "n": 20,
+          "ic": 0.13006649542861798
+        },
+        {
+          "period": 1,
+          "start_idx": 20,
+          "end_idx": 40,
+          "n": 20,
+          "ic": 0.0
+        },
+        {
+          "period": 2,
+          "start_idx": 40,
+          "end_idx": 61,
+          "n": 21,
+          "ic": 0.2946898458772509
+        }
+      ],
+      "checks": {
+        "Sample size sufficient": "Sample size 61 < min 100",
+        "IC statistically significant": "IC 0.2064 not significant (p=0.1053)",
+        "Bootstrap CI same sign": "CI crosses zero [-0.0226, 0.4123]",
+        "Temporal consistency": "Sign flips 2/2 periods",
+        "Survives transaction costs": "No split possible"
+      }
+    }
+  },
+  "cross_instrument": {
+    "mean_ic": -0.04198293246436761,
+    "min_ic": -0.6837708581899465,
+    "max_ic": 0.3514712789682053,
+    "sign_consistency": 0.6666666666666666,
+    "instrument_count": 3,
+    "per_instrument": {
+      "SPY": -0.6837708581899465,
+      "QQQ": 0.3514712789682053,
+      "TLT": 0.20635078182863842
+    }
+  },
+  "decision": {
+    "status": "rejected",
+    "confidence": "low",
+    "reasons": [
+      "Bootstrap CI crosses zero [-0.770, 0.511]",
+      "Not all instruments agree (consistency 67%)"
+    ]
+  }
+}

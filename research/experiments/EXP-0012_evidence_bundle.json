@@ -1,0 +1,165 @@
+{
+  "experiment_id": "EXP-00012",
+  "canonical_rq": "RQ-002",
+  "mechanism_id": "M-005",
+  "title": "Volume-Catalyzed Volatility Compression",
+  "timestamp": "2026-08-03T19:18:10.232183+00:00",
+  "decision": "REFINED",
+  "results": {
+    "SPY": {
+      "instrument": "SPY",
+      "total_events": 28,
+      "successful_events": 25,
+      "success_rate": 0.8929,
+      "events": [
+        {
+          "index": 166,
+          "timestamp": "2026-06-12T19:45:00+00:00",
+          "atr": 1.7590769127374029,
+          "volume_ratio": 3.1318003758320696,
+          "success": true
+        },
+        {
+          "index": 194,
+          "timestamp": "2026-06-15T19:30:00+00:00",
+          "atr": 0.9418031871493404,
+          "volume_ratio": 2.795241195757439,
+          "success": true
+        },
+        {
+          "index": 195,
+          "timestamp": "2026-06-15T19:45:00+00:00",
+          "atr": 0.984531530924393,
+          "volume_ratio": 7.002760185441585,
+          "success": true
+        },
+        {
+          "index": 221,
+          "timestamp": "2026-06-16T19:15:00+00:00",
+          "atr": 0.9309258851511252,
+          "volume_ratio": 2.9426923973961374,
+          "success": false
+        },
+        {
+          "index": 222,
+          "timestamp": "2026-06-16T19:30:00+00:00",
+          "atr": 0.9337168933546182,
+          "volume_ratio": 2.026579139282082,
+          "success": false
+        },
+        {
+          "index": 223,
+          "timestamp": "2026-06-16T19:45:00+00:00",
+          "atr": 0.9641656866864322,
+          "volume_ratio": 11.457530839590799,
+          "success": false
+        },
+        {
+          "index": 430,
+          "timestamp": "2026-06-26T18:45:00+00:00",
+          "atr": 1.6226785214842683,
+          "volume_ratio": 2.1224680173209456,
+          "success": true
+        },
+        {
+          "index": 432,
+          "timestamp": "2026-06-26T19:15:00+00:00",
+          "atr": 1.5728197455655153,
+          "volume_ratio": 2.527194644862213,
+          "success": true
+        },
+        {
+          "index": 433,
+          "timestamp": "2026-06-26T19:30:00+00:00",
+          "atr": 1.5711897637394119,
+          "volume_ratio": 2.178707211228573,
+          "success": true
+        },
+        {
+          "index": 462,
+          "timestamp": "2026-06-29T19:45:00+00:00",
+          "atr": 1.2883924346001956,
+          "volume_ratio": 9.467408168898787,
+          "success": true
+        },
+        {
+          "index": 465,
+          "timestamp": "2026-06-30T13:30:00+00:00",
+          "atr": 1.1977653712888574,
+          "volume_ratio": 2.867110566515989,
+          "success": true
+        },
+        {
+          "index": 466,
+          "timestamp": "2026-06-30T13:45:00+00:00",
+          "atr": 1.2729249876253677,
+          "volume_ratio": 2.270089119021428,
+          "success": true
+        },
+        {
+          "index": 489,
+          "timestamp": "2026-06-30T19:30:00+00:00",
+          "atr": 0.7794845632811587,
+          "volume_ratio": 2.4108203456118105,
+          "success": true
+        },
+        {
+          "index": 490,
+          "timestamp": "2026-06-30T19:45:00+00:00",
+          "atr": 0.8298785230467912,
+          "volume_ratio": 8.866472328815252,
+          "success": true
+        },
+        {
+          "index": 493,
+          "timestamp": "2026-07-01T13:30:00+00:00",
+          "atr": 1.0122861206755827,
+          "volume_ratio": 2.8567697052939987,
+          "success": true
+        },
+        {
+          "index": 494,
+          "timestamp": "2026-07-01T13:45:00+00:00",
+          "atr": 1.1128371120558953,
+          "volume_ratio": 2.466805814503426,
+          "success": true
+        },
+        {
+          "index": 518,
+          "timestamp": "2026-07-01T19:45:00+00:00",
+          "atr": 0.8963489572623058,
+          "volume_ratio": 7.935413125581243,
+          "success": true
+        },
+        {
+          "index": 574,
+          "timestamp": "2026-07-06T19:45:00+00:00",
+          "atr": 0.9082916376220671,
+          "volume_ratio": 8.665907473309609,
+          "success": true
+        },
+        {
+          "index": 602,
+          "timestamp": "2026-07-07T19:45:00+00:00",
+          "atr": 0.9171575012183052,
+          "volume_ratio": 6.3167798327931575,
+          "success": true
+        },
+        {
+          "index": 660,
+          "timestamp": "2026-07-09T19:30:00+00:00",
+          "atr": 0.7683648599842551,
+          "volume_ratio": 2.0886484447109392,
+          "success": true
+        }
+      ]
+    },
+    "EURUSD": {
+      "instrument": "EURUSD",
+      "total_events": 0,
+      "successful_events": 0,
+      "success_rate": 0.0,
+      "events": []
+    }
+  }
+}

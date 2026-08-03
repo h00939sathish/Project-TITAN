@@ -1,0 +1,25 @@
+{
+  "experiment_id": "EXP-00015",
+  "canonical_rq": "RQ-005",
+  "title": "Regime-Dependent Momentum Breakdown",
+  "timestamp": "2026-08-03T19:18:11.494194+00:00",
+  "decision": "REJECTED",
+  "results": {
+    "SPY": {
+      "instrument": "SPY",
+      "trending_sharpe": 0.73,
+      "rangebound_sharpe": 3.76,
+      "sharpe_delta": -3.03,
+      "trending_bars": 641,
+      "rangebound_bars": 370
+    },
+    "EURUSD": {
+      "instrument": "EURUSD",
+      "trending_sharpe": -4.08,
+      "rangebound_sharpe": -0.09,
+      "sharpe_delta": -3.99,
+      "trending_bars": 581,
+      "rangebound_bars": 368
+    }
+  }
+}
