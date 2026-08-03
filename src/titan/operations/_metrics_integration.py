@@ -21,6 +21,7 @@ trading_state_changed = _REGISTRY.counter("trading_state_changed")
 positions_open = _REGISTRY.gauge("positions_open")
 gross_exposure = _REGISTRY.gauge("gross_exposure")
 cash_balance = _REGISTRY.gauge("cash_balance")
+drawdown_fraction = _REGISTRY.gauge("drawdown_fraction")
 
 # Execution metrics
 orders_submitted = _REGISTRY.counter("orders_submitted")
@@ -28,6 +29,8 @@ orders_filled = _REGISTRY.counter("orders_filled")
 orders_rejected = _REGISTRY.counter("orders_rejected")
 orders_cancelled = _REGISTRY.counter("orders_cancelled")
 orders_unknown = _REGISTRY.counter("orders_unknown")
+order_latency_seconds = _REGISTRY.histogram("order_latency_seconds")
+
 
 # Reconciliation metrics
 drift_count_warning = _REGISTRY.gauge("drift_count_warning")
@@ -36,3 +39,12 @@ last_reconciliation_age_seconds = _REGISTRY.gauge("last_reconciliation_age_secon
 
 # System state
 system_state = _REGISTRY.gauge("system_state")
+
+# Governance & Qualification metrics
+qualified_strategies = _REGISTRY.gauge("qualified_strategies")
+watchlist_strategies = _REGISTRY.gauge("watchlist_strategies")
+shadow_trades_total = _REGISTRY.counter("shadow_trades_total")
+blocked_orders_total = _REGISTRY.counter("blocked_orders_total")
+gate_rejections_total = _REGISTRY.counter("gate_rejections_total")
+qualification_age_days = _REGISTRY.gauge("qualification_age_days")
+

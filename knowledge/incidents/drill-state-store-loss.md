@@ -23,5 +23,11 @@ Simulate event store unavailability. Verify:
 
 - Detection: ⚠️ Partial — EventStore constructor succeeds for new paths
 - Containment: ✅ RiskGate is independent of persistence (in-memory state)
-- Recovery: ⚠️ State persistence across restarts is deferred
-- Gaps: Event store corruption detection, state persistence, fail-halted on unreadable store
+- Recovery: ✅ Fixed 2026-07-14 — `transition_on_boot()` now detects empty store and forces HALTED
+- Gaps: Event store corruption detection, state persistence
+
+## Fix (2026-07-14)
+
+**Problem:** `recover_from_event_store()` used `RiskGate.load_or_default()` which correctly returns Halted for an empty store, but `transition_on_boot()` then overrode it to Active when no drift was detected (empty portfolio + empty broker = match).
+
+**Fix:** `recover_from_event_store()` now detects whether the store had prior state (`store.count() > 0`). `transition_on_boot()` accepts a `store_was_empty` flag and keeps the system HALTED when set, regardless of drift state.

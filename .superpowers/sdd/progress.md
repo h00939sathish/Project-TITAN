@@ -15,3 +15,15 @@ Task G1: complete (76371ec..195cb54, review clean, fix: apply_snapshot helper)
 Task G2: complete (195cb54..e6be7d8, review clean, fix: dead variable)
 Task G3: complete (e6be7d8..a164315, no review needed, CLI verified)
 Task G4: complete (a164315..6a850b0, review clean, 15 tests, 10/14 FAILURE_MATRIX rows)
+Task G5: complete (6a850b0..fee704f, review clean, 156 total)
+Task G6: complete (fee704f..3de8fa8, DONE_WITH_CONCERNS: unit label bug in brief code, encoding fix)
+Task forex: complete (19 tests, backtest verified, lint clean)
+
+Task 1: complete (0225053..0ab3e0c, review clean)
+
+Task 2: complete (0ab3e0c..20e7ffd, review clean)
+
+Task 3: complete (20e7ffd..965d66b, 94-pass safety evidence)
+
+Task 4: complete (965d66b..fae6c1c, docs + verify)
+Plan complete: 0225053..fae6c1c (6 commits, 136 tests, review clean)

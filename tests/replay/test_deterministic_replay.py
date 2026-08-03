@@ -80,24 +80,18 @@ class TestDeterministicReplay:
 
 class TestStrategyDrivenReplay:
     def test_ma_strategy_drives_replay(self):
+        from datetime import datetime, timezone
         from titan.strategies.moving_average import MovingAverageCrossover
-        from titan.strategies.manifest import StrategyManifest
-        from titan.strategies.runtime import StrategyRuntime
-        from titan._core import PortfolioEngine, Money, RiskGate, RiskConfig
-
-        # Setup
-        strat = MovingAverageCrossover(fast_period=2, slow_period=3)
-        manifest = StrategyManifest(
-            "ma-test", "1.0",
-            package_digest=StrategyManifest("ma-test", "1.0", universe=["AAPL"]).compute_digest(),
-            universe=["AAPL"],
+        from titan._core import (
+            PortfolioEngine, Money, RiskGate, RiskConfig, TradeIntent,
         )
-        rt = StrategyRuntime()
-        rt.register("ma-test", strat, manifest)
+
+        strat = MovingAverageCrossover(fast_period=2, slow_period=3)
         portfolio = PortfolioEngine("USD", Money("100000", "USD"))
         config = RiskConfig([], Money("1000000", "USD"), 1000, 5000,
-                            Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000)
+                            Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100)
         gate = RiskGate(config)
+        now = datetime.now(timezone.utc).isoformat()
 
         bars = [
             {"close": 100}, {"close": 101}, {"close": 99},
@@ -107,8 +101,20 @@ class TestStrategyDrivenReplay:
         for bar in bars:
             signal = strat.update(bar["close"])
             if signal:
-                intent = rt.emit_intent("ma-test", "AAPL", signal, "10", price=str(int(bar["close"])))
-                verdict = gate.evaluate(intent, None, None, None, None)
+                intent = TradeIntent(
+                    strategy_id="ma-test",
+                    strategy_package_digest="",
+                    account_id="paper-1",
+                    instrument_id="AAPL",
+                    side=signal,
+                    quantity="10",
+                    order_type="LIMIT",
+                    time_in_force="DAY",
+                    risk_profile_version="1.0",
+                    market_data_timestamp=now,
+                    price=str(int(bar["close"])),
+                )
+                verdict = gate.evaluate(intent, None, None, None, None, None)
                 if verdict.accepted:
                     portfolio.apply_fill("AAPL", signal.lower(), 10,
                                          Money(str(int(bar["close"])), "USD"))

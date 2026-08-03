@@ -1,130 +1,61 @@
-# Task F2: Conduct Operational Readiness Review
+### Task 2: Fail closed when boot reconciliation cannot fetch truth
 
-## Goal
+**Files:**
 
-Walk through every item in `specifications/ORR-checklist.md`, verify or waive each, and produce a signed assessment document at `knowledge/benchmarks/orr-phase-f-assessment.md`.
+- Modify: src/titan/recovery/restart.py
+- Modify: tests/recovery/test_restart.py
 
-## Files to create
+**Interfaces:**
 
-- `knowledge/benchmarks/orr-phase-f-assessment.md` — the ORR assessment document
+- Consumes: adapter positions and holdings snapshots.
+- Produces: snapshot_fetch_failed=True, reconciled=False, and HALTED (broker truth unavailable) when either fetch fails.
 
-## Structure of the assessment document
+- [ ] **Step 1: Write the failing recovery test**
 
-### 1. Architecture
+    class SnapshotFailureAdapter:
+        def positions(self, account_id: str):
+            raise RuntimeError("positions unavailable")
+        def holdings(self, account_id: str):
+            raise RuntimeError("holdings unavailable")
 
-For each item in ORR-checklist.md Architecture section:
-- Read each spec file in `specifications/` (there are 8+ .spec.md files plus cross-cutting specs)
-- Verify each subsystem boundary is documented
-- Verify the event store is canonical source (check core/src/event_store.rs)
-- Check for disposable caches
+    def test_boot_stays_halted_when_broker_truth_is_unavailable():
+        portfolio = PortfolioEngine("USD", Money("100000", "USD"))
+        recon = ReconciliationEngine(ReconciliationConfig(0.05, 0.01))
+        result = reconcile_on_boot(portfolio, SnapshotFailureAdapter(), recon)
+        gate = RiskGate(RiskConfig.default())
+        assert result["snapshot_fetch_failed"] is True
+        assert result["reconciled"] is False
+        assert transition_on_boot(result, gate) == "HALTED (broker truth unavailable)"
+        assert gate.trading_state == TradingState.Halted
 
-### 2. Performance
+- [ ] **Step 2: Verify red**
 
-Note all budgets from PERFORMANCE_SPEC.md. Since no benchmarks have been recorded in `knowledge/benchmarks/`, every item will be marked as "Not yet measured — deferred to post-Phase-F optimization cycle."
+Run: python -m pytest -q tests/recovery/test_restart.py::TestRecoverFromEventStore::test_boot_stays_halted_when_broker_truth_is_unavailable
 
-### 3. Risk controls
+Expected: FAIL because current recovery swallows snapshot exceptions.
 
-Check the following against the codebase:
-- Is risk gate the sole path? (check core/src/risk.rs, check that only RiskGate::evaluate creates ApprovedOrderIntent)
-- Are all 9 risk checks from Risk.spec.md implemented and tested? (check core/src/risk.rs tests)
-- Does kill switch persist across restarts? (check current implementation — currently in-memory only)
-- Has kill switch been tested end-to-end? (check tests/integration/test_paper_vertical_slice.py)
-- Is manual release procedure documented? (check docs/runbooks/paper-session.md)
+- [ ] **Step 3: Implement explicit failure state**
 
-### 4. Monitoring and alerting
+Set snapshot_fetch_failed in each snapshot exception handler. When it is true, return:
+    {
+        "has_drift": True,
+        "drift_count": 0,
+        "drift_details": ["broker truth snapshot unavailable"],
+        "reconciled": False,
+        "snapshot_fetch_failed": True,
+    }
 
-Evaluate the telemetry module created in F1:
-- structured logs with correlation_id
-- Metrics emitted for risk, kill-switch, drift, event lag
-- Safety alerts
-- Dashboard existence
+At the start of transition_on_boot, detect this flag, set TradingState.Halted, and return HALTED (broker truth unavailable).
 
-### 5. Recovery
+- [ ] **Step 4: Verify green**
 
-Evaluate:
-- Restart procedure (load from event store, reconcile)
-- Event store loss recovery
-- Broker disconnect procedure  
-- Reconciliation drift handling (check Rust implementation)
-- Chaos tests
+Run: python -m pytest -q tests/recovery/test_restart.py tests/adapters/test_simulated_adapter_contract.py
 
-### 6. Testing
+Expected: PASS.
 
-- Check FAILURE_MATRIX.md rows against existing tests
-  - Broker disconnect: tests/integration/test_paper_vertical_slice.py has some coverage
-  - Broker timeout: simulated adapter in tests/adapters/
-  - Duplicate fill: not directly tested
-  - Event store write failure: not tested
-  - Event store corruption: not tested
-  - Reconciliation drift: core/src/reconciliation.rs has tests
-  - Kill switch: core/src/risk.rs has tests
-  - Configuration load failure: not tested
-- Count unit tests (62 Rust + Python)
-- Count integration tests
-- Count replay tests
+- [ ] **Step 5: Commit**
 
-### 7. Security
+    git add src/titan/recovery/restart.py tests/recovery/test_restart.py
+    git commit -m "fix: halt recovery when broker truth is unavailable"
 
-All items: no credentials in source. (This is paper-only.)
 
-### 8. Runbooks
-
-Check docs/runbooks/paper-session.md and docs/runbooks/incident.md exist and cover required items.
-
-### 9. Rust/Python boundary evaluation
-
-Evaluate each subsystem:
-- Risk (Rust core + Python CLI wrappers) — good boundary?
-- Portfolio (Rust core) — good?
-- Reconciliation (Rust core) — good?
-- Orders/state machines (Rust core) — good?
-- Event store (Rust core, Python tests) — good?
-- Strategy (Python) — good?
-- Data pipeline (Python) — good?
-- Backtest (Python) — good?
-- Telemetry (Python, F1) — good?
-
-Identify any code paths that should move:
-- Python to Rust: event store scanning for replay could be faster in Rust
-- Rust to Python: none identified
-
-### 10. Optimization priority list
-
-Based on gaps found, priority-order the optimizations:
-1. Benchmark harness — establish baseline measurements
-2. Performance benchmarks for key budgets
-3. Event store persistence for kill switch state
-4. Structured logging wired into runtime
-5. Metrics emission wired into runtime
-
-### 11. Sign-off
-
-Include sign-off section:
-- **Architecture Council representative:** (self-review: [name])
-- **Risk Owner:** (self-review: [name])
-- **Developer (self-review):** TITAN Development
-
-**Date:** 2026-07-13
-**Result:** Conditional (list conditions)
-
-## Conditions for this phase
-
-Document which ORR items are NOT yet met and are waived for this phase. Key conditions:
-1. Performance benchmarks not yet measured — deferred to post-Phase-F optimization
-2. Kill-switch state persistence is in-memory only — acceptable for paper
-3. No live dashboards or alerting infrastructure — acceptable for paper
-4. FAILURE_MATRIX coverage is partial — remaining rows noted for future phases
-
-## Acceptance criteria
-
-- Document exists at `knowledge/benchmarks/orr-phase-f-assessment.md`
-- Every ORR-checklist.md item has a clear verdict: ✅ Verified, ⚠️ Partial, ❌ Missing
-- Rust/Python boundary is evaluated
-- Optimization priority list exists
-- Sign-off section is filled
-
-## Constraints
-
-- No code changes — this is purely a documentation/assessment task
-- Be honest about gaps — this is a paper-only assessment, not a live trading sign-off
-- Follow the same format as existing knowledge/ documents

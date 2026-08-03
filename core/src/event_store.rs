@@ -28,7 +28,9 @@ impl EventStore {
         })?;
 
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS events (
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             CREATE TABLE IF NOT EXISTS events (
                 message_id TEXT PRIMARY KEY,
                 message_type TEXT NOT NULL,
                 schema_version INTEGER NOT NULL,
@@ -234,5 +236,136 @@ impl EventStore {
             .map_err(|e| PyRuntimeError::new_err(format!("Query error: {}", e)))?;
 
         Ok(count)
-    }
-}
+            }
+        }
+
+        // ─── Tests ───────────────────────────────────────────────────────────────────────
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            fn make_event(msg_type: &str, agg_type: &str, agg_id: &str) -> EventEnvelope {
+                EventEnvelope::new(
+                    msg_type.to_string(),
+                    agg_type.to_string(),
+                    agg_id.to_string(),
+                    "test".to_string(),
+                    r#"{"key":"value"}"#.to_string(),
+                    None, None, None,
+                )
+            }
+
+            #[test]
+            fn test_empty_store_count() {
+                let store = EventStore::new(":memory:").unwrap();
+                assert_eq!(store.count().unwrap(), 0);
+            }
+
+            #[test]
+            fn test_append_and_count() {
+                let store = EventStore::new(":memory:").unwrap();
+                let event = make_event("OrderSubmitted", "Order", "ord-1");
+                store.append(&event).unwrap();
+                assert_eq!(store.count().unwrap(), 1);
+            }
+
+            #[test]
+            fn test_replay_all_empty() {
+                let store = EventStore::new(":memory:").unwrap();
+                let events = store.replay_all().unwrap();
+                assert!(events.is_empty());
+            }
+
+            #[test]
+            fn test_replay_all_returns_all() {
+                let store = EventStore::new(":memory:").unwrap();
+                store.append(&make_event("A", "Order", "1")).unwrap();
+                store.append(&make_event("B", "Order", "1")).unwrap();
+                store.append(&make_event("C", "Trade", "2")).unwrap();
+                let events = store.replay_all().unwrap();
+                assert_eq!(events.len(), 3);
+            }
+
+            #[test]
+            fn test_replay_aggregate() {
+                let store = EventStore::new(":memory:").unwrap();
+                store.append(&make_event("Created", "Order", "ord-1")).unwrap();
+                store.append(&make_event("Filled", "Order", "ord-1")).unwrap();
+                store.append(&make_event("Created", "Order", "ord-2")).unwrap();
+
+                let events = store.replay_aggregate("Order", "ord-1").unwrap();
+                assert_eq!(events.len(), 2);
+                assert_eq!(events[0].message_type, "Created");
+                assert_eq!(events[1].message_type, "Filled");
+            }
+
+            #[test]
+            fn test_replay_by_type() {
+                let store = EventStore::new(":memory:").unwrap();
+                store.append(&make_event("OrderSubmitted", "Order", "1")).unwrap();
+                store.append(&make_event("TradeExecuted", "Trade", "2")).unwrap();
+                store.append(&make_event("OrderSubmitted", "Order", "3")).unwrap();
+
+                let events = store.replay_by_type("OrderSubmitted").unwrap();
+                assert_eq!(events.len(), 2);
+            }
+
+            #[test]
+            fn test_duplicate_message_id_rejected() {
+                Python::initialize();
+                let store = EventStore::new(":memory:").unwrap();
+                let event = make_event("Test", "TestAgg", "agg-1");
+                store.append(&event).unwrap();
+                let result = store.append(&event);
+                assert!(result.is_err());
+                let err = result.unwrap_err();
+                assert!(err.to_string().contains("Duplicate"), "expected Duplicate error, got: {}", err);
+            }
+
+            #[test]
+            fn test_close_then_append_fails() {
+                Python::initialize();
+                let store = EventStore::new(":memory:").unwrap();
+                store.close().unwrap();
+                let event = make_event("Test", "TestAgg", "agg-1");
+                let result = store.append(&event);
+                assert!(result.is_err());
+                assert!(result.unwrap_err().to_string().contains("closed"));
+            }
+
+            #[test]
+            fn test_multiple_aggregates_independent() {
+                let store = EventStore::new(":memory:").unwrap();
+                store.append(&make_event("Buy", "Order", "AAPL")).unwrap();
+                store.append(&make_event("Sell", "Order", "MSFT")).unwrap();
+                store.append(&make_event("Buy", "Order", "AAPL")).unwrap();
+
+                let aapl_events = store.replay_aggregate("Order", "AAPL").unwrap();
+                assert_eq!(aapl_events.len(), 2);
+
+                let msft_events = store.replay_aggregate("Order", "MSFT").unwrap();
+                assert_eq!(msft_events.len(), 1);
+            }
+
+            #[test]
+            fn test_causation_and_correlation_ids() {
+                let store = EventStore::new(":memory:").unwrap();
+                let event = EventEnvelope::new(
+                    "Child".to_string(),
+                    "Order".to_string(),
+                    "ord-1".to_string(),
+                    "test".to_string(),
+                    "{}".to_string(),
+                    Some("corr-1".to_string()),
+                    Some("parent-1".to_string()),
+                    Some(r#"{"source":"pytest"}"#.to_string()),
+                );
+                store.append(&event).unwrap();
+                let events = store.replay_all().unwrap();
+                assert_eq!(events.len(), 1);
+                assert_eq!(events[0].correlation_id, "corr-1");
+                assert_eq!(events[0].causation_id, Some("parent-1".to_string()));
+                assert_eq!(events[0].metadata, Some(r#"{"source":"pytest"}"#.to_string()));
+            }
+        }

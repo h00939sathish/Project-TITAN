@@ -33,7 +33,7 @@ from nautilus_trader.model.data import Bar, BarType
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.trading.strategy import Strategy
 
-from titan._core import Money, RiskConfig, TradeIntent
+from titan._core import ContractType, Instrument, InstrumentId as TitanInstrumentId, Money, RiskConfig, TradeIntent
 from titan.execution.engine import PaperConfig, PaperTradingEngine
 from titan.runtime.events import MarketEvent, StrategyDefinition, TriggerSpec
 from titan.runtime.evaluator import RuntimeEvaluator
@@ -52,9 +52,21 @@ ACCOUNT_ID = os.getenv("TWS_ACCOUNT", "DUQ284074")
 AUTO_STOP_SECS = int(os.getenv("AUTO_STOP_SECS", "0"))
 
 INSTRUMENT_CONFIG = {
-    "SPY.ARCA": {
+    "SPY=STK.ARCA": {
         "price_type": "LAST",
         "timeframes": ["5-MINUTE", "15-MINUTE", "1-HOUR", "1-DAY"],
+    },
+    "QQQ=STK.NASDAQ": {
+        "price_type": "LAST",
+        "timeframes": ["5-MINUTE", "15-MINUTE", "1-HOUR", "1-DAY"],
+    },
+    "EUR.USD=CASH.IDEALPRO": {
+        "price_type": "MIDPOINT",
+        "timeframes": ["5-MINUTE", "15-MINUTE", "1-HOUR"],
+    },
+    "GBP.USD=CASH.IDEALPRO": {
+        "price_type": "MIDPOINT",
+        "timeframes": ["5-MINUTE", "15-MINUTE", "1-HOUR"],
     },
 }
 
@@ -80,6 +92,35 @@ STRATEGY_PARAMS = {
     "volatility-regime": {"vol_window": 20, "median_window": 60, "vol_multiple": 1.0},
     "dual-ma": {"fast": 5, "slow": 20},
 }
+
+
+def _paper_instruments() -> dict[str, Instrument]:
+    """Return the canonical TITAN contracts for the configured data ingress."""
+    return {
+        "SPY=STK.ARCA": Instrument(
+            TitanInstrumentId("SPY", "ARCA"), "0.01", 1, "1.0",
+            ContractType.Stock, "USD", 2,
+        ),
+        "QQQ=STK.NASDAQ": Instrument(
+            TitanInstrumentId("QQQ", "NASDAQ"), "0.01", 1, "1.0",
+            ContractType.Stock, "USD", 2,
+        ),
+        "EUR.USD=CASH.IDEALPRO": Instrument(
+            TitanInstrumentId("EURUSD", "IDEALPRO"), "0.0001", 1000, "1.0",
+            ContractType.Forex, "EUR", 5,
+        ),
+        "GBP.USD=CASH.IDEALPRO": Instrument(
+            TitanInstrumentId("GBPUSD", "IDEALPRO"), "0.0001", 1000, "1.0",
+            ContractType.Forex, "GBP", 5,
+        ),
+    }
+
+
+def _start_paper_engine(engine: PaperTradingEngine) -> None:
+    """Register canonical contracts before the fail-closed broker synchronization."""
+    for instrument_id, instrument in _paper_instruments().items():
+        engine.register_instrument(instrument, instrument_id)
+    engine.start(sync_from_broker=True)
 
 
 def _bar_type_str(inst_id: str, timeframe: str, price_type: str) -> str:
@@ -267,10 +308,11 @@ def _build_titan_runtime():
         5000, 100,
     )
 
+    EXEC_CLIENT_ID = int(os.getenv("IB_EXEC_CLIENT_ID", "1202"))
     try:
         from titan.execution.ibkr_adapter import IBKRPaperAdapter
-        adapter = IBKRPaperAdapter()
-        log.info("adapter: IBKRPaperAdapter (live IBKR paper)")
+        adapter = IBKRPaperAdapter(client_id=EXEC_CLIENT_ID)
+        log.info(f"adapter: IBKRPaperAdapter (live IBKR paper, client_id={EXEC_CLIENT_ID})")
     except Exception:
         from titan.execution.simulated_adapter import SimulatedAdapter
         log.warning("adapter: IBKR unavailable, using SimulatedAdapter")
@@ -320,7 +362,7 @@ def main():
     _print_qualification_summary()
 
     inst_provider = InteractiveBrokersInstrumentProviderConfig(
-        symbology_method=SymbologyMethod.IB_SIMPLIFIED,
+        symbology_method=SymbologyMethod.IB_RAW,
         load_ids=frozenset(INSTRUMENT_CONFIG.keys()),
     )
 
@@ -358,6 +400,8 @@ def main():
     node.trader.add_strategy(strategy)
     node.add_data_client_factory(IB, InteractiveBrokersLiveDataClientFactory)
     node.build()
+
+    _start_paper_engine(engine)
 
     if AUTO_STOP_SECS > 0:
         def stop():

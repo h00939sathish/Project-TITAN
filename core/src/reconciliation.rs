@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use pyo3::prelude::*;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use crate::portfolio::{PortfolioEngine, PositionSide};
 use crate::types::Money;
 
 // ─── ReconciliationDriftSeverity ────────────────────────────────────────────────
 
-#[pyclass(eq, eq_int)]
+#[pyclass(eq, eq_int, from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReconciliationDriftSeverity {
     InSync,
@@ -15,7 +17,7 @@ pub enum ReconciliationDriftSeverity {
 
 // ─── PositionDrift ──────────────────────────────────────────────────────────────
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PositionDrift {
     #[pyo3(get)]
@@ -34,7 +36,7 @@ pub struct PositionDrift {
 
 // ─── ReconciliationResult ────────────────────────────────────────────────────────
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct ReconciliationResult {
     #[pyo3(get)]
@@ -53,7 +55,7 @@ pub struct ReconciliationResult {
 
 // ─── ReconciliationConfig ────────────────────────────────────────────────────────
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct ReconciliationConfig {
     #[pyo3(get, set)]
@@ -85,7 +87,7 @@ impl Default for ReconciliationConfig {
 
 // ─── BrokerPosition ────────────────────────────────────────────────────────────
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct BrokerPosition {
     #[pyo3(get)]
@@ -110,7 +112,7 @@ impl BrokerPosition {
 
 // ─── ReconciliationEngine ────────────────────────────────────────────────────────
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct ReconciliationEngine {
     config: ReconciliationConfig,
@@ -173,12 +175,10 @@ impl ReconciliationEngine {
 
         let cash_expected = portfolio.get_cash_balance();
         let cash_actual = broker_cash.clone();
-        let cash_exp_amount = parse_amount(&cash_expected).unwrap_or(0);
-        let cash_act_amount = parse_amount(&cash_actual).unwrap_or(0);
-        let cash_drift_amount = (cash_exp_amount - cash_act_amount).unsigned_abs() as i64;
+        let cash_drift_amount = (cash_expected.amount - cash_actual.amount).abs();
 
         // Determine severity
-        let severity = self.compute_severity(&position_drifts, cash_exp_amount, cash_act_amount);
+        let severity = self.compute_severity(&position_drifts, cash_expected.amount, cash_actual.amount);
 
         let summary = format!(
             "Reconciliation: {:?} — {} position drift(s), cash drift {}",
@@ -187,7 +187,7 @@ impl ReconciliationEngine {
             cash_drift_amount,
         );
 
-        let cash_drift = Money::new(&cash_drift_amount.to_string(), &cash_expected.currency);
+        let cash_drift = Money { amount: cash_drift_amount, currency: cash_expected.currency.clone() };
 
         ReconciliationResult {
             severity,
@@ -204,8 +204,8 @@ impl ReconciliationEngine {
     fn compute_severity(
         &self,
         drifts: &[PositionDrift],
-        cash_exp_amount: i64,
-        cash_act_amount: i64,
+        cash_exp_amount: Decimal,
+        cash_act_amount: Decimal,
     ) -> ReconciliationDriftSeverity {
         let mut severity = ReconciliationDriftSeverity::InSync;
 
@@ -227,12 +227,12 @@ impl ReconciliationEngine {
 
         // Cash drift check
         if severity != ReconciliationDriftSeverity::Critical {
-            let cash_drift_amount = (cash_exp_amount - cash_act_amount).unsigned_abs() as i64;
+            let cash_drift_amount = (cash_exp_amount - cash_act_amount).abs();
             let max_cash = cash_exp_amount
                 .abs()
                 .max(cash_act_amount.abs())
-                .max(1);
-            let cash_drift_fraction = cash_drift_amount as f64 / max_cash as f64;
+                .max(Decimal::ONE);
+            let cash_drift_fraction = cash_drift_amount.to_f64().unwrap_or(0.0) / max_cash.to_f64().unwrap_or(1.0);
 
             if cash_drift_fraction > self.config.critical_drift_fraction {
                 return ReconciliationDriftSeverity::Critical;
@@ -249,9 +249,9 @@ impl ReconciliationEngine {
 // ─── Private helpers ─────────────────────────────────────────────────────────────
 
 fn signed_broker(side: &str, quantity: i64) -> i64 {
-    match side {
-        "LONG" => quantity,
-        "SHORT" => -quantity.abs(),
+    match side.to_ascii_uppercase().as_str() {
+        "LONG" | "BUY" => quantity,
+        "SHORT" | "SELL" => -quantity.abs(),
         _ => 0,
     }
 }
@@ -262,10 +262,6 @@ fn signed_position(side: PositionSide, quantity: u64) -> (String, i64) {
         PositionSide::Long => ("LONG".to_string(), quantity as i64),
         PositionSide::Short => ("SHORT".to_string(), -(quantity as i64)),
     }
-}
-
-fn parse_amount(m: &Money) -> Option<i64> {
-    m.amount.parse::<i64>().ok()
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────────

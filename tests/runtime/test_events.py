@@ -43,12 +43,26 @@ def test_event_ordering():
 
 
 def test_duplicate_message_rejection(evaluator, event_factory):
-    event = event_factory.bar_closed(Timeframe.FIVE_MINUTES)
+    event = event_factory.bar_closed(Timeframe.ONE_DAY)
     definition = StrategyDefinition(
         strategy_id="ma-crossover",
-        trigger=TriggerSpec(event_type="BarClosed", timeframe=Timeframe.FIVE_MINUTES),
+        trigger=TriggerSpec(event_type="BarClosed", timeframe=Timeframe.ONE_DAY),
     )
     evaluator.register(definition)
+
+    class DummyProducer:
+        def on_market_event(self, event):
+            from titan.runtime.events import TradeProposal
+            return [TradeProposal(
+                proposal_id="1", strategy_id="ma-crossover", producer_kind="strategy",
+                instrument_id=event.instrument_id, side="BUY", quantity=0.0,
+                price=10.0, timeframe=Timeframe.ONE_DAY,
+                close_timestamp=event.occurred_at, rationale_digest="",
+                sources=[event.message_id]
+            )]
+    evaluator.set_producer(DummyProducer())
+
+
     result1 = evaluator.on_market_event(event)
     assert len(result1.proposals) > 0
     result2 = evaluator.on_market_event(event)

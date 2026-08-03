@@ -9,7 +9,10 @@ log = logging.getLogger("titan.runtime")
 
 
 class MultiTimeframeRuntime:
-    def __init__(self, definitions: list[StrategyDefinition] | None = None):
+    DEFAULT_EQUITY = 100_000
+
+    def __init__(self, definitions: list[StrategyDefinition] | None = None, risk_pct: float = 10.0,
+                 watchlist_ids: set[str] | None = None):
         self._reg = get_registry()
         self._definitions: list[StrategyDefinition] = []
         self._signal_fns: dict[tuple[str, str, Timeframe], object] = {}
@@ -18,6 +21,8 @@ class MultiTimeframeRuntime:
         self._last_sides: dict[tuple[str, str, Timeframe], str | None] = {}
         self._last_timestamps: dict[tuple[str, str, Timeframe], datetime | None] = {}
         self._staleness_threshold_seconds: float = 86400
+        self._risk_pct = risk_pct
+        self._watchlist_ids: set[str] = watchlist_ids or set()
 
         if definitions:
             for d in definitions:
@@ -58,11 +63,17 @@ class MultiTimeframeRuntime:
                 continue
 
             registration = self._reg.get(d.strategy_id)
-            if not registration.is_qualified_for(tf, d.params):
+            is_qualified = registration.is_qualified_for(tf, d.params)
+            if not is_qualified and d.strategy_id not in self._watchlist_ids:
                 log.info(
                     f"[gate] SKIP: {d.strategy_id} ({tf}) — not qualified"
                 )
                 continue
+            producer_kind = "shadow" if d.strategy_id in self._watchlist_ids else "strategy"
+            if producer_kind == "shadow":
+                log.info(
+                    f"[gate] SHADOW: {d.strategy_id} ({tf}) — watchlist, routing to shadow deployer"
+                )
 
             if self._last_timestamps.get(key) == close_ts:
                 continue
@@ -81,13 +92,14 @@ class MultiTimeframeRuntime:
             if self._last_sides.get(key) == signal:
                 continue
 
+            shares = max(1, int(self.DEFAULT_EQUITY * self._risk_pct / 100.0 / close))
             proposal = TradeProposal(
                 proposal_id=f"prop-{event.message_id}-{d.strategy_id}",
                 strategy_id=d.strategy_id,
-                producer_kind="strategy",
+                producer_kind=producer_kind,
                 instrument_id=event.instrument_id,
                 side=signal,
-                quantity=1.0,
+                quantity=float(shares),
                 price=close,
                 timeframe=tf,
                 close_timestamp=close_ts,

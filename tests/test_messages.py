@@ -53,7 +53,7 @@ class TestTradeIntent:
     def test_create_minimal(self) -> None:
         intent = TradeIntent(
             "strat-1", "abc123", "acc-1", "AAPL.NASDAQ",
-            "BUY", "100", "MARKET", "DAY", "1.0",
+            "BUY", "100", "MARKET", "DAY", "1.0", "2026-07-13T23:12:00Z"
         )
         assert intent.strategy_id == "strat-1"
         assert intent.side == "BUY"
@@ -64,7 +64,7 @@ class TestTradeIntent:
     def test_create_with_limit(self) -> None:
         intent = TradeIntent(
             "strat-1", "abc123", "acc-1", "AAPL.NASDAQ",
-            "SELL", "200", "LIMIT", "GTC", "1.0",
+            "SELL", "200", "LIMIT", "GTC", "1.0", "2026-07-13T23:12:00Z",
             price="150.50",
         )
         assert intent.side == "SELL"
@@ -74,7 +74,7 @@ class TestTradeIntent:
 
     def test_round_trip_json(self) -> None:
         intent = TradeIntent(
-            "s1", "d1", "a1", "AAPL", "BUY", "50", "MARKET", "DAY", "1.0",
+            "s1", "d1", "a1", "AAPL", "BUY", "50", "MARKET", "DAY", "1.0", "2026-07-13T23:12:00Z",
         )
         json_str = intent.to_json()
         restored = TradeIntent.from_json(json_str)
@@ -86,7 +86,7 @@ class TestTradeIntent:
 class TestRiskDecision:
     def test_accepted(self) -> None:
         decision = RiskDecision(
-            "intent-1", "ACCEPTED", [], '[]',
+            "018f0a0d-1234-7890-abcd-ef0123456789", "ACCEPTED", [], '[]',
         )
         assert decision.decision == "ACCEPTED"
         assert decision.reason_codes == []
@@ -94,7 +94,7 @@ class TestRiskDecision:
 
     def test_rejected(self) -> None:
         decision = RiskDecision(
-            "intent-1", "REJECTED",
+            "018f0a0d-1234-7890-abcd-ef0123456789", "REJECTED",
             ["PRICE_CHECK_FAIL", "POSITION_LIMIT_EXCEEDED"],
             '[{"rule": "price_check", "result": "FAIL"}]',
         )
@@ -102,7 +102,7 @@ class TestRiskDecision:
         assert len(decision.reason_codes) == 2
 
     def test_round_trip_json(self) -> None:
-        d = RiskDecision("i-1", "ACCEPTED", [], '[]')
+        d = RiskDecision("018f0a0d-1234-7890-abcd-ef0123456789", "ACCEPTED", [], '[]')
         json_str = d.to_json()
         restored = RiskDecision.from_json(json_str)
         assert restored.decision == d.decision
@@ -112,9 +112,9 @@ class TestRiskDecision:
 class TestApprovedOrderIntent:
     def test_create(self) -> None:
         approved = ApprovedOrderIntent(
-            "risk-1", "intent-1", "ORD-001", "AAPL.NASDAQ",
+            "018f0a0d-1234-7890-abcd-ef0123456780", "018f0a0d-1234-7890-abcd-ef0123456789", "018f0a0d-1234-7890-abcd-ef0123456781", "AAPL.NASDAQ",
             "BUY", "100", "MARKET", "DAY", "1.0",
         )
-        assert approved.client_order_id == "ORD-001"
+        assert approved.client_order_id == "018f0a0d-1234-7890-abcd-ef0123456781"
         assert approved.side == "BUY"
-        assert approved.risk_decision_id == "risk-1"
+        assert approved.risk_decision_id == "018f0a0d-1234-7890-abcd-ef0123456780"

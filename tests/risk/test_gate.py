@@ -85,6 +85,21 @@ class TestRiskGate:
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.OrderQuantityExceeded
 
+    def test_rejects_negative_quantity(self):
+        gate = make_default_gate()
+        verdict = gate.evaluate(make_intent(quantity="-5"), None, None, None, None, None)
+        assert not verdict.accepted
+
+    def test_rejects_zero_quantity(self):
+        gate = make_default_gate()
+        verdict = gate.evaluate(make_intent(quantity="0"), None, None, None, None, None)
+        assert not verdict.accepted
+
+    def test_rejects_malformed_quantity(self):
+        gate = make_default_gate()
+        verdict = gate.evaluate(make_intent(quantity="abc"), None, None, None, None, None)
+        assert not verdict.accepted
+
     def test_rejects_position_size_exceeded(self):
         gate = make_default_gate()
         verdict = gate.evaluate(make_intent(), 60000, None, None, None, None)

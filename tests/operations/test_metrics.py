@@ -70,24 +70,29 @@ class TestMetricsIntegration:
         gate = RiskGate(config)
 
         # Simulate: evaluate an intent (risk decision)
+        before = intents_evaluated.value
         intents_evaluated.inc()
         intents_evaluated.inc()
-        assert intents_evaluated.value == 2
+        assert intents_evaluated.value == before + 2
 
         # Simulate: reject an intent
+        before_r = intents_rejected.value
         intents_rejected.inc()
-        assert intents_rejected.value == 1
+        assert intents_rejected.value == before_r + 1
 
         # Simulate: trigger kill switch
+        before_k = kill_switch_triggered.value
         kill_switch_triggered.inc()
-        assert kill_switch_triggered.value == 1
+        assert kill_switch_triggered.value == before_k + 1
 
         # Simulate: portfolio update
         positions_open.set(3)
         assert positions_open.value == 3
 
         # Simulate: order events
+        before_s = orders_submitted.value
+        before_f = orders_filled.value
         orders_submitted.inc()
         orders_filled.inc()
-        assert orders_submitted.value == 1
-        assert orders_filled.value == 1
+        assert orders_submitted.value == before_s + 1
+        assert orders_filled.value == before_f + 1

@@ -1,36 +1,44 @@
-# Task F2: Operational Readiness Review — Report
-
-**Status:** DONE_WITH_CONCERNS
+# Task 2 Report: Fail closed when boot reconciliation cannot fetch truth
 
 ## Summary
 
-Completed ORR Phase F assessment at `knowledge/benchmarks/orr-phase-f-assessment.md`. 
-32 ORR checklist items evaluated: 10 ✅ Verified, 7 ⚠️ Partial, 15 ❌ Missing 
-(with waivers for performance/security paper-phase items).
+Boot reconciliation now detects when broker snapshot fetches raise exceptions,
+returning a `snapshot_fetch_failed=True` dict and halting the system via
+`transition_on_boot` instead of silently swallowing the error and proceeding.
 
-## Key findings
+## Changes
 
-- **Architecture:** All 8 subsystem boundaries documented and matching implementation. Clean dependency graph.
-- **Risk controls:** RiskGate is sole path ✅. 9 checks implemented (8 of 9 tested — market-data freshness not wired). Kill switch tested end-to-end ✅ but in-memory only ❌.
-- **Monitoring/alerting:** Not implemented. Telemetry module exists but is unwired. Acceptable for paper.
-- **Recovery:** Reconciliation drift detection implemented ✅. Restart-from-event-store ❌, backup/restore ❌, broker disconnect automation ⚠️.
-- **Testing:** 208 total tests (62 Rust + 118 Python + 28 integration/replay/adapter). State machine coverage excellent ✅. FAILURE_MATRIX coverage 3/14 rows ❌.
-- **Security:** Clean (no credentials). All paper-deferred items waived.
-- **Performance:** 0/12 budgets measured. Benchmark harness deferred to post-Phase-F.
+### `src/titan/recovery/restart.py`
 
-## Commits
+- `reconcile_on_boot`: track `snapshot_fetch_failed` across both snapshot
+  fetches (positions, holdings). If either raises, return an early result with
+  `snapshot_fetch_failed=True`, `reconciled=False`, and a placeholder drift
+  detail string.
+- `transition_on_boot`: check `snapshot_fetch_failed` (via `.get()` for
+  backward compat) before the drift check; set `TradingState.Halted` and
+  return `"HALTED (broker truth unavailable)"`.
 
-- `a7e3b7f` — feat: ORR Phase F assessment document
+### `tests/recovery/test_restart.py`
 
-## Concerns
+- Added `SnapshotFailureAdapter` class at module level (raises `RuntimeError`
+  on both `positions()` and `holdings()`).
+- Added `test_boot_stays_halted_when_broker_truth_is_unavailable` as a method
+  of `TestRecoverFromEventStore`.
 
-1. Market-data freshness check is defined in spec and ReasonCode exists but is never called — this is a spec/implementation gap.
-2. Kill switch defaults to ARMED (not HALTED) on restart, violating the "fail closed on unreadable state" invariant.
-3. 7 of 14 FAILURE_MATRIX rows have no tests — these represent real failure modes that cannot be validated.
-4. Telemetry/HealthReporter exists but is completely unwired from runtime — it's dead code.
-5. No restart-from-event-store procedure exists — the event store can replay state but nothing orchestrates this.
+## Verification
 
-## Files
+- `python -m pytest tests/recovery/test_restart.py::TestRecoverFromEventStore::test_boot_stays_halted_when_broker_truth_is_unavailable`
+  — FAIL (red) before fix, PASS after.
+- `python -m pytest tests/recovery/test_restart.py tests/adapters/test_simulated_adapter_contract.py`
+  — 18 passed, confirming no regressions.
 
-- `knowledge/benchmarks/orr-phase-f-assessment.md` — Assessment document
-- `specifications/ORR-checklist.md` — Source checklist evaluated
+## Commit
+
+```
+74aad1e fix: halt recovery when broker truth is unavailable
+```
+
+## Files modified
+
+- `src/titan/recovery/restart.py`
+- `tests/recovery/test_restart.py`

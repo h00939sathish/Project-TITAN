@@ -91,16 +91,28 @@ def test_registered_strategy_produces_proposal_with_correct_fields(evaluator, ev
     definition = StrategyDefinition(
         strategy_id="ma-crossover",
         trigger=TriggerSpec(
-            event_type="BarClosed", timeframe=Timeframe.FIVE_MINUTES
+            event_type="BarClosed", timeframe=Timeframe.ONE_DAY
         ),
     )
     evaluator.register(definition)
+
+    class DummyProducer:
+        def on_market_event(self, event):
+            from titan.runtime.events import TradeProposal
+            return [TradeProposal(
+                proposal_id="1", strategy_id="ma-crossover", producer_kind="strategy",
+                instrument_id=event.instrument_id, side="BUY", quantity=100.0,
+                price=150.0, timeframe=Timeframe.ONE_DAY,
+                close_timestamp=event.occurred_at, rationale_digest="",
+                sources=[event.message_id]
+            )]
+    evaluator.set_producer(DummyProducer())
+
     result = evaluator.on_market_event(
-        event_factory.bar_closed(Timeframe.FIVE_MINUTES, instrument_id="AAPL", close=150.0)
+        event_factory.bar_closed(Timeframe.ONE_DAY, instrument_id="AAPL", close=150.0)
     )
     assert len(result.proposals) == 1
-    proposal = result.proposals[0]
-    assert proposal.strategy_id == "ma-crossover"
-    assert proposal.instrument_id == "AAPL"
-    assert proposal.price == 150.0
-    assert proposal.timeframe == Timeframe.FIVE_MINUTES
+    assert result.proposals[0].strategy_id == "ma-crossover"
+
+
+

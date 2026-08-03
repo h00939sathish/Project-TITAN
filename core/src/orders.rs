@@ -1,6 +1,12 @@
+use chrono::Utc;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::event_store;
+use crate::messages::EventEnvelope;
 
 /// Valid order states per EXECUTION_SPEC.md.
 #[pyclass(eq, eq_int, from_py_object)]
@@ -41,6 +47,17 @@ impl OrderState {
     }
 }
 
+/// Event payload for order state transitions persisted to EventStore.
+#[derive(Serialize)]
+pub struct OrderEvent {
+    pub order_id: String,
+    pub from_state: String,
+    pub to_state: String,
+    pub reason: String,
+    pub occurred_at: String,
+    pub message_id: String,
+}
+
 /// Pure Rust state machine — no PyO3 dependency, testable from `cargo test`.
 #[derive(Clone, Debug, Default)]
 pub struct StateMachineCore {
@@ -74,7 +91,9 @@ impl StateMachineCore {
             (OrderState::Validated, OrderState::Submitted) => true,
             (OrderState::Submitted, OrderState::Acknowledged) => true,
             (OrderState::Acknowledged, OrderState::PartiallyFilled) => true,
+            (OrderState::Acknowledged, OrderState::Filled) => true,
             (OrderState::PartiallyFilled, OrderState::Filled) => true,
+
 
             // Rejection can happen from multiple states
             (OrderState::New, OrderState::Rejected) => true,
@@ -100,6 +119,7 @@ impl StateMachineCore {
             (OrderState::Unknown, OrderState::Filled) => true,
             (OrderState::Unknown, OrderState::Rejected) => true,
             (OrderState::Unknown, OrderState::Cancelled) => true,
+            (OrderState::Unknown, OrderState::Expired) => true,
 
             _ => false,
         };
@@ -149,6 +169,39 @@ impl OrderStateMachine {
         self.inner.reset_to(state);
     }
 
+    pub fn persist_transition(
+        &self,
+        store: &event_store::EventStore,
+        order_id: &str,
+        from: &OrderState,
+        to: &OrderState,
+        reason: &str,
+    ) -> PyResult<()> {
+        let now = Utc::now().to_rfc3339();
+        let msg_id = Uuid::now_v7().to_string();
+        let event = OrderEvent {
+            order_id: order_id.to_string(),
+            from_state: format!("{:?}", from),
+            to_state: format!("{:?}", to),
+            reason: reason.to_string(),
+            occurred_at: now,
+            message_id: msg_id,
+        };
+        let payload = serde_json::to_string(&event)
+            .map_err(|e| PyRuntimeError::new_err(format!("Serialize error: {}", e)))?;
+        let envelope = EventEnvelope::new(
+            "OrderTransition".to_string(),
+            "Order".to_string(),
+            order_id.to_string(),
+            "titan_core".to_string(),
+            payload,
+            None,
+            None,
+            None,
+        );
+        store.append(&envelope)
+    }
+
     fn __str__(&self) -> String {
         format!("OrderStateMachine({:?})", self.inner.current)
     }
@@ -182,6 +235,17 @@ mod tests {
         m.transition(OrderState::Filled).unwrap();
         assert_eq!(m.current, OrderState::Filled);
     }
+
+    #[test]
+    fn test_direct_acknowledged_to_filled() {
+        let mut m = StateMachineCore::new();
+        m.transition(OrderState::Validated).unwrap();
+        m.transition(OrderState::Submitted).unwrap();
+        m.transition(OrderState::Acknowledged).unwrap();
+        m.transition(OrderState::Filled).unwrap();
+        assert_eq!(m.current, OrderState::Filled);
+    }
+
 
     #[test]
     fn test_rejection_from_new() {

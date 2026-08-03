@@ -119,9 +119,9 @@ Extended by ADR-017.
 
 Expanded by ADR-014 for simulated and backtest trading only.
 
-- **Seven major pairs only.** EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD. Exotics and crosses excluded.
+- **Four USD-quote pairs only.** EUR/USD, GBP/USD, AUD/USD, and NZD/USD. Non-USD-quote pairs, exotics, and crosses are excluded because USD-only portfolio valuation cannot safely value their PnL.
 - **Micro-lot convention.** 1 unit = 1000 base currency; `step_size = 1000`; all order quantities must be multiples of 1000.
-- **Simulated / backtest only.** No live broker. Live forex requires a future IBKR adapter ADR.
+- **Simulated / backtest only.** IBKR paper and live forex execution are not approved. Any broker route requires accepted ADR-018 (or a superseding ADR), `Forex.spec.md`, paper-session evidence, and Architecture Council/Risk Owner approval.
 - **No leverage.** Position sized against cash balance. No margin expansion for forex positions.
 - **Existing strategies work unchanged.** Strategy code trading on price series (OHLC) needs no modification for forex symbols — only instrument registration changes.
 - **Forex 24/5 calendar.** Weekdays are trading days (Mon–Fri). US market holidays are not observed. Saturday and Sunday are closed.

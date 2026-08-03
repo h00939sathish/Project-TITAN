@@ -87,6 +87,10 @@ class FakeIBKRPaperAdapter(BrokerAdapter):
     def cancel(self, order_id: BrokerOrderId) -> CancellationAcknowledgement:
         return self.transport.cancel(order_id)
 
+    def tick(self, order_id: str) -> None:
+        return None
+
+
 
 def _approved_intent() -> ApprovedOrderIntent:
     return ApprovedOrderIntent(

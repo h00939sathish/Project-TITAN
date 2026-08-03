@@ -20,7 +20,10 @@ _reg.register(StrategyRegistration(
         ParameterDef("slow", "int", 20, "Slow moving average period"),
     ),
     factory=make_ma_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True))}),
+    qualified_variants=frozenset({
+        (Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
+        (Timeframe.FIVE_MINUTES, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
+    }),
 ))
 
 _reg.register(StrategyRegistration(
@@ -71,7 +74,10 @@ _reg.register(StrategyRegistration(
         ParameterDef("slow", "int", 20, "Slow moving average period"),
     ),
     factory=make_dual_ma_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True))}),
+    qualified_variants=frozenset({
+        (Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
+        (Timeframe.FIVE_MINUTES, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
+    }),
 ))
 
 _reg.register(StrategyRegistration(
@@ -87,6 +93,12 @@ _reg.register(StrategyRegistration(
     qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"window": 14, "oversold": 30.0, "overbought": 70.0}, sort_keys=True))}),
 ))
 
+from titan.research.harness import (make_ma_signal_fn, make_momentum_signal_fn,
+                                    make_mr_signal_fn, make_vol_regime_signal_fn,
+                                    make_dual_ma_signal_fn, make_rsi_signal_fn,
+                                    make_bollinger_signal_fn, make_orb_signal_fn,
+                                    make_vwap_signal_fn)
+
 _reg.register(StrategyRegistration(
     strategy_id="bollinger",
     version="1.0.0",
@@ -97,4 +109,29 @@ _reg.register(StrategyRegistration(
     ),
     factory=make_bollinger_signal_fn,
     qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"window": 20, "std_dev_multiplier": 2.0}, sort_keys=True))}),
+))
+
+_reg.register(StrategyRegistration(
+    strategy_id="orb",
+    version="1.0.0",
+    description="Opening Range Breakout — BUY on upside breakout above opening range with ATR and volume expansion filters.",
+    parameter_schema=(
+        ParameterDef("atr_period", "int", 14, "ATR lookback for volatility context"),
+        ParameterDef("min_volume_ratio", "float", 1.2, "Minimum volume expansion ratio"),
+        ParameterDef("breakout_mult", "float", 1.0, "Breakout distance multiplier"),
+    ),
+    factory=make_orb_signal_fn,
+    qualified_variants=frozenset(),
+))
+
+_reg.register(StrategyRegistration(
+    strategy_id="vwap-reversion",
+    version="1.0.0",
+    description="VWAP Mean Reversion — BUY on oversold price extension below lower VWAP std dev band.",
+    parameter_schema=(
+        ParameterDef("window", "int", 30, "Rolling window for VWAP calculation"),
+        ParameterDef("std_dev", "float", 2.0, "Standard deviation band multiplier"),
+    ),
+    factory=make_vwap_signal_fn,
+    qualified_variants=frozenset(),
 ))

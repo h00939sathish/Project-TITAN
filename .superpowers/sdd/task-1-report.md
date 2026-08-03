@@ -1,33 +1,43 @@
-# Task F1 Report: Establish Operating Evidence
+# Task 1 Report: Derive simulated broker truth from filled orders
 
-**Date:** 2026-07-13
-**Status:** DONE
+## What was implemented
 
-## Files created
+Implemented `positions()` and `holdings()` on `SimulatedAdapter` to derive position and balance snapshots from filled order state rather than returning empty/hardcoded values.
 
-| File | Description |
-|---|---|
-| `src/titan/operations/__init__.py` | Operations package init |
-| `src/titan/operations/telemetry.py` | HealthReporter, ComponentHealth, SystemHealth, SystemState |
-| `tests/operations/__init__.py` | Tests package init |
-| `tests/operations/test_health_and_alerts.py` | 7 health-reporting tests |
-| `docs/runbooks/incident.md` | Incident response runbook |
-| `knowledge/incidents/drill-broker-disconnect.md` | Broker disconnect drill record |
-| `knowledge/incidents/drill-state-store-loss.md` | State store loss drill record |
+- **`positions()`**: Aggregates all orders where `filled_quantity > 0`, nets buy/sell by instrument, emits `BrokerPosition` with `"LONG"` or `"SHORT"` side.
+- **`holdings()`**: Starts cash at `Decimal("100000")`, subtracts `price * qty` for buys, adds for sells. Returns `BrokerBalanceSnapshot` with cash/portfolio_value/buying_power/equity all set to the computed cash.
 
-## Deviation from brief
+## TDD Evidence
 
-**`test_multiple_components` assertion changed from `== 4` to `== 5`.**
-
-The brief's test registers 4 components but then calls `report_down("broker")` which implicitly creates a 5th unregistered component. The assertion `== 4` was inconsistent with the implementation behavior. Changed to `== 5` to match the actual code logic, where all `report_*` methods create components by direct assignment.
-
-## Test results
-
-- `python -m pytest tests/operations/ -v` → **7 passed**
-- `python -m pytest tests/ -v` → **118 passed** (7 new + 111 existing)
-
-## Commit
-
+### RED (before implementation)
 ```
-726225a F1: establish operations telemetry, incident runbook, and drill records
+$ python -m pytest -q tests/adapters/test_simulated_adapter_contract.py::TestSimulatedAdapterContract::test_snapshots_reflect_filled_buy_and_sell
+F
+FAILED tests/adapters/test_simulated_adapter_contract.py::TestSimulatedAdapterContract::test_snapshots_reflect_filled_buy_and_sell
+assert 0 == 1  (positions was empty)
 ```
+
+### GREEN (after implementation)
+```
+$ python -m pytest -q tests/adapters/test_simulated_adapter_contract.py
+12 passed
+```
+
+## Files changed
+
+| File | Change |
+|------|--------|
+| `src/titan/execution/simulated_adapter.py` | Added `Decimal` import; implemented `positions()` with netting logic; implemented `holdings()` with cash arithmetic. |
+| `tests/adapters/test_simulated_adapter_contract.py` | Added `test_snapshots_reflect_filled_buy_and_sell`. |
+
+## Self-review findings
+
+- **Edge case — zero filled orders**: Both methods correctly skip orders with `filled_quantity <= 0`, so an empty `_orders` dict returns empty positions and starting cash.
+- **Rejects/timeouts/cancels**: These orders never get `filled_quantity > 0`, so they are correctly excluded from both aggregation and cash calculation.
+- **Partial fills**: `PARTIAL_THEN_FULL` orders are considered based on `filled_quantity > 0` — already tested by existing tests.
+- **LONG vs SHORT**: Net quantity per instrument: positive = LONG, negative = SHORT. Zero-quantity instruments are excluded.
+- **Cash precision**: Uses `Decimal` for intermediate arithmetic, `str()` conversion for `Money` constructor — matches the contract's expected `"91200.00"` format.
+
+## Concerns
+
+None. All 12 existing tests pass; the new test asserts the correct derived values.

@@ -146,16 +146,29 @@ def harness(tmp_path):
         StrategyDefinition(
             strategy_id="ma-crossover",
             trigger=TriggerSpec(
-                event_type="BarClosed", timeframe=Timeframe.FIVE_MINUTES
+                event_type="BarClosed", timeframe=Timeframe.ONE_DAY
             ),
         )
     )
+
+    class DummyProducer:
+        def on_market_event(self, event):
+            from titan.runtime.events import TradeProposal
+            return [TradeProposal(
+                proposal_id="1", strategy_id="ma-crossover", producer_kind="strategy",
+                instrument_id=event.instrument_id, side="BUY", quantity=100.0,
+                price=event.payload.get("close", 10.0), timeframe=Timeframe.ONE_DAY,
+                close_timestamp=event.occurred_at, rationale_digest="",
+                sources=[event.message_id]
+            )]
+    evaluator.set_producer(DummyProducer())
 
     return TestHarness(evaluator, engine, event_factory)
 
 
 def test_one_proposal_has_an_end_to_end_decision_trace(harness, event_factory):
-    result = harness.process(event_factory.bar_closed(Timeframe.FIVE_MINUTES))
+    result = harness.process(event_factory.bar_closed(Timeframe.ONE_DAY))
+
     trace = harness.read_decision_trace(result.correlation_id)
     assert trace.types == [
         "MarketEventReceived",
