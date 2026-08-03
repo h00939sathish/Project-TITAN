@@ -1,0 +1,30 @@
+language: en
+
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base: master
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Focus on: kill-switch state-machine transition legality (Released->Triggered gaps),
+        reconcile/drift handling, async task lifecycle and cleanup on shutdown,
+        silent failure paths, and integer/float edge cases in position sizing.
+    - path: "core/**"
+      instructions: |
+        Rust code: idiomatic error handling (no panics in hot paths), unsafe block
+        justification, and PyO3 boundary safety (GIL, reference counts).
+    - path: "scripts/**"
+      instructions: |
+        Check process supervision loops, signal handling, and that cleanup runs in
+        finally blocks (TWS client disconnect).
+
+chat:
+  auto_reply: true
