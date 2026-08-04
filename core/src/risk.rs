@@ -329,6 +329,14 @@ impl RiskGate {
     }
 
     pub fn trigger_kill_switch(&mut self) -> PyResult<()> {
+        // RELEASED is the post-reconciliation state. A later independent
+        // fault must be able to halt routing again, but the state graph only
+        // permits triggering from ARMED, so re-arm explicitly first.
+        if self.kill_switch == KillSwitchState::Released {
+            self.kill_switch
+                .transition(KillSwitchState::Armed)
+                .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        }
         self.kill_switch
             .transition(KillSwitchState::Triggered)
             .map_err(pyo3::exceptions::PyValueError::new_err)

@@ -267,6 +267,20 @@ def _format_uptime(seconds: float) -> str:
     return f"{hours}h{mins}m"
 
 
+def _bar_seconds(bar_size: str) -> int:
+    """Seconds per bar from a TWS bar-size string ('5 mins' -> 300)."""
+    parts = (bar_size or "5 mins").split()
+    try:
+        n = int(parts[0])
+    except (ValueError, IndexError):
+        return 300
+    if len(parts) >= 2 and parts[1].startswith("min"):
+        return n * 60
+    if len(parts) >= 2 and parts[1].startswith("sec"):
+        return n
+    return 300
+
+
 def _symbol(state: str) -> str:
     symbols: dict[str, str] = {"ACTIVE": "[+]", "DEGRADED": "[!]", "HALTED": "[X]"}
     return symbols.get(state, "[?]")
@@ -417,6 +431,11 @@ def main() -> None:
         help="TWS bar size for --intraday mode (default: 5 mins)",
     )
     parser.add_argument(
+        "--enable-fx", action="store_true",
+        help="Enable FX spot instruments (EURUSD/GBPUSD/...) despite ADR-018 "
+             "remaining Proposed. Default: FX is excluded from the session.",
+    )
+    parser.add_argument(
         "--order-type", default="market", choices=["market", "limit"],
         help="Order type for strategy intents (default: market). Limit orders are priced "
              "aggressively (last +/- --limit-offset) so they behave like marketable orders "
@@ -473,6 +492,15 @@ def main() -> None:
     from titan._core import ContractType, Instrument, InstrumentId
     from titan.data.forex_pairs import FOREX_SYMBOLS, STEP_SIZE, forex_instrument
 
+    # ADR-018 (forex simulated trading) is Proposed, not accepted: exclude FX
+    # from the session unless explicitly promoted via --enable-fx.
+    if not getattr(args, "enable_fx", False):
+        fx_instruments = [i for i in instruments if i in FOREX_SYMBOLS]
+        if fx_instruments:
+            instruments = [i for i in instruments if i not in FOREX_SYMBOLS]
+            print(f"ADR-018 FX gate: excluding FX instruments {fx_instruments} "
+                  f"(pass --enable-fx to include)", flush=True)
+
     log_file = args.log_file or f"titan-{datetime.now(timezone.utc).strftime('%Y%m%d')}.log"
     log_path = Path(log_file)
     log_handler = open(log_path, "a", encoding="utf-8") if log_path.suffix == ".log" else None
@@ -489,6 +517,12 @@ def main() -> None:
         },
     )
 
+    bar_seconds = _bar_seconds(args.bar_size)
+    # data_freshness_threshold_ms must exceed one bar period: intents now stamp
+    # the COMPLETED bar's timestamp (risk.data_freshness), so a 5-min bar is up
+    # to ~300s old. Allow 2 bars + 1s buffer — a genuinely stalled feed
+    # (>~10 min stale) is rejected by the freshness gate (fail-closed).
+    data_freshness_threshold_ms = (bar_seconds * 2 + 1) * 1000
     risk_config = RiskConfig(
         instruments,
         Money(args.starting_capital, "USD"),
@@ -497,7 +531,7 @@ def main() -> None:
         Money(args.starting_capital, "USD"),
         0.10,
         Money("5000", "USD"),
-        5000,
+        data_freshness_threshold_ms,
         100,
     )
     paper_config = PaperConfig(
@@ -747,6 +781,31 @@ def main() -> None:
             except Exception as e:
                 print(f"adapter health check error: {e}", flush=True)
 
+        # Feed recovery: TWS can silently stall (1100 / 10182 / farm storms) with
+        # no new completed bars. Reconnect + resubscribe, verify bars advance, and
+        # stay FAIL-CLOSED (no intents) until the feed is fresh again.
+        feed_ok = True
+        if feed:
+            stale_after_s = max(30.0, float(bar_seconds * 2))
+            if feed.needs_recovery() or not feed.is_healthy(stale_after_s=stale_after_s):
+                print("[feed] unhealthy — attempting reconnect/resubscribe", flush=True)
+                try:
+                    ref_ts = feed.latest_ts()
+                    feed.recover()
+                    advanced = feed.bars_advancing(ref_ts)
+                    for _ in range(2):
+                        if advanced:
+                            break
+                        time.sleep(10)
+                        advanced = feed.bars_advancing(ref_ts)
+                    feed_ok = bool(advanced or not feed._has_any_bar)
+                    print(f"[feed] recovery "
+                          f"{'advanced — trading resumes' if feed_ok else 'still stalled — fail-closed'}",
+                          flush=True)
+                except Exception as e:
+                    print(f"[feed] recovery failed: {e} — fail-closed", flush=True)
+                    feed_ok = False
+
         for instr in instruments:
             price = strategies.current_price(instr)
             if price is None:
@@ -798,9 +857,17 @@ def main() -> None:
                 shadow.on_price(instr, price, bar_date=bar_date)
             if intent is None:
                 continue
+            # Fail-closed: never emit an intent while the feed is unhealthy/stalled.
+            if not feed_ok:
+                continue
             result = engine.submit_intent(intent)
             if result.accepted:
                 logger.info("strategy", f"Intent accepted for {instr}: {result.broker_order_id}")
+                # Admission semantics: only accepted intents update bridge
+                # position/side state, so a rejection can't suppress the next
+                # valid same-direction signal.
+                if bridge:
+                    bridge.admitted(instr, intent.side)
             else:
                 logger.warning("strategy", f"Intent rejected for {instr}: {result.rejection_reason}")
 

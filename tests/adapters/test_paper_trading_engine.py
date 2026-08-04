@@ -18,6 +18,7 @@ from titan._core import (
     ReconciliationConfig,
     ReconciliationDriftSeverity,
     RiskConfig,
+    KillSwitchState,
     TradeIntent,
     TradingState,
 )
@@ -335,6 +336,20 @@ class TestPaperTradingEngineStatus:
         self.engine.release_kill_switch()
         assert not self.engine.risk_gate.kill_switch.blocks_routing()
         assert self.engine.risk_gate.trading_state == TradingState.Active
+
+    def test_critical_reconcile_retriggers_switch_after_release(self):
+        """A later critical drift must re-halt a released session without crashing."""
+        engine = PaperTradingEngine(_default_config(), SimulatedAdapter())
+        engine.trigger_kill_switch()
+        engine.release_kill_switch()
+        assert engine.risk_gate.kill_switch == KillSwitchState.Released
+
+        engine.adapter = _DivergingAdapter()
+
+        result = engine.reconcile()
+
+        assert result.severity == ReconciliationDriftSeverity.Critical
+        assert engine.risk_gate.kill_switch == KillSwitchState.Triggered
 
     def test_release_kill_switch_refuses_on_critical_drift_with_reason(self):
         """P0 fix: release refuses on critical reconcile drift and the error

@@ -164,6 +164,10 @@ class TWSRealtimeFeed(EWrapper, EClient):
         self._bar_size = bar_size
         self._duration = duration
         self._window = window
+        self._host = host
+        self._port = port
+        self._base_cid = client_id
+        self._connect_timeout = connect_timeout
 
         self._ready = threading.Event()
         self._lock = threading.Lock()
@@ -172,6 +176,17 @@ class TWSRealtimeFeed(EWrapper, EClient):
         # instr -> (ts, close) of the currently forming bar (not exposed)
         self._forming: dict[str, tuple[str, float] | None] = {i: None for i in instruments}
         self._instr_by_req: dict[int, str] = {}
+
+        # Feed-recovery state: disconnect/error storms must trigger a
+        # reconnect + resubscribe, and a stalled feed must fail closed.
+        self._storm_codes = frozenset(
+            {1100, 2110, 2103, 2105, 2107, 2108, 10182, 10187, 10191, 202}
+        )
+        self._err_storm = 0
+        self._recovery_needed = False
+        self._recovering = False
+        self._last_update = time.monotonic()
+        self._has_any_bar = False
 
         import random
         base_cid = client_id if client_id != 150 else random.randint(300, 800)
@@ -197,6 +212,8 @@ class TWSRealtimeFeed(EWrapper, EClient):
         ts = datetime.fromtimestamp(float(bar.date), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         close = float(bar.close)
         with self._lock:
+            self._last_update = time.monotonic()
+            self._has_any_bar = True
             forming = self._forming.get(instr)
             if forming is not None and forming[0] != ts:
                 # previous bar completed → promote to completed list
@@ -207,9 +224,82 @@ class TWSRealtimeFeed(EWrapper, EClient):
 
     def error(self, req_id: int, errorTime: int = -1, errorCode: int = 0,
               errorString: str = "", advancedOrderRejectJson: str = "") -> None:
+        # Connectivity/farm/stream-loss codes. A storm of these (or a lone 1100
+        # disconnect) means the bars have silently stopped advancing; mark the
+        # feed for recovery so the session can reconnect + resubscribe.
+        if errorCode == 1102:  # connectivity restored
+            self._err_storm = 0
+            return
+        if errorCode in self._storm_codes:
+            self._err_storm += 1
+            if self._err_storm >= 3:
+                self._recovery_needed = True
+                self._err_storm = 0
+            if errorCode == 1100:
+                # A full disconnect should recover on its own, not wait for a 3-storm.
+                self._recovery_needed = True
         # 10167/10197 = delayed data (paper account, no realtime subscription) — normal
-        if errorCode not in (2104, 2106, 2158, 2159, 10167, 10197, 202):
+        elif errorCode not in (2104, 2106, 2158, 2159, 10167, 10197):
             print(f"[tws_realtime] Err {errorCode}: {errorString}", flush=True)
+
+    # ── feed recovery (disconnect/reconnect + resubscribe, fail-closed) ──────
+    def needs_recovery(self) -> bool:
+        return bool(self._recovery_needed or self._recovering)
+
+    def recover(self) -> None:
+        """Reconnect and resubscribe every contract after a disconnect/error
+        storm. Keeps existing completed bars (for continuity) but resets the
+        forming bar so a fresh transition re-promotes on the next push."""
+        if self._recovering:
+            return
+        self._recovering = True
+        try:
+            self._ready.clear()
+            try:
+                self.disconnect()
+            except Exception:
+                pass
+            import random
+            cid = self._base_cid if self._base_cid != 150 else random.randint(300, 800)
+            self.connect(self._host, self._port, cid)
+            self._thread = threading.Thread(target=self.run, daemon=True)
+            self._thread.start()
+            if not self._ready.wait(timeout=self._connect_timeout):
+                raise ConnectionError("TWSRealtimeFeed: reconnect timed out")
+            with self._lock:
+                self._forming = {i: None for i in self._instruments}
+            self._subscribe()
+            self._recovery_needed = False
+            self._err_storm = 0
+            self._last_update = time.monotonic()
+        finally:
+            self._recovering = False
+
+    def is_healthy(self, stale_after_s: float = 30.0) -> bool:
+        """False while recovering or when bar pushes have stalled beyond
+        stale_after_s (but only once we've seen at least one bar)."""
+        if self._recovering:
+            return False
+        if self._has_any_bar and time.monotonic() - self._last_update > stale_after_s:
+            return False
+        return True
+
+    def bars_advancing(self, since_ts: str | None = None) -> bool:
+        """True if any completed bar is newer than since_ts (feed advanced)."""
+        with self._lock:
+            for bars in self._bars.values():
+                if bars and (since_ts is None or bars[-1][0] > since_ts):
+                    return True
+        return False
+
+    def latest_ts(self) -> str | None:
+        """Most recent completed-bar timestamp across all instruments, or None."""
+        with self._lock:
+            latest = None
+            for bars in self._bars.values():
+                if bars and (latest is None or bars[-1][0] > latest):
+                    latest = bars[-1][0]
+            return latest
 
     # ── public API ──────────────────────────────────────────────────────────
     def _subscribe(self) -> None:

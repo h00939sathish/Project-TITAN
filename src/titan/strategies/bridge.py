@@ -121,9 +121,6 @@ class StrategyBridge:
         if last_side == signal:
             return None
 
-        self._has_position[instrument] = signal == "BUY"
-        self._last_intent_sides[instrument] = signal
-
         regime_dict = None
         if self._current_regime:
             regime_dict = {
@@ -148,7 +145,7 @@ class StrategyBridge:
             order_type=self._order_type,
             time_in_force="DAY",
             risk_profile_version=self._risk_profile_version,
-            market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+            market_data_timestamp=bar_date or datetime.now(timezone.utc).isoformat(),
             price=str(order_price),
         )
         self._last_manifest = make_manifest(
@@ -162,6 +159,15 @@ class StrategyBridge:
             regime=regime_dict,
         )
         return intent
+
+    def admitted(self, instrument: str, side: str) -> None:
+        """Record that an intent for *instrument*/*side* was ADMITTED by the
+        engine (passed the risk gate and was dispatched to the broker).
+
+        Only admitted intents update position/side state so a later risk/broker
+        rejection cannot suppress the next valid same-direction signal."""
+        self._has_position[instrument] = side == "BUY"
+        self._last_intent_sides[instrument] = side
 
     def _quantity(self, instrument: str) -> int:
         """Order quantity in instrument units: order_size × lot size.

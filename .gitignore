@@ -109,3 +109,11 @@ research/tws_daily/
 research/tws_history/
 research/cot/
 research/neg_results/configs/
+
+# session runtime + build artifacts
+paper_session_console.log
+paper_session_restarts.log
+metrics-*.json
+dist_wheels/
+*.pyd.old
+*.pyd.bak2
