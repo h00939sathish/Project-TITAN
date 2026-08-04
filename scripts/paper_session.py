@@ -544,7 +544,6 @@ def main() -> None:
     )
 
     adapter = _build_adapter(args.mode, use_tws=args.tws)
-    engine = PaperTradingEngine(paper_config, adapter, logger=logger)
 
     if args.tws:
         if args.intraday:
@@ -564,6 +563,22 @@ def main() -> None:
         print(f"Live data feed active for {instruments}", flush=True)
     else:
         feed = None
+
+    # ADR-019: the release gate verifies control health via a data-feed-owned
+    # FeedHealthSnapshot. Only the TWS realtime feed satisfies the contract;
+    # anything else (TWSDataFeed, AlpacaDataFeed, None) fails closed on release.
+    if args.tws and args.intraday:
+        from titan.data.feed_health import FeedHealthSnapshot
+        snapshot = FeedHealthSnapshot(
+            feed,
+            instruments,
+            stale_after_s=(data_freshness_threshold_ms / 1000.0),
+        )
+        feed_health = snapshot.evaluate
+    else:
+        feed_health = None
+
+    engine = PaperTradingEngine(paper_config, adapter, logger=logger, feed_health=feed_health)
 
     for instr in instruments:
         if instr in FOREX_SYMBOLS:
@@ -745,9 +760,20 @@ def main() -> None:
         # this is the sanctioned way to resume a halted session without a
         # restart or state surgery.
         release_file = Path("release_kill_switch.signal")
+        auth_file = Path("release_kill_switch.auth.json")
         if release_file.exists() and cycle_count % 5 == 0:
+            # The .signal file is only a transport hint; authorization is carried
+            # by the ReleaseAuthorization record (ADR-019 / RISK_POLICY:37).
+            authorization = None
+            if auth_file.exists():
+                try:
+                    from titan.risk.release_authorization import ReleaseAuthorization
+                    authorization = ReleaseAuthorization.from_json(
+                        auth_file.read_text(encoding="utf-8"))
+                except Exception:
+                    authorization = None
             try:
-                engine.release_kill_switch()
+                engine.release_kill_switch(authorization)
                 # Idempotent: release is a no-op if the switch was not held.
                 # If the causal condition is still live, the engine re-triggers
                 # on the next check — surface that instead of a false "RELEASED".
@@ -755,12 +781,13 @@ def main() -> None:
                     print("kill switch release accepted but RE-TRIGGERED: "
                           "causal condition still live", flush=True)
                 else:
-                    print("kill switch RELEASED (operator signal)", flush=True)
+                    print("kill switch RELEASED (authorized)", flush=True)
             except Exception as e:
                 # Exception carries kill_reason=<code> from engine.release_kill_switch
                 print(f"kill switch release REFUSED: {e}", flush=True)
             finally:
                 release_file.unlink(missing_ok=True)
+                auth_file.unlink(missing_ok=True)
 
         # Reconnect guard: if TWS drops (restart, network), re-authenticate and
         # re-import broker truth so the next reconcile starts from a consistent

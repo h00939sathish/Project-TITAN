@@ -170,9 +170,27 @@ def _status(order_id, status="Filled", filled="100", price="150.0", instrument="
     )
 
 
+def _ops_feed():
+    from titan.data.feed_health import FeedHealthVerdict
+    from datetime import datetime, timezone
+    return lambda: FeedHealthVerdict(True, "", {}, datetime.now(timezone.utc).isoformat())
+
+
+def _ops_auth(corr):
+    from datetime import datetime, timedelta, timezone
+    from titan.risk.release_authorization import (
+        ReleaseApproval, ReleaseAuthorization, new_nonce)
+    now = datetime.now(timezone.utc).isoformat()
+    return ReleaseAuthorization(
+        correlation_id=corr or "ks-test", assessment="a", remediation="r",
+        approvers=[ReleaseApproval("alice", now), ReleaseApproval("bob", now)],
+        issued_at=now, expiry=(datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+        nonce=new_nonce("t"))
+
+
 def _engine(adapter, state_path=""):
     logger = StructuredLogger(min_severity=LogSeverity.INFO, output=io.StringIO())
-    engine = PaperTradingEngine(_config(state_path), adapter, logger=logger)
+    engine = PaperTradingEngine(_config(state_path), adapter, logger=logger, feed_health=_ops_feed())
     for sym in ("AAPL", "MSFT"):
         engine.register_instrument(
             Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
@@ -387,7 +405,7 @@ def test_kill_switch_release_cycle():
     assert engine.status().kill_switch.blocks_routing()
     # Broker recovers; the release path reconciles clean and resumes.
     adapter.timeout_positions = False
-    engine.release_kill_switch()
+    engine.release_kill_switch(_ops_auth(corr=engine._kill_correlation))
     st = engine.status()
     assert not st.kill_switch.is_triggered()
     assert not st.kill_switch.blocks_routing()
@@ -407,7 +425,7 @@ def test_kill_switch_release_refused_on_real_drift():
     assert engine.status().kill_switch.is_triggered()
     import pytest as _pytest
     with _pytest.raises(RuntimeError, match="Cannot release"):
-        engine.release_kill_switch()
+        engine.release_kill_switch(_ops_auth(corr=engine._kill_correlation))
     engine.stop()
 
 # ── 6. Working order is never rejected/cancelled locally ────────────────────

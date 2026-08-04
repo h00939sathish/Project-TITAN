@@ -208,12 +208,33 @@ class TestPaperTradingEngineSubmitIntent:
         assert exposure.currency == "USD"
 
 
+def _pressure_test_auth(corr):
+    from datetime import timedelta
+    from titan.risk.release_authorization import (
+        ReleaseApproval, ReleaseAuthorization, new_nonce)
+    now = datetime.now(timezone.utc).isoformat()
+    return ReleaseAuthorization(
+        correlation_id=corr or "ks-test",
+        assessment="assessment-ref", remediation="remediation-ref",
+        approvers=[ReleaseApproval("alice", now), ReleaseApproval("bob", now)],
+        issued_at=now,
+        expiry=(datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+        nonce=new_nonce("t"),
+    )
+
+
+def _pressure_feed():
+    from titan.data.feed_health import FeedHealthVerdict
+    return lambda: FeedHealthVerdict(True, "", {}, datetime.now(timezone.utc).isoformat())
+
+
 class TestPaperTradingEngineRisk:
     def setup_method(self):
         self.config = _default_config()
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
-        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine = PaperTradingEngine(
+            self.config, self.adapter, feed_health=_pressure_feed())
         initialize_fresh(self.engine)
         self.engine.start()
         for sym in ("AAPL", "MSFT"):
@@ -233,7 +254,8 @@ class TestPaperTradingEngineRisk:
 
     def test_kill_switch_release_allows_intents(self):
         self.engine.trigger_kill_switch()
-        self.engine.release_kill_switch()
+        self.engine.release_kill_switch(
+            _pressure_test_auth(corr=self.engine._kill_correlation))
         result = self.engine.submit_intent(_make_intent())
         assert result.accepted is True
 
@@ -287,7 +309,7 @@ class TestPaperTradingEngineStatus:
         self.config = _default_config()
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
-        self.engine = PaperTradingEngine(self.config, self.adapter)
+        self.engine = PaperTradingEngine(self.config, self.adapter, feed_health=_pressure_feed())
         initialize_fresh(self.engine)
         self.engine.start()
         for sym in ("AAPL", "MSFT"):
@@ -326,7 +348,8 @@ class TestPaperTradingEngineStatus:
 
     def test_release_kill_switch_updates_status(self):
         self.engine.trigger_kill_switch()
-        self.engine.release_kill_switch()
+        self.engine.release_kill_switch(
+            _pressure_test_auth(corr=self.engine._kill_correlation))
         status = self.engine.status()
         assert status.kill_switch is not None
 
@@ -338,16 +361,19 @@ class TestPaperTradingEngineStatus:
 
     def test_release_kill_switch_returns_to_active(self):
         self.engine.trigger_kill_switch()
-        self.engine.release_kill_switch()
+        self.engine.release_kill_switch(
+            _pressure_test_auth(corr=self.engine._kill_correlation))
         assert not self.engine.risk_gate.kill_switch.blocks_routing()
         assert self.engine.risk_gate.trading_state == TradingState.Active
 
     def test_critical_reconcile_retriggers_switch_after_release(self):
         """A later critical drift must re-halt a released session without crashing."""
-        engine = PaperTradingEngine(_default_config(), SimulatedAdapter())
+        engine = PaperTradingEngine(
+            _default_config(), SimulatedAdapter(), feed_health=_pressure_feed())
         initialize_fresh(engine)
         engine.trigger_kill_switch()
-        engine.release_kill_switch()
+        engine.release_kill_switch(
+            _pressure_test_auth(corr=engine._kill_correlation))
         assert engine.risk_gate.kill_switch == KillSwitchState.Released
 
         engine.adapter = _DivergingAdapter()
@@ -361,12 +387,13 @@ class TestPaperTradingEngineStatus:
         """P0 fix: release refuses on critical reconcile drift and the error
         carries a structured kill_reason code the session can echo."""
         adapter = _DivergingAdapter()
-        engine = PaperTradingEngine(self._config(), adapter)
+        engine = PaperTradingEngine(self._config(), adapter, feed_health=_pressure_feed())
         initialize_fresh(engine)
         engine.start()
         engine.trigger_kill_switch()
         with pytest.raises(RuntimeError) as excinfo:
-            engine.release_kill_switch()
+            engine.release_kill_switch(
+                _pressure_test_auth(corr=engine._kill_correlation))
         assert "kill_reason=critical_reconcile_drift" in str(excinfo.value)
         # switch remains held — release did not silently succeed
         assert engine.risk_gate.kill_switch.blocks_routing()
