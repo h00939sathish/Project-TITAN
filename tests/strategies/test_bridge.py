@@ -38,6 +38,7 @@ class TestStrategyBridge:
             intent = bridge.on_price("SPY", p)
             if intent:
                 intents.append(intent)
+                bridge.admitted("SPY", intent.side)  # admission semantics (P0)
         buy_intents = [i for i in intents if i.side == "BUY"]
         sell_intents = [i for i in intents if i.side == "SELL"]
         assert len(buy_intents) == 1
@@ -167,6 +168,7 @@ class TestStrategyBridgeWarmup:
 
         assert exit_intent is not None
         assert exit_intent.side == "SELL"
+        bridge.admitted("SPY", exit_intent.side)  # admission semantics (P0)
         assert bridge.on_price("SPY", 89.0, bar_date="2026-07-16") is None
 
     def test_warmup_idempotent(self):
@@ -189,6 +191,7 @@ class TestStrategyBridgeWarmup:
         bridge.warmup("SPY", prices)
         intent1 = bridge.on_price("SPY", 110, bar_date="2026-07-15")
         assert intent1 is not None
+        bridge.admitted("SPY", intent1.side)  # admission semantics (P0)
         intent2 = bridge.on_price("SPY", 111, bar_date="2026-07-15")
         assert intent2 is None
         intent3 = bridge.on_price("SPY", 112, bar_date="2026-07-16")
@@ -227,6 +230,7 @@ class TestStrategyBridgeWarmup:
         intent1 = bridge.on_price("SPY", 110)
         assert intent1 is not None
         assert intent1.side == "BUY"
+        bridge.admitted("SPY", intent1.side)  # admission semantics (P0)
         intent2 = bridge.on_price("SPY", 115)
         assert intent2 is None
 
@@ -237,7 +241,9 @@ class TestStrategyBridgeWarmup:
         )
         prices = [100, 100, 90, 80, 100, 105]
         bridge.warmup("SPY", prices)
-        bridge.on_price("SPY", 110, bar_date="2026-07-14")
+        intent = bridge.on_price("SPY", 110, bar_date="2026-07-14")
+        assert intent is not None
+        bridge.admitted("SPY", intent.side)  # admission semantics (P0)
         state = bridge.save_state()
         assert "last_bar_dates" in state
         assert state["last_bar_dates"].get("SPY") == "2026-07-14"
