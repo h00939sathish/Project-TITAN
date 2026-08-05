@@ -82,25 +82,6 @@ class RuntimeEvaluator:
         if self._producer is not None:
             proposals = list(self._producer.on_market_event(event) or [])
 
-        if not proposals:
-            for defn in self._definitions.values():
-                if (
-                    defn.trigger.event_type == event.event_type
-                    and defn.trigger.timeframe == event_timeframe
-                ):
-                    proposals.append(TradeProposal(
-                        proposal_id=str(uuid.uuid4()),
-                        strategy_id=defn.strategy_id,
-                        producer_kind="strategy",
-                        instrument_id=event.instrument_id,
-                        side="BUY", quantity=0.0,
-                        price=event.payload.get("close", 0.0),
-                        timeframe=event_timeframe,
-                        close_timestamp=event.occurred_at,
-                        rationale_digest="",
-                        sources=[event.message_id],
-                    ))
-
         self._trace(event.correlation_id, "StrategyEvaluated")
         self._trace(event.correlation_id, "TradeProposalCreated",
                      {"proposal_count": len(proposals)})

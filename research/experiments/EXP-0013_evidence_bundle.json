@@ -1,0 +1,25 @@
+{
+  "experiment_id": "EXP-00013",
+  "canonical_rq": "RQ-003",
+  "title": "Execution Microstructure Alpha & Limit Order Timing",
+  "timestamp": "2026-08-03T19:18:10.322664+00:00",
+  "decision": "REFINED",
+  "results": {
+    "SPY": {
+      "instrument": "SPY",
+      "total_orders": 1061,
+      "fill_rate": 0.8247,
+      "avg_market_cost_bps": 1.0,
+      "avg_limit_cost_bps": 0.68,
+      "spread_capture": 0.3247
+    },
+    "EURUSD": {
+      "instrument": "EURUSD",
+      "total_orders": 999,
+      "fill_rate": 0.8809,
+      "avg_market_cost_bps": 1.25,
+      "avg_limit_cost_bps": 0.65,
+      "spread_capture": 0.4809
+    }
+  }
+}

@@ -1,5 +1,9 @@
 use std::collections::HashMap;
+use std::str::FromStr;
+use chrono::Utc;
 use pyo3::prelude::*;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::types::Money;
 
@@ -68,17 +72,26 @@ pub struct PortfolioEngine {
     pub base_currency: String,
     #[pyo3(get)]
     pub realized_pnl: Money,
+    peak_total_value: Decimal,
+    daily_realized_loss: Decimal,
+    loss_date: String,
+    market_prices: HashMap<String, String>,
 }
 
 #[pymethods]
 impl PortfolioEngine {
     #[new]
     pub fn new(base_currency: &str, initial_cash: &Money) -> Self {
+        let initial_amount = initial_cash.amount;
         Self {
             positions: HashMap::new(),
             cash_balance: initial_cash.clone(),
             base_currency: base_currency.to_string(),
             realized_pnl: Money::new("0", base_currency),
+            peak_total_value: initial_amount,
+            daily_realized_loss: Decimal::ZERO,
+            loss_date: String::new(),
+            market_prices: HashMap::new(),
         }
     }
 
@@ -108,15 +121,21 @@ impl PortfolioEngine {
             ));
         }
 
-        let price_per_unit = parse_amount(price);
-        let notional = price_per_unit * quantity as i64;
+        let qty = Decimal::from(quantity);
+        let notional = match price.amount.checked_mul(qty) {
+            Some(n) => n,
+            None => {
+                return Err(PyErr::new::<pyo3::exceptions::PyOverflowError, _>(
+                    "position notional overflow",
+                ));
+            }
+        };
 
         // Update cash: buys decrease, sells increase
-        let cash_amount = parse_amount(&self.cash_balance);
         let new_cash = if is_buy {
-            cash_amount.checked_sub(notional)
+            self.cash_balance.amount.checked_sub(notional)
         } else {
-            cash_amount.checked_add(notional)
+            self.cash_balance.amount.checked_add(notional)
         };
         let new_cash = match new_cash {
             Some(v) => v,
@@ -124,7 +143,7 @@ impl PortfolioEngine {
                 "cash balance overflow",
             )),
         };
-        self.cash_balance = Money::new(&new_cash.to_string(), &self.base_currency);
+        self.cash_balance.amount = new_cash;
 
         let position = self.positions.get_mut(instrument_id);
 
@@ -133,64 +152,78 @@ impl PortfolioEngine {
             match (pos.side, is_buy) {
                 (PositionSide::Long, true) => {
                     // Adding to long: weighted average cost basis
-                    let old_cost = parse_amount(&pos.cost_basis);
-                    let total = old_cost * pos.quantity as i64 + price_per_unit * quantity as i64;
+                    let old_total = match pos.cost_basis.amount.checked_mul(Decimal::from(pos.quantity)) {
+                        Some(v) => v,
+                        None => {
+                            return Err(PyErr::new::<pyo3::exceptions::PyOverflowError, _>(
+                                "cost basis overflow",
+                            ));
+                        }
+                    };
+                    let new_total = old_total + notional;
                     let new_qty = pos.quantity + quantity;
-                    let new_cost = total / new_qty as i64;
+                    let new_cost = new_total / Decimal::from(new_qty);
                     pos.quantity = new_qty;
-                    pos.cost_basis = Money::new(&new_cost.to_string(), &self.base_currency);
+                    pos.cost_basis.amount = new_cost;
                 }
                 (PositionSide::Long, false) => {
                     // Selling from long
-                    let old_cost = parse_amount(&pos.cost_basis);
-                    let pnl_qty = quantity.min(pos.quantity);
-                    let pnl = (price_per_unit - old_cost) * pnl_qty as i64;
+                    let pnl_per_unit = price.amount - pos.cost_basis.amount;
+                    let pnl_qty = Decimal::from(quantity.min(pos.quantity));
+                    let pnl = pnl_per_unit * pnl_qty;
                     if quantity < pos.quantity {
                         pos.quantity -= quantity;
                     } else if quantity == pos.quantity {
                         pos.side = PositionSide::Flat;
                         pos.quantity = 0;
-                        pos.cost_basis = Money::new("0", &self.base_currency);
+                        pos.cost_basis.amount = Decimal::ZERO;
                     } else {
                         let excess = quantity - pos.quantity;
                         pos.side = PositionSide::Short;
                         pos.quantity = excess;
-                        pos.cost_basis = Money::new(&price_per_unit.to_string(), &self.base_currency);
+                        pos.cost_basis.amount = price.amount;
                     }
                     self.add_pnl(pnl);
                 }
                 (PositionSide::Short, false) => {
                     // Adding to short: weighted average cost basis
-                    let old_cost = parse_amount(&pos.cost_basis);
-                    let total = old_cost * pos.quantity as i64 + price_per_unit * quantity as i64;
+                    let old_total = match pos.cost_basis.amount.checked_mul(Decimal::from(pos.quantity)) {
+                        Some(v) => v,
+                        None => {
+                            return Err(PyErr::new::<pyo3::exceptions::PyOverflowError, _>(
+                                "cost basis overflow",
+                            ));
+                        }
+                    };
+                    let new_total = old_total + notional;
                     let new_qty = pos.quantity + quantity;
-                    let new_cost = total / new_qty as i64;
+                    let new_cost = new_total / Decimal::from(new_qty);
                     pos.quantity = new_qty;
-                    pos.cost_basis = Money::new(&new_cost.to_string(), &self.base_currency);
+                    pos.cost_basis.amount = new_cost;
                 }
                 (PositionSide::Short, true) => {
                     // Buying to cover short
-                    let old_cost = parse_amount(&pos.cost_basis);
-                    let pnl_qty = quantity.min(pos.quantity);
-                    let pnl = (old_cost - price_per_unit) * pnl_qty as i64;
+                    let pnl_per_unit = pos.cost_basis.amount - price.amount;
+                    let pnl_qty = Decimal::from(quantity.min(pos.quantity));
+                    let pnl = pnl_per_unit * pnl_qty;
                     if quantity < pos.quantity {
                         pos.quantity -= quantity;
                     } else if quantity == pos.quantity {
                         pos.side = PositionSide::Flat;
                         pos.quantity = 0;
-                        pos.cost_basis = Money::new("0", &self.base_currency);
+                        pos.cost_basis.amount = Decimal::ZERO;
                     } else {
                         let excess = quantity - pos.quantity;
                         pos.side = PositionSide::Long;
                         pos.quantity = excess;
-                        pos.cost_basis = Money::new(&price_per_unit.to_string(), &self.base_currency);
+                        pos.cost_basis.amount = price.amount;
                     }
                     self.add_pnl(pnl);
                 }
                 (PositionSide::Flat, _) => {
                     pos.side = if is_buy { PositionSide::Long } else { PositionSide::Short };
                     pos.quantity = quantity;
-                    pos.cost_basis = Money::new(&price_per_unit.to_string(), &self.base_currency);
+                    pos.cost_basis.amount = price.amount;
                 }
             }
         } else {
@@ -204,7 +237,7 @@ impl PortfolioEngine {
                 instrument_id: instrument_id.to_string(),
                 side: side_enum,
                 quantity,
-                cost_basis: Money::new(&price_per_unit.to_string(), &self.base_currency),
+                cost_basis: Money { amount: price.amount, currency: self.base_currency.clone() },
             };
             self.positions.insert(instrument_id.to_string(), pos);
         }
@@ -225,6 +258,10 @@ impl PortfolioEngine {
         self.realized_pnl.clone()
     }
 
+    pub fn set_realized_pnl(&mut self, pnl: &Money) {
+        self.realized_pnl.amount = pnl.amount;
+    }
+
     /// Compute unrealized PnL for a given instrument at `current_price`.
     /// Returns 0 if the position is Flat.
     pub fn get_unrealized_pnl(
@@ -238,50 +275,111 @@ impl PortfolioEngine {
             )
         })?;
 
-        let current = parse_amount(current_price);
-        let cost = parse_amount(&pos.cost_basis);
         let pnl_per_unit = match pos.side {
-            PositionSide::Long => current - cost,
-            PositionSide::Short => cost - current,
-            PositionSide::Flat => 0,
+            PositionSide::Long => current_price.amount - pos.cost_basis.amount,
+            PositionSide::Short => pos.cost_basis.amount - current_price.amount,
+            PositionSide::Flat => Decimal::ZERO,
         };
-        let total_pnl = pnl_per_unit * pos.quantity as i64;
-        Ok(Money::new(&total_pnl.to_string(), &self.base_currency))
+        let total_pnl = pnl_per_unit * Decimal::from(pos.quantity);
+        Ok(Money { amount: total_pnl, currency: self.base_currency.clone() })
     }
 
-    /// Sum of absolute position values using cost basis as proxy price.
+    /// Sum of absolute position values using market price (M2M) with cost-basis fallback.
     pub fn total_gross_exposure(&self) -> Money {
-        let mut total: i64 = 0;
+        let mut total = Decimal::ZERO;
         for pos in self.positions.values() {
-            let cost = parse_amount(&pos.cost_basis);
-            total += cost * pos.quantity as i64;
+            let price = self.market_prices
+                .get(&pos.instrument_id)
+                .and_then(|p| Decimal::from_str(p).ok())
+                .unwrap_or(pos.cost_basis.amount);
+            total += price * Decimal::from(pos.quantity);
         }
-        Money::new(&total.to_string(), &self.base_currency)
+        Money { amount: total, currency: self.base_currency.clone() }
     }
 
     /// Build a portfolio snapshot of the current state.
     pub fn get_snapshot(&self) -> PortfolioSnapshot {
+        let dd = self.drawdown_fraction();
         PortfolioSnapshot {
             gross_exposure: self.total_gross_exposure(),
-            drawdown_fraction: 0.0,
-            daily_realized_loss: Money::new("0", &self.base_currency),
+            drawdown_fraction: dd,
+            daily_realized_loss: Money { amount: self.daily_realized_loss, currency: self.base_currency.clone() },
             position_size: self.positions.len() as u64,
         }
+    }
+
+    pub fn drawdown_fraction(&self) -> f64 {
+        let total = self.total_value();
+        if self.peak_total_value <= Decimal::ZERO || total <= Decimal::ZERO {
+            return 0.0;
+        }
+        let dd = (self.peak_total_value - total) / self.peak_total_value;
+        dd.to_f64().unwrap_or(0.0).max(0.0)
+    }
+
+    pub fn get_daily_loss(&self) -> Money {
+        Money { amount: self.daily_realized_loss, currency: self.base_currency.clone() }
+    }
+
+    /// Store a market price and recalculate peak total value for drawdown tracking.
+    pub fn update_market_price(&mut self, instrument_id: &str, price: &str) -> PyResult<()> {
+        // Validate price is parseable
+        let _ = Decimal::from_str(price).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid market price '{}': {}", price, e))
+        })?;
+        self.market_prices.insert(instrument_id.to_string(), price.to_string());
+        let total = self.total_value();
+        if total > self.peak_total_value {
+            self.peak_total_value = total;
+        }
+        Ok(())
+    }
+
+    /// Bulk update market prices.
+    pub fn update_market_prices(&mut self, prices: Vec<(String, String)>) -> PyResult<()> {
+        for (instrument_id, price) in prices {
+            self.update_market_price(&instrument_id, &price)?;
+        }
+        Ok(())
     }
 }
 
 // ─── Private helpers ─────────────────────────────────────────────────────────────
 
 impl PortfolioEngine {
-    fn add_pnl(&mut self, amount: i64) {
-        let current = parse_amount(&self.realized_pnl);
-        let new_pnl = current + amount;
-        self.realized_pnl = Money::new(&new_pnl.to_string(), &self.base_currency);
+    fn add_pnl(&mut self, amount: Decimal) {
+        self.realized_pnl.amount += amount;
+        // Track peak total value for drawdown
+        let total = self.total_value();
+        if total > self.peak_total_value {
+            self.peak_total_value = total;
+        }
+        // Track daily realized loss
+        if amount < Decimal::ZERO {
+            let today = Utc::now().format("%Y-%m-%d").to_string();
+            if self.loss_date != today {
+                self.loss_date = today;
+                self.daily_realized_loss = Decimal::ZERO;
+            }
+            self.daily_realized_loss += amount;
+        }
     }
-}
 
-fn parse_amount(m: &Money) -> i64 {
-    m.amount.parse::<i64>().expect("Invalid money amount")
+    fn total_value(&self) -> Decimal {
+        let mut total = self.cash_balance.amount;
+        for pos in self.positions.values() {
+            let price = self.market_prices
+                .get(&pos.instrument_id)
+                .and_then(|p| Decimal::from_str(p).ok())
+                .unwrap_or(pos.cost_basis.amount);
+            match pos.side {
+                PositionSide::Long => total += price * Decimal::from(pos.quantity),
+                PositionSide::Short => total -= price * Decimal::from(pos.quantity),
+                PositionSide::Flat => {}
+            }
+        }
+        total
+    }
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────────
@@ -291,14 +389,14 @@ mod tests {
     use super::*;
 
     fn engine() -> PortfolioEngine {
-        PortfolioEngine::new("USD", &Money::new("100000", "USD"))
-    }
+            PortfolioEngine::new("USD", &Money::new("100000", "USD"))
+        }
 
-    fn apply(engine: &mut PortfolioEngine, instrument: &str, side: &str, qty: u64, price: i64) {
-        engine
-            .apply_fill(instrument, side, qty, &Money::new(&price.to_string(), "USD"))
-            .unwrap();
-    }
+        fn apply(engine: &mut PortfolioEngine, instrument: &str, side: &str, qty: u64, price: i64) {
+            engine
+                .apply_fill(instrument, side, qty, &Money::new(&price.to_string(), "USD"))
+                .unwrap();
+        }
 
     #[test]
     fn test_buy_open_long() {
@@ -330,8 +428,8 @@ mod tests {
         let pos = e.get_position("AAPL").unwrap();
         assert_eq!(pos.side, PositionSide::Long);
         assert_eq!(pos.quantity, 150);
-        // Weighted avg: (50*100 + 60*50) / 150 = 8000/150 = 53
-        assert_eq!(pos.cost_basis, Money::new("53", "USD"));
+        // Weighted avg: (50*100 + 60*50) / 150 = 8000/150 = 53.333...
+        assert_eq!(pos.cost_basis, Money::new("53.333333333333333333333333333", "USD"));
         assert_eq!(e.get_cash_balance(), Money::new("92000", "USD"));
     }
 
@@ -425,8 +523,48 @@ mod tests {
         apply(&mut e, "AAPL", "buy", 100, 50);
         let snap = e.get_snapshot();
         assert_eq!(snap.gross_exposure, Money::new("5000", "USD"));
+        // No realized PnL yet, so no drawdown
         assert!((snap.drawdown_fraction - 0.0).abs() < f64::EPSILON);
         assert_eq!(snap.daily_realized_loss, Money::new("0", "USD"));
+    }
+
+    #[test]
+    fn test_drawdown_after_losing_trade() {
+        let mut e = engine();
+        apply(&mut e, "AAPL", "buy", 100, 100);
+        // Sell at a loss: 100 -> 80
+        apply(&mut e, "AAPL", "sell", 100, 80);
+        let dd = e.drawdown_fraction();
+        assert!(dd > 0.0);
+        // Loss = (80 - 100) * 100 = -2000 on 100000 equity = 2% drawdown
+        assert!((dd - 0.02).abs() < 1e-10 || (dd - 0.02).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_daily_loss_tracked() {
+        let mut e = engine();
+        apply(&mut e, "AAPL", "buy", 100, 100);
+        apply(&mut e, "AAPL", "sell", 100, 80);
+        let dl = e.get_daily_loss();
+        assert!(dl.amount < Decimal::ZERO);
+    }
+
+    #[test]
+    fn test_zero_drawdown_on_no_trades() {
+        let e = engine();
+        let dd = e.drawdown_fraction();
+        assert!((dd - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_peak_equity_tracking() {
+        let mut e = engine();
+        apply(&mut e, "AAPL", "buy", 100, 50);
+        apply(&mut e, "AAPL", "sell", 100, 60);  // profit
+        apply(&mut e, "MSFT", "buy", 200, 30);
+        apply(&mut e, "MSFT", "sell", 200, 20);  // loss
+        let dd = e.drawdown_fraction();
+        assert!(dd > 0.0, "Drawdown should be positive after a loss");
     }
 
     #[test]

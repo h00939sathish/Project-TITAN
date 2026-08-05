@@ -1,0 +1,40 @@
+{
+  "experiment": {
+    "id": "EXP-00001",
+    "question": "Does volatility contraction followed by strong relative strength predict positive 20-day returns?",
+    "dataset_id": "spy_daily_v1",
+    "features": [
+      "atr_percentile_20",
+      "relative_strength_60d",
+      "vol_contraction_flag"
+    ],
+    "target": "forward_return_20d",
+    "fingerprint": "3a27e43fb6a9"
+  },
+  "evidence": {
+    "experiment_id": "EXP-00001",
+    "dataset_id": "spy_daily_v1",
+    "ic": -0.4143540669856459,
+    "p_value": 8.986835035347525e-05,
+    "effect_size": null,
+    "sample_size": 76,
+    "stable_bull": null,
+    "stable_bear": null,
+    "stable_sideways": null,
+    "stable_decades": null,
+    "survived_costs": false,
+    "lookahead_safe": true,
+    "leakage_free": true,
+    "computed_at": "2026-07-29T04:05:30.504679",
+    "fingerprint": ""
+  },
+  "checks": {
+    "Sample size sufficient": "Sample size 76 < min 100",
+    "IC statistically significant": true,
+    "Survives transaction costs": "Net spread -0.0190 <= 0 after 10.0 bps",
+    "Lookahead safe": true
+  },
+  "promoted": true,
+  "filter_hits": 76,
+  "total_bars": 1301
+}

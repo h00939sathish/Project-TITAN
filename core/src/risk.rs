@@ -182,12 +182,12 @@ impl Default for RiskConfig {
     fn default() -> Self {
         Self {
             instrument_eligibility: Vec::new(),
-            max_order_notional: Money::new("1000000", "USD"),
-            max_order_quantity: 5_000,
-            max_position_size: 50_000,
-            max_gross_exposure: Money::new("10000000", "USD"),
-            max_drawdown_fraction: 0.10,
-            max_daily_loss: Money::new("50000", "USD"),
+                        max_order_notional: Money::new("1000000", "USD"),
+                        max_order_quantity: 5_000,
+                        max_position_size: 50_000,
+                        max_gross_exposure: Money::new("10000000", "USD"),
+                        max_drawdown_fraction: 0.10,
+                        max_daily_loss: Money::new("50000", "USD"),
             data_freshness_threshold_ms: 5_000,
             clock_skew_tolerance_ms: 100,
             max_correlated_exposure: 0.70,
@@ -280,181 +280,39 @@ impl RiskGate {
         current_position_side: Option<String>,
         correlation_scores: Option<Vec<f64>>,
     ) -> RiskVerdict {
-        // a. Kill switch check
-        if self.kill_switch.blocks_routing() {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::KillSwitchTriggered),
-                reason_detail: "Kill switch is blocking routing".to_string(),
-            };
+        // Chain of guard checks — first failure short-circuits
+        if let Some(v) = self.check_kill_switch() {
+            return v;
         }
-
-        // b. Trading state check
-        if !self.trading_state.accepts_intents() {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::TradingHalted),
-                reason_detail: "Trading is not accepting intents".to_string(),
-            };
+        if let Some(v) = self.check_trading_state() {
+            return v;
         }
-
-        // c. Data freshness / clock drift check
-        let threshold_ms = self.config.data_freshness_threshold_ms as i64
-            + self.config.clock_skew_tolerance_ms as i64;
-        if let Ok(market_ts) = intent.market_data_timestamp.parse::<DateTime<Utc>>() {
-            let drift = (Utc::now() - market_ts).num_milliseconds().abs();
-            if drift > threshold_ms {
-                return RiskVerdict {
-                    accepted: false,
-                    reason: Some(RiskReasonCode::DataStale),
-                    reason_detail: format!(
-                        "Market data timestamp {} is {}ms from system clock (threshold: {}ms)",
-                        intent.market_data_timestamp, drift, threshold_ms,
-                    ),
-                };
-            }
-        } else {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::DataStale),
-                reason_detail: format!(
-                    "Market data timestamp '{}' is not a valid RFC 3339 timestamp",
-                    intent.market_data_timestamp,
-                ),
-            };
+        if let Some(v) = self.check_data_freshness(intent) {
+            return v;
         }
-
-        // d. Instrument eligibility
-        if !self.config.instrument_eligibility.is_empty()
-            && !self.config.instrument_eligibility.contains(&intent.instrument_id)
-        {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::InstrumentNotEligible),
-                reason_detail: format!("Instrument {} is not eligible", intent.instrument_id),
-            };
+        if let Some(v) = self.check_instrument_eligibility(intent) {
+            return v;
         }
-
-        // e. Order limits — notional
-        let qty = match (
-            Decimal::from_str(&intent.quantity),
-            intent.price.as_ref().map(|p| Decimal::from_str(p)).transpose(),
+        if let Some(v) = self.check_order_limits(intent) {
+            return v;
+        }
+        if let Some(v) = self.check_position_limits(
+            current_position_size,
+            current_gross_exposure,
+            current_drawdown,
+            current_daily_loss,
         ) {
-            (Ok(q), Ok(Some(p))) => {
-                let notional = q * p;
-                if notional > self.config.max_order_notional.amount {
-                    return RiskVerdict {
-                        accepted: false,
-                        reason: Some(RiskReasonCode::OrderNotionalExceeded),
-                        reason_detail: format!("Order notional {} exceeds max {}", notional, self.config.max_order_notional.amount),
-                    };
-                }
-                q
-            }
-            (Ok(q), Ok(None)) => q,
-            _ => {
-                return RiskVerdict {
-                    accepted: false,
-                    reason: Some(RiskReasonCode::InternalError),
-                    reason_detail: "Invalid decimal in intent quantity or price".to_string(),
-                };
-            }
-        };
-
-        // f. Order limits — quantity
-        if qty > Decimal::from(self.config.max_order_quantity) {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::OrderQuantityExceeded),
-                reason_detail: format!("Order quantity {} exceeds max {}", qty, self.config.max_order_quantity),
-            };
+            return v;
         }
-
-        // g. Position/exposure limits
-        if let Some(pos) = current_position_size
-            && pos > self.config.max_position_size
-        {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::PositionLimitExceeded),
-                reason_detail: format!("Position size {} exceeds max {}", pos, self.config.max_position_size),
-            };
+        if let Some(v) = self.check_side_consistency(
+            intent,
+            current_position_side,
+            current_position_size,
+        ) {
+            return v;
         }
-
-        // h. Gross exposure check
-        if let Some(exp) = current_gross_exposure
-            && exp.amount > self.config.max_gross_exposure.amount
-        {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::GrossExposureExceeded),
-                reason_detail: format!("Gross exposure {} exceeds max {}", exp.amount, self.config.max_gross_exposure.amount),
-            };
-        }
-
-        // i. Drawdown check
-        if let Some(dd) = current_drawdown
-            && dd > self.config.max_drawdown_fraction
-        {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::DrawdownExceeded),
-                reason_detail: format!("Drawdown {} exceeds max {}", dd, self.config.max_drawdown_fraction),
-            };
-        }
-
-        // j. Daily loss check
-        if let Some(dl) = current_daily_loss
-            && dl.amount.abs() > self.config.max_daily_loss.amount
-        {
-            return RiskVerdict {
-                accepted: false,
-                reason: Some(RiskReasonCode::DailyLossExceeded),
-                reason_detail: format!("Daily loss {} exceeds max {}", dl.amount, self.config.max_daily_loss.amount),
-            };
-        }
-
-        // k. Side validation — don't trade more than we hold
-        if let (Some(side), Some(qty)) = (&current_position_side, current_position_size) {
-            let side_upper = side.to_uppercase();
-            let intent_qty = Decimal::from_str(&intent.quantity).unwrap_or(Decimal::ZERO);
-            if intent.side == "SELL" && side_upper == "LONG" && intent_qty > Decimal::from(qty) {
-                return RiskVerdict {
-                    accepted: false,
-                    reason: Some(RiskReasonCode::SellExceedsPosition),
-                    reason_detail: format!(
-                        "Sell {} exceeds long position of {}",
-                        intent_qty, qty
-                    ),
-                };
-            }
-            if intent.side == "BUY" && side_upper == "SHORT" && intent_qty > Decimal::from(qty) {
-                return RiskVerdict {
-                    accepted: false,
-                    reason: Some(RiskReasonCode::BuyExceedsShortPosition),
-                    reason_detail: format!(
-                        "Buy-to-cover {} exceeds short position of {}",
-                        intent_qty, qty
-                    ),
-                };
-            }
-        }
-
-        // l. Correlation check
-        if let Some(scores) = &correlation_scores {
-            if !scores.is_empty() {
-                let mean: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
-                if mean > self.config.max_correlated_exposure {
-                    return RiskVerdict {
-                        accepted: false,
-                        reason: Some(RiskReasonCode::CorrelatedExposureExceeded),
-                        reason_detail: format!(
-                            "Mean correlation {:.4} exceeds max {:.2}",
-                            mean, self.config.max_correlated_exposure,
-                        ),
-                    };
-                }
-            }
+        if let Some(v) = self.check_correlation(intent, &correlation_scores) {
+            return v;
         }
 
         RiskVerdict {
@@ -471,6 +329,14 @@ impl RiskGate {
     }
 
     pub fn trigger_kill_switch(&mut self) -> PyResult<()> {
+        // RELEASED is the post-reconciliation state. A later independent
+        // fault must be able to halt routing again, but the state graph only
+        // permits triggering from ARMED, so re-arm explicitly first.
+        if self.kill_switch == KillSwitchState::Released {
+            self.kill_switch
+                .transition(KillSwitchState::Armed)
+                .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        }
         self.kill_switch
             .transition(KillSwitchState::Triggered)
             .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -510,17 +376,17 @@ impl RiskGate {
     }
 
     pub fn restore_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
-        let events = store.replay_by_type("RiskStateSnapshot")?;
-        if let Some(latest) = events.last() {
-            if let Ok(snapshot) = serde_json::from_str::<RiskStateSnapshot>(&latest.payload) {
+            let events = store.replay_by_type("RiskStateSnapshot")?;
+            if let Some(latest) = events.last()
+                && let Ok(snapshot) = serde_json::from_str::<RiskStateSnapshot>(&latest.payload)
+            {
                 self.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
                     .unwrap_or(KillSwitchState::Triggered);
                 self.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
                     .unwrap_or(TradingState::Halted);
             }
+            Ok(())
         }
-        Ok(())
-    }
 
     #[staticmethod]
     pub fn load_or_default(config: RiskConfig, store: &event_store::EventStore) -> PyResult<RiskGate> {
@@ -530,10 +396,282 @@ impl RiskGate {
     }
 }
 
+// ─── Private helpers for evaluate() chain ─────────────────────────────────────
+
 impl RiskGate {
+    /// a. Kill switch check — rejects if kill switch is blocking routing.
+    fn check_kill_switch(&self) -> Option<RiskVerdict> {
+        if self.kill_switch.blocks_routing() {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::KillSwitchTriggered),
+                reason_detail: "Kill switch is blocking routing".to_string(),
+            });
+        }
+        None
+    }
+
+    /// b. Trading state check — rejects unless trading state accepts intents.
+    fn check_trading_state(&self) -> Option<RiskVerdict> {
+        if !self.trading_state.accepts_intents() {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::TradingHalted),
+                reason_detail: "Trading is not accepting intents".to_string(),
+            });
+        }
+        None
+    }
+
+    /// c. Data freshness / clock drift check — rejects if market data is too stale.
+    fn check_data_freshness(&self, intent: &TradeIntent) -> Option<RiskVerdict> {
+        let threshold_ms = self.config.data_freshness_threshold_ms as i64
+            + self.config.clock_skew_tolerance_ms as i64;
+
+        if let Ok(market_ts) = intent.market_data_timestamp.parse::<DateTime<Utc>>() {
+            let drift = (Utc::now() - market_ts).num_milliseconds().abs();
+            if drift > threshold_ms {
+                return Some(RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::DataStale),
+                    reason_detail: format!(
+                        "Market data timestamp {} is {}ms from system clock (threshold: {}ms)",
+                        intent.market_data_timestamp, drift, threshold_ms,
+                    ),
+                });
+            }
+        } else {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::DataStale),
+                reason_detail: format!(
+                    "Market data timestamp '{}' is not a valid RFC 3339 timestamp",
+                    intent.market_data_timestamp,
+                ),
+            });
+        }
+        None
+    }
+
+    /// d. Instrument eligibility check — rejects if instrument is not in the eligible list.
+    fn check_instrument_eligibility(&self, intent: &TradeIntent) -> Option<RiskVerdict> {
+        if !self.config.instrument_eligibility.is_empty()
+            && !self.config.instrument_eligibility.contains(&intent.instrument_id)
+        {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::InstrumentNotEligible),
+                reason_detail: format!("Instrument {} is not eligible", intent.instrument_id),
+            });
+        }
+        None
+    }
+
+    /// e+f. Order limits — notional and quantity. Parses intent once and validates both.
+    fn check_order_limits(&self, intent: &TradeIntent) -> Option<RiskVerdict> {
+        let qty = match (
+            Decimal::from_str(&intent.quantity),
+            intent.price.as_ref().map(|p| Decimal::from_str(p)).transpose(),
+        ) {
+            (Ok(q), Ok(Some(p))) => {
+                // checked_mul: rust_decimal's Mul panics on 96-bit mantissa
+                // overflow, and price/quantity are Python-supplied strings.
+                let notional = match q.checked_mul(p) {
+                    Some(n) => n,
+                    None => {
+                        return Some(RiskVerdict {
+                            accepted: false,
+                            reason: Some(RiskReasonCode::InternalError),
+                            reason_detail: "Order notional overflow".to_string(),
+                        });
+                    }
+                };
+                if notional > self.config.max_order_notional.amount {
+                    return Some(RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::OrderNotionalExceeded),
+                        reason_detail: format!(
+                            "Order notional {} exceeds max {}",
+                            notional, self.config.max_order_notional.amount
+                        ),
+                    });
+                }
+                q
+            }
+            (Ok(q), Ok(None)) => q,
+            _ => {
+                return Some(RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::InternalError),
+                    reason_detail: "Invalid decimal in intent quantity or price".to_string(),
+                });
+            }
+        };
+
+        // Non-positive quantity is invalid regardless of limits: a negative
+        // quantity flips notional sign and defeats the max bounds above.
+        if qty <= Decimal::ZERO {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::InternalError),
+                reason_detail: format!("Order quantity must be positive, got {}", qty),
+            });
+        }
+
+        if qty > Decimal::from(self.config.max_order_quantity) {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::OrderQuantityExceeded),
+                reason_detail: format!(
+                    "Order quantity {} exceeds max {}",
+                    qty, self.config.max_order_quantity
+                ),
+            });
+        }
+        None
+    }
+
+    /// g+h+i+j — Position size, gross exposure, drawdown, and daily loss limits.
+    fn check_position_limits(
+        &self,
+        current_position_size: Option<u64>,
+        current_gross_exposure: Option<&Money>,
+        current_drawdown: Option<f64>,
+        current_daily_loss: Option<&Money>,
+    ) -> Option<RiskVerdict> {
+        // g. Position size
+        if let Some(pos) = current_position_size
+            && pos > self.config.max_position_size
+        {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::PositionLimitExceeded),
+                reason_detail: format!(
+                    "Position size {} exceeds max {}",
+                    pos, self.config.max_position_size
+                ),
+            });
+        }
+
+        // h. Gross exposure
+        if let Some(exp) = current_gross_exposure
+            && exp.amount > self.config.max_gross_exposure.amount
+        {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::GrossExposureExceeded),
+                reason_detail: format!(
+                    "Gross exposure {} exceeds max {}",
+                    exp.amount, self.config.max_gross_exposure.amount
+                ),
+            });
+        }
+
+        // i. Drawdown
+        if let Some(dd) = current_drawdown
+            && dd > self.config.max_drawdown_fraction
+        {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::DrawdownExceeded),
+                reason_detail: format!(
+                    "Drawdown {} exceeds max {}",
+                    dd, self.config.max_drawdown_fraction
+                ),
+            });
+        }
+
+        // j. Daily loss
+        if let Some(dl) = current_daily_loss
+            && dl.amount.abs() > self.config.max_daily_loss.amount
+        {
+            return Some(RiskVerdict {
+                accepted: false,
+                reason: Some(RiskReasonCode::DailyLossExceeded),
+                reason_detail: format!(
+                    "Daily loss {} exceeds max {}",
+                    dl.amount, self.config.max_daily_loss.amount
+                ),
+            });
+        }
+
+        None
+    }
+
+    /// k. Side validation — prevents selling more than held or covering more than shorted.
+    fn check_side_consistency(
+        &self,
+        intent: &TradeIntent,
+        current_position_side: Option<String>,
+        current_position_size: Option<u64>,
+    ) -> Option<RiskVerdict> {
+        if let (Some(side), Some(qty)) = (&current_position_side, current_position_size) {
+            let side_upper = side.to_uppercase();
+            // Reject unparsable quantity rather than coercing to zero: a parse
+            // failure would otherwise silently bypass side/oversell protection.
+            let intent_qty = match Decimal::from_str(&intent.quantity) {
+                Ok(q) => q,
+                Err(_) => {
+                    return Some(RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::InternalError),
+                        reason_detail: format!(
+                            "Invalid intent quantity '{}'",
+                            intent.quantity
+                        ),
+                    });
+                }
+            };
+
+            if intent.side == "SELL" && side_upper == "LONG" && intent_qty > Decimal::from(qty) {
+                return Some(RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::SellExceedsPosition),
+                    reason_detail: format!("Sell {} exceeds long position of {}", intent_qty, qty),
+                });
+            }
+
+            if intent.side == "BUY" && side_upper == "SHORT" && intent_qty > Decimal::from(qty) {
+                return Some(RiskVerdict {
+                    accepted: false,
+                    reason: Some(RiskReasonCode::BuyExceedsShortPosition),
+                    reason_detail: format!(
+                        "Buy-to-cover {} exceeds short position of {}",
+                        intent_qty, qty
+                    ),
+                });
+            }
+        }
+        None
+    }
+
+    /// l. Correlation check — rejects if mean correlation exceeds the configured limit.
+        fn check_correlation(
+            &self,
+            _intent: &TradeIntent,
+            correlation_scores: &Option<Vec<f64>>,
+        ) -> Option<RiskVerdict> {
+            if let Some(scores) = correlation_scores
+                && !scores.is_empty()
+            {
+                let mean: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
+                if mean > self.config.max_correlated_exposure {
+                    return Some(RiskVerdict {
+                        accepted: false,
+                        reason: Some(RiskReasonCode::CorrelatedExposureExceeded),
+                        reason_detail: format!(
+                            "Mean correlation {:.4} exceeds max {:.2}",
+                            mean, self.config.max_correlated_exposure,
+                        ),
+                    });
+                }
+            }
+            None
+        }
+
     fn apply_snapshot(gate: &mut RiskGate, store: &event_store::EventStore) -> PyResult<()> {
-        let events = store.replay_by_type("RiskStateSnapshot")?;
-        if let Some(latest) = events.last() {
+        let snapshots = store.replay_by_type("RiskStateSnapshot")?;
+        if let Some(latest) = snapshots.last() {
             let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
                 PyRuntimeError::new_err(format!("Deserialize error: {}", e))
             })?;
@@ -541,14 +679,23 @@ impl RiskGate {
                 .unwrap_or(KillSwitchState::Triggered);
             gate.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
                 .unwrap_or(TradingState::Halted);
-        } else {
+            return Ok(());
+        }
+        // No risk snapshot persisted. A snapshot that EXISTS but is corrupt is
+        // fail-closed above. With NO snapshot we must distinguish a genuinely
+        // fresh session from a killed session whose state was lost:
+        //   - store has events (engine appended SessionStarted at boot) -> a
+        //     live session that never persisted risk state yet -> keep defaults
+        //   - store completely empty -> may be a killed session after state
+        //     loss -> FAIL CLOSED (Triggered/Halted) so a halted session can
+        //     never silently restart trading.
+        if store.replay_all()?.is_empty() {
             gate.kill_switch = KillSwitchState::Triggered;
             gate.trading_state = TradingState::Halted;
         }
         Ok(())
     }
 }
-
 // ─── Tests ───────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -24,6 +24,7 @@ def default_config() -> RiskConfig:
         0.10,
         Money("5000", "USD"),
         5000,
+        100,
     )
 
 
@@ -44,9 +45,11 @@ def adapter() -> SimulatedAdapter:
 
 def make_intent(instrument="AAPL", side="BUY", quantity="100",
                 price="150", strategy_id="strat-v1") -> TradeIntent:
+    from datetime import datetime, timezone
     return TradeIntent(
         strategy_id, "pkg-v1", "acct-1", instrument,
         side, quantity, "LIMIT", "DAY", "1.0",
+        datetime.now(timezone.utc).isoformat(),
         price=price,
     )
 
@@ -64,6 +67,7 @@ class TestPaperVerticalSlice:
             current_gross_exposure=None,
             current_drawdown=None,
             current_daily_loss=None,
+            current_position_side=None,
         )
         assert verdict.accepted, f"Risk rejected: {verdict.reason_detail}"
 
@@ -101,7 +105,7 @@ class TestPaperVerticalSlice:
     def test_risk_rejects_intent(self, gate, portfolio, adapter):
         """Risk rejects an intent -> no execution happens."""
         intent = make_intent(instrument="GOOGL")
-        verdict = gate.evaluate(intent, None, None, None, None)
+        verdict = gate.evaluate(intent, None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.InstrumentNotEligible
 
@@ -109,7 +113,7 @@ class TestPaperVerticalSlice:
         """Kill switch triggered -> all intents rejected."""
         gate.trigger_kill_switch()
         intent = make_intent()
-        verdict = gate.evaluate(intent, None, None, None, None)
+        verdict = gate.evaluate(intent, None, None, None, None, None)
         assert not verdict.accepted
         assert verdict.reason == RiskReasonCode.KillSwitchTriggered
 
@@ -125,7 +129,7 @@ class TestPaperVerticalSlice:
         """Partial fill followed by full fill is tracked correctly."""
         intent = make_intent(quantity="100", price="150")
 
-        verdict = gate.evaluate(intent, None, None, None, None)
+        verdict = gate.evaluate(intent, None, None, None, None, None)
         assert verdict.accepted
 
         adapter.set_default_fill_quality(SimFillQuality.PARTIAL_THEN_FULL)
@@ -177,11 +181,11 @@ class TestPaperVerticalSlice:
     def test_full_pipeline_with_rejection_then_recovery(self, gate, portfolio, adapter):
         """Rejected intent -> fix -> accepted -> execute -> reconcile."""
         intent = make_intent(instrument="GOOGL")
-        verdict = gate.evaluate(intent, None, None, None, None)
+        verdict = gate.evaluate(intent, None, None, None, None, None)
         assert not verdict.accepted
 
         intent = make_intent(instrument="AAPL", quantity="50", price="200")
-        verdict = gate.evaluate(intent, None, None, None, None)
+        verdict = gate.evaluate(intent, None, None, None, None, None)
         assert verdict.accepted
 
         order = adapter.submit_order("ord-003", "AAPL", "buy", 50, "200")

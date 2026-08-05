@@ -1,0 +1,26 @@
+{
+  "EXP-00001": {
+    "experiment_id": "EXP-00001",
+    "question": "Does volatility contraction + strong relative strength predict positive 20d returns?",
+    "decision": "reject",
+    "confidence": "low",
+    "ic": -0.042,
+    "sample_size": 61,
+    "reasons": [
+      "Cross-instrument consistency only 67%",
+      "Bootstrap CI crosses zero",
+      "SPY and QQQ contradict (IC: -0.68 vs +0.35)",
+      "Small samples (61-129 obs)",
+      "Cost check fails across all instruments"
+    ],
+    "dataset_id": "multi_instrument_v1",
+    "features": [
+      "atr_percentile_20",
+      "relative_strength_60d",
+      "vol_contraction_flag"
+    ],
+    "target": "forward_return_20d",
+    "timestamp": "2026-07-29T04:50:17.497262",
+    "notes": ""
+  }
+}

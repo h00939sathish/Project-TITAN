@@ -5,6 +5,7 @@ pub mod orders;
 pub mod portfolio;
 pub mod reconciliation;
 pub mod risk;
+pub mod validation;
 
 use pyo3::prelude::*;
 
@@ -25,6 +26,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<types::Quantity>()?;
     m.add_class::<types::Price>()?;
     m.add_class::<types::InstrumentId>()?;
+    m.add_class::<types::ContractType>()?;
+    m.add_class::<types::Instrument>()?;
 
     // Messages
     m.add_class::<messages::EventEnvelope>()?;

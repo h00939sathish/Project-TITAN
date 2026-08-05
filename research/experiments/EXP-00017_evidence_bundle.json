@@ -1,0 +1,85 @@
+{
+ "experiment_id": "EXP-00017",
+ "canonical_research_question": "Does realized volatility over the last ~1.7h (20 bars) predict the magnitude of the next 1h move?",
+ "hypothesis": [
+  "realized_vol_20"
+ ],
+ "economic_mechanism": "Volatility clustering / ARCH effects in FX returns",
+ "instruments": [
+  "EURUSD",
+  "GBPUSD"
+ ],
+ "governance_checks": {
+  "Sample size sufficient": "True",
+  "IC statistically significant": "True",
+  "Bootstrap CI same sign": "True",
+  "Temporal consistency": "True",
+  "Survives transaction costs": "Net spread -0.0018 <= 0 after 10.0 bps"
+ },
+ "decision": "promote",
+ "results": {
+  "EURUSD": {
+   "ic": 0.2671,
+   "n": 12508,
+   "bootstrap_ci": [
+    0.2525,
+    0.283
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4169,
+     "n": 4169,
+     "ic": 0.27674644398697595
+    },
+    {
+     "period": 1,
+     "start_idx": 4169,
+     "end_idx": 8338,
+     "n": 4169,
+     "ic": 0.22157064236387072
+    },
+    {
+     "period": 2,
+     "start_idx": 8338,
+     "end_idx": 12508,
+     "n": 4170,
+     "ic": 0.29962788623058323
+    }
+   ]
+  },
+  "GBPUSD": {
+   "ic": 0.2799,
+   "n": 12508,
+   "bootstrap_ci": [
+    0.2626,
+    0.2975
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4169,
+     "n": 4169,
+     "ic": 0.27659880981210144
+    },
+    {
+     "period": 1,
+     "start_idx": 4169,
+     "end_idx": 8338,
+     "n": 4169,
+     "ic": 0.22200348316798885
+    },
+    {
+     "period": 2,
+     "start_idx": 8338,
+     "end_idx": 12508,
+     "n": 4170,
+     "ic": 0.3342561702429758
+    }
+   ]
+  }
+ },
+ "execution_timestamp": "2026-08-01T17:04:24.487078+00:00"
+}

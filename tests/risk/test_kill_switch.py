@@ -7,7 +7,7 @@ def make_gate():
     return RiskGate(
         RiskConfig(
             [], Money("1000000", "USD"), 10000, 50000,
-            Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000,
+            Money("10000000", "USD"), 0.10, Money("50000", "USD"), 5000, 100,
         )
     )
 

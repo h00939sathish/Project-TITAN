@@ -8,16 +8,21 @@ use uuid::Uuid;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EventEnvelope {
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub message_id: String,
     #[pyo3(get)]
     pub message_type: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_schema_version")]
     pub schema_version: u32,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_rfc3339")]
     pub occurred_at: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub correlation_id: String,
     #[pyo3(get, set)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_uuid")]
     pub causation_id: Option<String>,
     #[pyo3(get)]
     pub aggregate_type: String,
@@ -102,10 +107,13 @@ pub struct TradeIntent {
     #[pyo3(get)]
     pub side: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_decimal_string")]
     pub quantity: String,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub price: Option<String>,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub stop_price: Option<String>,
     #[pyo3(get)]
     pub order_type: String,
@@ -113,6 +121,12 @@ pub struct TradeIntent {
     pub time_in_force: String,
     #[pyo3(get)]
     pub risk_profile_version: String,
+    #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_rfc3339")]
+    pub market_data_timestamp: String,
+    #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_rfc3339")]
+    pub expiry: Option<String>,
 }
 
 #[pymethods]
@@ -121,8 +135,8 @@ impl TradeIntent {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         strategy_id, strategy_package_digest, account_id, instrument_id,
-        side, quantity, order_type, time_in_force, risk_profile_version,
-        price=None, stop_price=None
+        side, quantity, order_type, time_in_force, risk_profile_version, market_data_timestamp,
+        price=None, stop_price=None, expiry=None
     ))]
     pub fn new(
         strategy_id: String,
@@ -134,8 +148,10 @@ impl TradeIntent {
         order_type: String,
         time_in_force: String,
         risk_profile_version: String,
+        market_data_timestamp: String,
         price: Option<String>,
         stop_price: Option<String>,
+        expiry: Option<String>,
     ) -> Self {
         Self {
             strategy_id,
@@ -149,6 +165,8 @@ impl TradeIntent {
             order_type: order_type.to_uppercase(),
             time_in_force: time_in_force.to_uppercase(),
             risk_profile_version,
+            market_data_timestamp,
+            expiry,
         }
     }
 
@@ -175,10 +193,12 @@ impl TradeIntent {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RiskDecision {
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub intent_id: String,
     #[pyo3(get)]
     pub decision: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_rfc3339")]
     pub evaluated_at: String,
     #[pyo3(get)]
     pub reason_codes: Vec<String>,
@@ -236,20 +256,26 @@ impl RiskDecision {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ApprovedOrderIntent {
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub risk_decision_id: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub intent_id: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_uuid")]
     pub client_order_id: String,
     #[pyo3(get)]
     pub instrument_id: String,
     #[pyo3(get)]
     pub side: String,
     #[pyo3(get)]
+    #[serde(deserialize_with = "crate::validation::deserialize_decimal_string")]
     pub quantity: String,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub price: Option<String>,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub stop_price: Option<String>,
     #[pyo3(get)]
     pub order_type: String,
@@ -257,6 +283,8 @@ pub struct ApprovedOrderIntent {
     pub time_in_force: String,
     #[pyo3(get)]
     pub risk_profile_version: String,
+    #[pyo3(get)]
+    pub risk_token: Option<String>,
 }
 
 #[pymethods]
@@ -266,7 +294,7 @@ impl ApprovedOrderIntent {
     #[pyo3(signature = (
         risk_decision_id, intent_id, client_order_id, instrument_id,
         side, quantity, order_type, time_in_force, risk_profile_version,
-        price=None, stop_price=None
+        price=None, stop_price=None, risk_token=None
     ))]
     pub fn new(
         risk_decision_id: String,
@@ -280,6 +308,7 @@ impl ApprovedOrderIntent {
         risk_profile_version: String,
         price: Option<String>,
         stop_price: Option<String>,
+        risk_token: Option<String>,
     ) -> Self {
         Self {
             risk_decision_id,
@@ -293,7 +322,50 @@ impl ApprovedOrderIntent {
             order_type: order_type.to_uppercase(),
             time_in_force: time_in_force.to_uppercase(),
             risk_profile_version,
+            risk_token,
         }
+    }
+
+    pub fn compute_expected_token(&self, secret_key: &str) -> String {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        let payload = format!(
+            "{}:{}:{}:{}:{}:{}",
+            self.risk_decision_id,
+            self.client_order_id,
+            self.instrument_id,
+            self.side,
+            self.quantity,
+            self.price.as_deref().unwrap_or("0")
+        );
+        hasher.update(secret_key.as_bytes());
+        hasher.update(payload.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    pub fn attach_risk_token(&mut self, secret_key: &str) {
+        self.risk_token = Some(self.compute_expected_token(secret_key));
+    }
+
+    pub fn verify_risk_token(&self, secret_key: &str) -> bool {
+        match &self.risk_token {
+            Some(token) => token == &self.compute_expected_token(secret_key),
+            None => false,
+        }
+    }
+
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(self).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e))
+        })
+    }
+
+    #[staticmethod]
+    pub fn from_json(json: &str) -> PyResult<Self> {
+        serde_json::from_str(json).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Deserialization error: {}", e))
+        })
     }
 
     fn __str__(&self) -> String {

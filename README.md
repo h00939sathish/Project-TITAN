@@ -55,10 +55,32 @@ Research and AI propose structured hypotheses; validation tests them; strategies
 | [DEPLOYMENT.md](DEPLOYMENT.md) | environments, release, rollback, disaster recovery |
 | [EVIDENCE_SYNTHESIS.md](EVIDENCE_SYNTHESIS.md) | section-by-section R&D synthesis, conflicts, and pre-implementation ADR gates |
 | [PLAN.md](PLAN.md) | evidence-gated solo-developer MVP implementation plan |
+| [NEWPLAN.md](NEWPLAN.md) | post-MVP research, paper-operation, and restricted-live maturity plan |
+| [docs/superpowers/plans/2026-07-13-cross-asset-validation.md](docs/superpowers/plans/2026-07-13-cross-asset-validation.md) | implementation plan for cross-asset validation reporting and gate coverage |
 
 ## Developer workflow
 
 Identify evidence and subsystem ownership, design and document the boundary, write tests, implement a small reversible change, run the applicable test/replay/benchmark gates, then update documentation and ADRs. No change may cross into paper or live operation without the gates in `IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.
+
+## Research Progress
+
+Experimental baselines against frozen synthetic fixtures. All results are OOS (2023-01-01 to 2024-12-31). See `knowledge/research/benchmarks/rejected-control-baselines.md` for full detail.
+
+| Strategy | Instrument | Status | Sharpe | Win Rate | Trades |
+|---|---|---|---|---|---|
+| MA(5,20) | SPY | Rejected | 1.56 | 30.8% | 13 |
+| MA(50,200) | SPY | Rejected | 0.00 | 0.0% | 0 |
+| Mean Reversion | SPY | Rejected (gate) | 0.69 | 100.0% | 2 |
+| Volatility Regime | SPY | Rejected (gate) | 1.36 | 76.9% | 26 |
+| Volatility Regime | QQQ | Replicated | 0.63 | 64.9% | 37 |
+| Volatility Regime | TLT | Rejected | -0.48 | 43.2% | 37 |
+| Time-series Momentum | SPY | Accepted | 1.38 | 28.6% | 35 |
+| Time-series Momentum | QQQ | Replicated | 0.87 | 34.0% | 47 |
+| Volatility Regime (pooled) | SPY+QQQ | [pending] | - | - | - |
+
+> Test count: `[verify count]`
+>
+> *See `knowledge/research/benchmarks/rejected-control-baselines.md` for full baseline detail, `knowledge/research/hypotheses/` for preregistrations, and `knowledge/research/experiments/` for frozen experiment records.*
 
 ## Evidence base
 

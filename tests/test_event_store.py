@@ -87,3 +87,40 @@ class TestEventStore:
         assert len(events) == 1
         assert events[0].message_type == "test.event"
         store2.close()
+
+
+    def test_replayed_aggregate_exactly_matches_original_state(self) -> None:
+        from titan._core import OrderState, OrderStateMachine
+        import json
+
+        # Original state machine
+        m1 = OrderStateMachine()
+        m1.transition(OrderState.Validated)
+        m1.transition(OrderState.Submitted)
+        m1.transition(OrderState.Acknowledged)
+        m1.transition(OrderState.PartiallyFilled)
+        m1.transition(OrderState.Filled)
+
+        # Persist as events
+        events = [
+            EventEnvelope("order.transition", "order", "ORD-001", "exec", json.dumps({"s": "Validated"})),
+            EventEnvelope("order.transition", "order", "ORD-001", "exec", json.dumps({"s": "Submitted"})),
+            EventEnvelope("order.transition", "order", "ORD-001", "exec", json.dumps({"s": "Acknowledged"})),
+            EventEnvelope("order.transition", "order", "ORD-001", "exec", json.dumps({"s": "PartiallyFilled"})),
+            EventEnvelope("order.transition", "order", "ORD-001", "exec", json.dumps({"s": "Filled"})),
+        ]
+        
+        for e in events:
+            self.store.append(e)
+
+        # Hydrate a new machine from events
+        m2 = OrderStateMachine()
+        replayed = self.store.replay_aggregate("order", "ORD-001")
+        for e in replayed:
+            state_str = json.loads(e.payload)["s"]
+            target_state = getattr(OrderState, state_str)
+            m2.transition(target_state)
+
+        # Verify exactly match
+        assert m1.current == m2.current
+        assert m1.current == OrderState.Filled

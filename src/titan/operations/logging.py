@@ -1,11 +1,10 @@
-"""Structured JSON logging for TITAN operations."""
-
+import json
+import logging
+import sys
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
-import json
-import sys
 
 
 class LogSeverity(str, Enum):
@@ -14,6 +13,15 @@ class LogSeverity(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+_SEVERITY_MAP = {
+    LogSeverity.DEBUG: logging.DEBUG,
+    LogSeverity.INFO: logging.INFO,
+    LogSeverity.WARNING: logging.WARNING,
+    LogSeverity.ERROR: logging.ERROR,
+    LogSeverity.CRITICAL: logging.CRITICAL,
+}
 
 
 @dataclass
@@ -34,24 +42,23 @@ class LogEvent:
 
 
 class StructuredLogger:
-    """Writes JSON-structured log lines to an output stream."""
-
     def __init__(self, min_severity: LogSeverity = LogSeverity.INFO, output=None):
+        level = _SEVERITY_MAP.get(min_severity, logging.INFO)
+        self._logger = logging.getLogger("titan")
+        self._logger.setLevel(level)
+        self._logger.handlers.clear()
+        handler = logging.StreamHandler(output or sys.stdout)
+        handler.setLevel(level)
+        self._logger.addHandler(handler)
         self._min = min_severity
-        self._output = output or sys.stdout
 
     @property
     def min_severity(self) -> LogSeverity:
         return self._min
 
     def log_event(self, event: LogEvent) -> None:
-        severity_order = {
-            LogSeverity.DEBUG: 0, LogSeverity.INFO: 1,
-            LogSeverity.WARNING: 2, LogSeverity.ERROR: 3, LogSeverity.CRITICAL: 4,
-        }
-        if severity_order.get(event.severity, 1) < severity_order.get(self._min, 1):
-            return
-        print(event.to_json(), file=self._output, flush=True)
+        self._logger.log(_SEVERITY_MAP.get(event.severity, logging.INFO),
+                         event.to_json())
 
     def _log(self, severity: LogSeverity, component: str, message: str,
              correlation_id: str = "", causation_id: str = "",

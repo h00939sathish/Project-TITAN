@@ -4,7 +4,8 @@ import os
 import time
 import uuid
 import threading
-from collections import deque
+from collections import Counter, deque
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +36,16 @@ from titan._core import (
 )
 
 from titan.operations.logging import StructuredLogger, LogSeverity
+
+# Order statuses that mean "still alive at the broker" — a working order must
+# NEVER be rejected/cancelled locally (the broker may fill it any moment).
+_WORKING_ORDER_STATUSES = frozenset({
+    "Submitted", "PreSubmitted", "PendingSubmit", "PendingCancel",
+})
+# Terminal statuses where the broker will take no further action.
+_DEAD_ORDER_STATUSES = frozenset({
+    "Filled", "Rejected", "Cancelled", "Inactive", "ApiCancelled", "ApiRejected",
+})
 from titan.operations._metrics_integration import (
     intents_evaluated,
     intents_rejected,
@@ -99,11 +110,18 @@ class PaperTradingEngine:
         self.logger = logger
         store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
-        self.risk_gate = RiskGate(config.risk_config)
-        try:
-            self.risk_gate.restore_state(self._event_store)
-        except Exception:
-            pass
+        # A genuinely fresh session (empty store) appends a SessionStarted
+        # bootstrap event so the risk gate restores Armed/Active on first run.
+        # Without it, load_or_default fails closed (Triggered/Halted) on an
+        # empty store — a killed session whose state was lost must never
+        # silently restart trading. (restore_state is fail-open and must not
+        # be used here.)
+        if not self._event_store.replay_all():
+            self._event_store.append(EventEnvelope(
+                "SessionStarted", "Engine", "system", "titan_python",
+                json.dumps({"started_at": datetime.now(timezone.utc).isoformat()}),
+            ))
+        self.risk_gate = RiskGate.load_or_default(config.risk_config, self._event_store)
         self.portfolio = PortfolioEngine(config.currency, Money(config.starting_capital, config.currency))
 
         recon_config = config.reconciliation_config or ReconciliationConfig()
@@ -120,10 +138,14 @@ class PaperTradingEngine:
         self._order_metadata: dict[str, dict] = {}
         self._order_filled_quantity: dict[str, int] = {}
         self._decision_traces: dict[str, list[dict]] = {}
+        self.intents_by_instrument: Counter = Counter()
+        self.fills_by_instrument: Counter = Counter()
+        self.rejections_by_instrument: Counter = Counter()
         
         self._lock = threading.RLock()
         self._poller_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+
 
     def _restore_order_states(self) -> None:
         try:
@@ -190,16 +212,27 @@ class PaperTradingEngine:
     def _sync_from_broker(self) -> None:
         broker_cash = None
         broker_positions = []
+        snapshot_fetch_failed = False
         try:
             bal = self.adapter.holdings(self.config.account_id)
             broker_cash = bal.cash
-        except Exception:
-            pass
+        except Exception as exc:
+            snapshot_fetch_failed = True
+            if self.logger:
+                self.logger.warning("engine", f"Startup sync: holdings fetch failed: {exc}")
         try:
             pos_snap = self.adapter.positions(self.config.account_id)
             broker_positions = pos_snap.positions
-        except Exception:
-            pass
+        except Exception as exc:
+            snapshot_fetch_failed = True
+            if self.logger:
+                self.logger.warning("engine", f"Startup sync: position fetch failed: {exc}")
+
+        if snapshot_fetch_failed:
+            if not self.risk_gate.kill_switch.blocks_routing():
+                self.risk_gate.trigger_kill_switch()
+                kill_switch_triggered.inc()
+            return
 
         if broker_cash is not None:
             self.portfolio = PortfolioEngine(
@@ -424,6 +457,10 @@ class PaperTradingEngine:
         self._session = None
         if self.logger:
             self.logger.info("engine", "Session stopped")
+        try:
+            self._event_store.close()
+        except Exception:
+            pass
 
     def register_instrument(self, instrument: Instrument, instrument_id: str | None = None) -> None:
         key = instrument_id or instrument.instrument_id.symbol
@@ -488,8 +525,12 @@ class PaperTradingEngine:
         }
 
     def submit_intent(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
+        instr_str = str(intent.instrument_id)
+        self.intents_by_instrument[instr_str] += 1
+
         with self._lock:
             if not self._check_adapter_health():
+                self.rejections_by_instrument[instr_str] += 1
                 payload = self._rejection_payload(intent, "ADAPTER_UNHEALTHY")
                 if self.logger:
                     self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
@@ -497,6 +538,7 @@ class PaperTradingEngine:
                 return OrderResult(accepted=False, rejection_reason=f"Adapter unhealthy — trading halted")
 
         if not TradingState.Active.accepts_intents():
+            self.rejections_by_instrument[instr_str] += 1
             payload = self._rejection_payload(intent, "TRADING_HALTED")
             if self.logger:
                 self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
@@ -504,6 +546,7 @@ class PaperTradingEngine:
             return OrderResult(accepted=False, rejection_reason="Trading state is not active")
 
         if self.risk_gate.kill_switch.blocks_routing():
+            self.rejections_by_instrument[instr_str] += 1
             payload = self._rejection_payload(intent, "SAFETY_KILL_SWITCH")
             if self.logger:
                 self.logger.warning("engine", f"{intent.side} rejected — routing prevented",
@@ -513,9 +556,11 @@ class PaperTradingEngine:
         instr_id = str(intent.instrument_id)
         instrument = self.instruments.get(instr_id)
         if instrument is None:
+            self.rejections_by_instrument[instr_str] += 1
             return OrderResult(accepted=False, rejection_reason=f"Instrument is not registered: {instr_id}")
         raw = instrument.validate_order(intent.side or "BUY", int(intent.quantity), intent.price or "0")
         if raw is not None:
+            self.rejections_by_instrument[instr_str] += 1
             if self.logger:
                 self.logger.warning("engine", f"Intent rejected: instrument validation: {raw}")
             return OrderResult(accepted=False, rejection_reason=f"Instrument validation failed: {raw}")
@@ -557,6 +602,7 @@ class PaperTradingEngine:
         )
 
         if not verdict.accepted:
+            self.rejections_by_instrument[instr_str] += 1
             reason = verdict.reason_detail or str(verdict.reason)
             self._trace_decision(correlation_id, "RiskDecision",
                                  {"accepted": False, "reason": reason})
@@ -586,6 +632,16 @@ class PaperTradingEngine:
             price=str(intent.price) if intent.price else None,
             stop_price=str(intent.stop_price) if hasattr(intent, 'stop_price') and intent.stop_price else None,
         )
+
+        secret_key = getattr(self.config, 'risk_secret_key', 'TITAN_RISK_SECRET_KEY')
+        if hasattr(approved, 'attach_risk_token'):
+            approved.attach_risk_token(secret_key)
+
+        # Fail closed verification
+        if hasattr(approved, 'verify_risk_token') and not approved.verify_risk_token(secret_key):
+            self.rejections_by_instrument[instr_str] += 1
+            intents_rejected.inc()
+            return OrderResult(accepted=False, rejection_reason="Unsigned or invalid risk token")
 
         self._trace_decision(correlation_id, "ApprovedOrderIntent",
                              {"client_order_id": client_order_id,
@@ -630,6 +686,7 @@ class PaperTradingEngine:
             try:
                 acknowledgement = self.adapter.place_order(approved)
             except Exception as e:
+                self.rejections_by_instrument[instr_str] += 1
                 sm.transition(OrderState.Rejected)
                 sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_error: {e}")
                 if self.logger:
@@ -642,6 +699,7 @@ class PaperTradingEngine:
                     rejection_reason=f"Broker submit failed: {e}",
                 )
         if not acknowledgement.accepted:
+            self.rejections_by_instrument[instr_str] += 1
             sm.transition(OrderState.Rejected)
             sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_rejected: {acknowledgement.rejection_reason}")
             orders_rejected.inc()
@@ -653,6 +711,7 @@ class PaperTradingEngine:
                 accepted=False,
                 rejection_reason=acknowledgement.rejection_reason,
             )
+
 
         broker_id = acknowledgement.broker_order_id
         sm.transition(OrderState.Acknowledged)
@@ -669,6 +728,16 @@ class PaperTradingEngine:
                              {"broker_order_id": str(broker_id.id) if broker_id else None,
                               "client_order_id": client_order_id,
                               "accepted": True})
+
+        # Track metadata for ALL accepted orders (filled AND still-working) so
+        # poll_fills can absorb async fills, partial fills and external cancels.
+        total_qty = int(str(approved.quantity))
+        self._order_metadata[client_order_id] = {
+            "instrument_id": str(intent.instrument_id),
+            "side": str(intent.side),
+            "quantity": total_qty,
+        }
+        self._order_filled_quantity.setdefault(client_order_id, 0)
 
         fills = self._resolve_fills(approved, broker_id, acknowledgement)
         if fills:
@@ -690,6 +759,8 @@ class PaperTradingEngine:
                 )
                 self.update_price(fill.instrument_id, fill.price)
                 orders_filled.inc()
+                self.fills_by_instrument[fill.instrument_id] += 1
+
 
                 new_pos = self.portfolio.get_position(fill.instrument_id)
                 new_side = str(new_pos.side) if new_pos else "None"
@@ -721,12 +792,6 @@ class PaperTradingEngine:
                     }),
                 ))
 
-            total_qty = int(str(approved.quantity))
-            self._order_metadata[client_order_id] = {
-                "instrument_id": str(intent.instrument_id),
-                "side": str(intent.side),
-                "quantity": total_qty,
-            }
             self._order_filled_quantity[client_order_id] = total_filled
             if total_filled < total_qty:
                 sm.transition(OrderState.PartiallyFilled)
@@ -735,12 +800,32 @@ class PaperTradingEngine:
                 sm.transition(OrderState.Filled)
                 sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Filled, "full_fill")
         else:
-            sm.transition(OrderState.Rejected)
-            sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Rejected, "no_fill_quantity")
-            if self.logger:
-                log_adapter_event(self.logger, "fill_failed", client_order_id,
-                                  instrument_id=str(intent.instrument_id),
-                                  payload={"reason": "no_fill_quantity"})
+            ack_status = getattr(acknowledgement, "order_status", None) or ""
+            if ack_status in _WORKING_ORDER_STATUSES:
+                # Order is still working at the broker (Submitted/PreSubmitted) —
+                # the engine's fill timeout elapsed before a terminal status.
+                # Keep the order PENDING: poll_fills absorbs the fill or external
+                # cancel asynchronously via adapter.tick(). Never assume it dead.
+                if self.logger:
+                    log_adapter_event(self.logger, "order_working", client_order_id,
+                                      instrument_id=str(intent.instrument_id),
+                                      payload={"status": ack_status})
+            else:
+                sm.transition(OrderState.Rejected)
+                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Rejected, "no_fill_quantity")
+                if self.logger:
+                    log_adapter_event(self.logger, "fill_failed", client_order_id,
+                                      instrument_id=str(intent.instrument_id),
+                                      payload={"reason": "no_fill_quantity"})
+                # The broker may still be working this order or may fill it after our
+                # timeout. Cancel it so TWS does not fill an order the engine already
+                # declared dead — otherwise positions drift (TWS holds what the engine
+                # thinks never existed).
+                if broker_id is not None:
+                    try:
+                        self.adapter.cancel(broker_id)
+                    except Exception:
+                        pass
 
 
         self._save_state()
@@ -776,19 +861,48 @@ class PaperTradingEngine:
 
                 meta = self._order_metadata.get(order_id)
                 already_filled = self._order_filled_quantity.get(order_id, 0)
-                from_state = copy.deepcopy(sm.current)
+                # pyo3 enum objects are immutable — a plain reference is fine
+                # (deepcopy raises TypeError: cannot pickle OrderState).
+                from_state = sm.current
 
             if meta is None:
                 continue
 
             try:
                 result = self.adapter.tick(order_id)
-            except Exception:
+            except AttributeError as e:
+                log_adapter_event(self.logger, "fill_poll_error", order_id, payload={"error": f"Adapter missing tick method: {e}"})
+                continue
+            except Exception as e:
+                log_adapter_event(self.logger, "fill_poll_warning", order_id, payload={"error": str(e)})
                 continue
             if result is None:
                 continue
 
-            new_qty = result.filled_quantity - already_filled
+            status = str(getattr(result, "status", "") or "")
+            if status in _DEAD_ORDER_STATUSES and status != "Filled":
+                # Terminal dead state reached outside the synchronous wait —
+                # typically an external cancel/reject from the TWS UI or a
+                # rejected fill. Transition the order and drop tracking.
+                with self._lock:
+                    try:
+                        sm.transition(OrderState.Rejected)
+                        sm.persist_transition(
+                            self._event_store, order_id, from_state,
+                            OrderState.Rejected, f"broker_{status.lower()}",
+                        )
+                    except Exception:
+                        pass
+                    self._order_metadata.pop(order_id, None)
+                    self._order_filled_quantity.pop(order_id, None)
+                log_adapter_event(self.logger, "broker_dead_order", order_id,
+                                  payload={"status": status, "instrument_id": result.instrument_id})
+                continue
+            if status not in ("Filled", ""):
+                # Still working at the broker — nothing to do this poll.
+                continue
+
+            new_qty = int(result.filled_quantity or 0) - already_filled
             if new_qty <= 0:
                 continue
 
@@ -838,10 +952,10 @@ class PaperTradingEngine:
                     }),
                 ))
 
-                self._order_filled_quantity[order_id] = result.filled_quantity
+                self._order_filled_quantity[order_id] = int(result.filled_quantity or 0)
                 total_qty = meta.get("quantity", 0)
 
-                if result.filled_quantity < total_qty:
+                if int(result.filled_quantity or 0) < total_qty:
                     if from_state == OrderState.Acknowledged:
                         sm.transition(OrderState.PartiallyFilled)
                         sm.persist_transition(self._event_store, order_id, from_state, OrderState.PartiallyFilled, "partial_fill_from_poll")
@@ -856,20 +970,54 @@ class PaperTradingEngine:
     def reconcile(self) -> ReconciliationResult:
         with self._lock:
             broker_positions = []
+            positions_unavailable = False
             try:
                 pos_snapshot = self.adapter.positions(self.config.account_id)
                 broker_positions = pos_snapshot.positions
             except Exception as e:
+                # One retry: transient API hiccups (TWS overload, reconnect window)
+                # must not halt a healthy session. A second failure fails closed —
+                # the compare below will flag the empty set and trip the kill switch
+                # with a clear reason in the log.
                 if self.logger:
-                    self.logger.warning("engine", f"Reconcile: position fetch failed: {e}")
+                    self.logger.warning("engine", f"Reconcile: position fetch failed ({e}); retrying once")
+                time.sleep(1.0)
+                try:
+                    pos_snapshot = self.adapter.positions(self.config.account_id)
+                    broker_positions = pos_snapshot.positions
+                except Exception as e2:
+                    # Two consecutive failures: likely the TWS "API wedge"
+                    # (account queries stall while market data flows). Force a
+                    # fresh connection and try once more before failing closed.
+                    if self.logger:
+                        self.logger.warning("engine", f"Reconcile: position fetch failed after retry ({e2}); forcing reconnect")
+                    if hasattr(self.adapter, "ensure_connected"):
+                        try:
+                            self.adapter.ensure_connected(force=True)
+                        except Exception:
+                            pass
+                    try:
+                        pos_snapshot = self.adapter.positions(self.config.account_id)
+                        broker_positions = pos_snapshot.positions
+                    except Exception as e3:
+                        positions_unavailable = True
+                        if self.logger:
+                            self.logger.warning("engine", f"Reconcile: position fetch failed after reconnect: {e3}")
 
-            broker_cash = Money("0", self.config.currency)
+            broker_cash = None
             try:
                 bal_snapshot = self.adapter.holdings(self.config.account_id)
                 broker_cash = bal_snapshot.cash
             except Exception as e:
                 if self.logger:
                     self.logger.warning("engine", f"Reconcile: holdings fetch failed: {e}")
+            if broker_cash is None:
+                # Broker cash unavailable — skip cash verification rather than
+                # comparing against a zero balance (which would read as a 100%
+                # phantom cash drift and trip the kill switch on a hiccup).
+                broker_cash = self.portfolio.get_cash_balance()
+                if self.logger:
+                    self.logger.warning("engine", "Reconcile: cash verification skipped (broker cash unavailable)")
 
             result = self.reconciler.compare(
                 self.portfolio,
@@ -928,7 +1076,29 @@ class PaperTradingEngine:
                 adapter_health=health,
             )
 
+    def get_per_instrument_stats(self) -> dict[str, dict]:
+        with self._lock:
+            stats = {}
+            all_instruments = (
+                set(self.intents_by_instrument.keys())
+                | set(self.fills_by_instrument.keys())
+                | set(self.rejections_by_instrument.keys())
+                | set(self.instruments.keys())
+            )
+            for instr in sorted(all_instruments):
+                pos = self.portfolio.get_position(instr)
+                stats[instr] = {
+                    "intents": self.intents_by_instrument[instr],
+                    "fills": self.fills_by_instrument[instr],
+                    "rejections": self.rejections_by_instrument[instr],
+                    "position": pos.quantity if pos else 0,
+                    "side": str(pos.side) if pos else "NONE",
+                    "price": self._last_prices.get(instr, "0.00"),
+                }
+            return stats
+
     def trigger_kill_switch(self) -> None:
+
         self.risk_gate.trigger_kill_switch()
         self._save_state()
         kill_switch_triggered.inc()
@@ -936,14 +1106,35 @@ class PaperTradingEngine:
             self.logger.warning("engine", "Kill switch triggered")
 
     def release_kill_switch(self) -> None:
+        """Resume a halted session.
+
+        Idempotent by design: if the kill switch is not held (state Armed or
+        Released), the release is a no-op and returns cleanly instead of
+        trying an illegal state transition (the Rust machine only allows
+        Triggered -> Releasing -> Released). When held, it reconciles first
+        and refuses on critical drift, surfacing a structured reason so a
+        caller can echo why the release was denied.
+        """
+        # 1) Not held -> nothing to release. No-op, not an error.
+        if not self.risk_gate.kill_switch.blocks_routing():
+            if self.logger:
+                self.logger.info("engine", "Kill switch release: not held (no-op)")
+            return
+
+        # 2) Held: refuse on genuine critical drift, with a reason code.
         result = self.reconcile()
         if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
             raise RuntimeError(
-                f"Cannot release kill switch: critical reconciliation drift "
+                f"Cannot release kill switch: "
+                f"kill_reason=critical_reconcile_drift "
                 f"({len(result.position_drifts)} position drifts, "
                 f"cash drift {result.cash_drift})"
             )
-        self.risk_gate.release_initiated()
+
+        # 3) Complete the transition. Covers both held states: Triggered needs
+        #    the initiator step, Releasing jumps straight to completion.
+        if self.risk_gate.kill_switch.is_triggered():
+            self.risk_gate.release_initiated()
         self.risk_gate.release_completed()
         if self.risk_gate.trading_state != TradingState.Active:
             self.risk_gate.set_trading_state(TradingState.Active)

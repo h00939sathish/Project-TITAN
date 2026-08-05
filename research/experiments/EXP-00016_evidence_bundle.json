@@ -1,0 +1,85 @@
+{
+ "experiment_id": "EXP-00016",
+ "canonical_research_question": "Does the trailing 12h EURUSD/GBPUSD return predict the next 1h return (intraday analog of time-series momentum)?",
+ "hypothesis": [
+  "return_12h"
+ ],
+ "economic_mechanism": "Positive autocorrelation in FX returns (documented at monthly horizon; intraday scale is exploratory)",
+ "instruments": [
+  "EURUSD",
+  "GBPUSD"
+ ],
+ "governance_checks": {
+  "Sample size sufficient": "True",
+  "IC statistically significant": "IC -0.0298 below threshold 0.03",
+  "Bootstrap CI same sign": "True",
+  "Temporal consistency": "True",
+  "Survives transaction costs": "Net spread -0.0020 <= 0 after 10.0 bps"
+ },
+ "decision": "reject",
+ "results": {
+  "EURUSD": {
+   "ic": -0.0834,
+   "n": 12384,
+   "bootstrap_ci": [
+    -0.1024,
+    -0.0668
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4128,
+     "n": 4128,
+     "ic": -0.06597347671089283
+    },
+    {
+     "period": 1,
+     "start_idx": 4128,
+     "end_idx": 8256,
+     "n": 4128,
+     "ic": -0.0843523071725666
+    },
+    {
+     "period": 2,
+     "start_idx": 8256,
+     "end_idx": 12384,
+     "n": 4128,
+     "ic": -0.11382148531799796
+    }
+   ]
+  },
+  "GBPUSD": {
+   "ic": -0.0298,
+   "n": 12384,
+   "bootstrap_ci": [
+    -0.0479,
+    -0.014
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4128,
+     "n": 4128,
+     "ic": -0.04024284118562651
+    },
+    {
+     "period": 1,
+     "start_idx": 4128,
+     "end_idx": 8256,
+     "n": 4128,
+     "ic": -0.06580048296328875
+    },
+    {
+     "period": 2,
+     "start_idx": 8256,
+     "end_idx": 12384,
+     "n": 4128,
+     "ic": 0.0024711189030237283
+    }
+   ]
+  }
+ },
+ "execution_timestamp": "2026-08-01T17:03:56.507014+00:00"
+}

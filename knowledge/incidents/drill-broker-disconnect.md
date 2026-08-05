@@ -30,3 +30,9 @@ Verify:
 - Containment: ✅ (Kill switch blocked routing)
 - Recovery: ✅ (Adapter healthy → release → resume)
 - Gaps: Automated circuit breaker not implemented (manual trigger only)
+
+## Fix (2026-07-14)
+
+**Problem:** Adapter health was monitored via HealthReporter but not wired into the trading pipeline. A degraded broker did not automatically block orders — the kill switch had to be triggered manually.
+
+**Fix:** `PaperTradingEngine._check_adapter_health()` is called before every `submit_intent()`. If the adapter heartbeat fails or returns disconnected, it auto-triggers the kill switch (fail-closed). The system remains halted until an operator diagnoses the issue and manually releases the kill switch.

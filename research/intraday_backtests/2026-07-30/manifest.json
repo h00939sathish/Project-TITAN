@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-07-30T05:15:20.083815+00:00",
+  "assets": {
+    "SPY": {
+      "source": "Alpaca IEX historical bars",
+      "timeframes": {
+        "5m": {
+          "rows": 3000,
+          "from": "2026-06-05T17:55:00+00:00",
+          "to": "2026-07-29T20:30:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\spy_5m.csv",
+          "sha256": "a0b33bb4948e090beac3e5535d8908505ccf292d1c28d3cb2f0be5ec3e32912a"
+        },
+        "15m": {
+          "rows": 1062,
+          "from": "2026-06-05T17:45:00+00:00",
+          "to": "2026-07-29T20:30:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\spy_15m.csv",
+          "sha256": "19ceb297e4f09a624318d1841be9b5da4198315190025271c407512d519e6feb"
+        },
+        "1h": {
+          "rows": 309,
+          "from": "2026-06-05T17:00:00+00:00",
+          "to": "2026-07-29T20:00:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\spy_1h.csv",
+          "sha256": "f194298164d7fc7284529230613a912826bf7c2fdb187b33dc5dfc81a7e25ddd"
+        }
+      }
+    },
+    "EURUSD": {
+      "source": "Yahoo Finance via yfinance \u2014 unapproved research source",
+      "timeframes": {
+        "5m": {
+          "rows": 3000,
+          "from": "2026-07-15T16:15:00+00:00",
+          "to": "2026-07-30T05:10:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\eurusd_5m.csv",
+          "sha256": "d0ef4f06328ae28de5cf5e39b5fd4eec01b3b2038e9627b34e8a8548d6919c81"
+        },
+        "15m": {
+          "rows": 1000,
+          "from": "2026-07-15T16:15:00+00:00",
+          "to": "2026-07-30T05:00:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\eurusd_15m.csv",
+          "sha256": "34139e6ab154338e92054037acbfefed1766a4c9304d36e6eb66bd1d051ba9b7"
+        },
+        "1h": {
+          "rows": 252,
+          "from": "2026-07-15T16:00:00+00:00",
+          "to": "2026-07-30T05:00:00+00:00",
+          "path": "research\\intraday_backtests\\2026-07-30\\eurusd_1h.csv",
+          "sha256": "66de4cc2421349386ca0054ccd1b4b9694120872c3094636269adbcd0ba5a191"
+        }
+      }
+    }
+  }
+}

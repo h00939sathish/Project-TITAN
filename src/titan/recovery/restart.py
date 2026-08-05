@@ -5,9 +5,43 @@ from typing import Any
 from titan._core import (
     EventStore, RiskGate, RiskConfig, PortfolioEngine,
     Money, ReconciliationEngine, ReconciliationConfig,
-    TradingState, KillSwitchState,
+    TradingState, KillSwitchState, ReconciliationDriftSeverity,
 )
+
 from titan.execution.simulated_adapter import SimulatedAdapter
+
+
+import json
+
+
+def replay_portfolio_events(store: EventStore, portfolio: PortfolioEngine) -> int:
+    """Replay OrderFilled events from EventStore to rebuild portfolio state.
+
+    Returns the number of replayed fill events.
+    """
+    events = store.replay_by_type("OrderFilled")
+    replayed_count = 0
+
+    for envelope in events:
+        try:
+            data = json.loads(envelope.payload)
+            inst_id = data.get("instrument_id")
+            side = data.get("side", "").lower()
+            qty = int(data.get("filled_quantity", data.get("quantity", 0)))
+            price_str = str(data.get("fill_price", data.get("price", "0")))
+
+            if inst_id and side in ("buy", "sell") and qty > 0:
+                portfolio.apply_fill(
+                    instrument_id=inst_id,
+                    side=side,
+                    quantity=qty,
+                    price=Money(price_str, "USD"),
+                )
+                replayed_count += 1
+        except Exception:
+            pass
+
+    return replayed_count
 
 
 def recover_from_event_store(store_path: str = ":memory:") -> dict:
@@ -16,7 +50,7 @@ def recover_from_event_store(store_path: str = ":memory:") -> dict:
     Returns a dict with:
         store: EventStore instance
         risk_gate: RiskGate with restored state
-        portfolio: PortfolioEngine (empty — full replay is deferred)
+        portfolio: PortfolioEngine with replayed state
         adapter: SimulatedAdapter (no persisted state)
         recon_engine: ReconciliationEngine
     """
@@ -24,6 +58,7 @@ def recover_from_event_store(store_path: str = ":memory:") -> dict:
     config = RiskConfig.default()
     risk_gate = RiskGate.load_or_default(config, store)
     portfolio = PortfolioEngine("USD", Money("100000", "USD"))
+    replay_portfolio_events(store, portfolio)
     adapter = SimulatedAdapter()
     recon_engine = ReconciliationEngine(
         ReconciliationConfig(
@@ -38,6 +73,7 @@ def recover_from_event_store(store_path: str = ":memory:") -> dict:
         "adapter": adapter,
         "recon_engine": recon_engine,
     }
+
 
 
 def reconcile_on_boot(portfolio: PortfolioEngine, adapter: Any,
@@ -70,23 +106,29 @@ def reconcile_on_boot(portfolio: PortfolioEngine, adapter: Any,
             "snapshot_fetch_failed": True,
         }
     result = recon_engine.compare(portfolio, broker_positions, broker_cash)
-    has_drift = len(result.position_drifts) > 0
+    has_drift = result.severity != ReconciliationDriftSeverity.InSync
+    non_zero_drifts = [d for d in result.position_drifts if getattr(d, 'quantity_drift', 0) > 0]
+
     return {
         "has_drift": has_drift,
-        "drift_count": len(result.position_drifts),
-        "drift_details": [str(d) for d in result.position_drifts],
+        "drift_count": len(non_zero_drifts),
+        "drift_details": [str(d) for d in non_zero_drifts],
         "reconciled": not has_drift,
     }
+
 
 
 def transition_on_boot(recon_result: dict[str, Any], risk_gate: RiskGate) -> str:
     """Transition system to ACTIVE if clean, HALTED if drift or fetch failure."""
     if recon_result.get("snapshot_fetch_failed"):
-        risk_gate.set_trading_state(TradingState.Halted)
+        if risk_gate.trading_state != TradingState.Halted:
+            risk_gate.set_trading_state(TradingState.Halted)
         return "HALTED (broker truth unavailable)"
     if recon_result["has_drift"]:
-        risk_gate.set_trading_state(TradingState.Halted)
+        if risk_gate.trading_state != TradingState.Halted:
+            risk_gate.set_trading_state(TradingState.Halted)
         return "HALTED (drift)"
     if risk_gate.trading_state != TradingState.Active:
         risk_gate.set_trading_state(TradingState.Active)
     return "ACTIVE"
+

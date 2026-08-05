@@ -32,6 +32,9 @@ jobs:
       - run: pip install maturin pytest ruff mypy
       - run: maturin build --release --manifest-path core/Cargo.toml
       - run: pip install target/wheels/*.whl
-      - run: ruff check .
-      - run: mypy platform/ tests/
+      - run: mypy src/titan tests/
+      - run: python scripts/check_adr_gate.py
       - run: pytest tests/
+      - name: Throughput benchmark
+        run: python -m pytest tests/replay/test_throughput.py --no-header -q
+

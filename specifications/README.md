@@ -30,6 +30,7 @@ Every `.spec.md` contains:
 | TradeIntent.spec.md | Intent schema, provenance, expiry | Phase B |
 | Execution.spec.md | Order service, outbox, adapter contract | Phase C |
 | Risk.spec.md | Risk gate pipeline, limits, kill switch | Phase C |
+| StrategyRuntime.spec.md | Strategy warmup, signal deduplication, and intent proposal boundary | Phase J |
 | Broker.spec.md | Session lifecycle, auth, reconciliation | Phase C/E |
 | Replay.spec.md | Clock, determinism, fill models | Phase D |
 
@@ -37,6 +38,7 @@ Every `.spec.md` contains:
 
 | File | Content |
 |---|---|
+| Governance.spec.md | Research → Architecture → Implementation → Evolution continuous loop definitions, state machine, metrics, and configuration |
 | PERFORMANCE_SPEC.md | p99 latency budgets per subsystem |
 | FAILURE_MATRIX.md | Failure → behavior → recovery → verification |
 | VERSIONING.md | Independent version policy for all artifacts |

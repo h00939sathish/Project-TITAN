@@ -8,7 +8,7 @@ class TestBrokerTimeoutCancel:
     def test_cancel_filled_order_returns_false(self):
         """SimulatedAdapter.cancel_order returns False for filled orders (cannot cancel)."""
         adapter = SimulatedAdapter()
-        intent = TradeIntent("s1", "p1", "a1", "AAPL", "BUY", "100", "LIMIT", "DAY", "1.0", price="150")
+        intent = TradeIntent("s1", "p1", "a1", "AAPL", "BUY", "100", "LIMIT", "DAY", "1.0", "2026-07-13T23:12:00Z", price="150")
         order = adapter.submit_order("ord-cancel-to", "AAPL", "buy", 100, "150")
         assert order.status == "filled"
         result = adapter.cancel_order("ord-cancel-to")

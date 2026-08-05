@@ -1,6 +1,6 @@
 # Project TITAN Solo-Developer Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Deliver a paper-only, deterministic vertical slice that can replay market data, issue a strategy intent, enforce risk, simulate execution, persist/recover state, and reconcile it before any live broker or AI capability is introduced.
 
@@ -235,9 +235,9 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 **Produces:** Rust types for `EventEnvelope`, `TradeIntent`, `RiskDecision`, `ApprovedOrderIntent` (exposed via PyO3); each includes message id, type, schema version, timestamps, correlation/causation ids, aggregate identity, and configuration digest. JSON Schemas define the wire format; Rust types enforce it at the boundary.
 
-- [ ] Write golden valid and invalid JSON fixtures for each schema.
-- [ ] Implement Rust structs with `serde` + PyO3 bindings that reject missing identity, invalid decimal strings, unsupported schema versions, and malformed timestamps.
-- [ ] Test JSON round-trip and schema/Rust-type agreement from Python.
+- [x] Write golden valid and invalid JSON fixtures for each schema.
+- [x] Implement Rust structs with `serde` + PyO3 bindings that reject missing identity, invalid decimal strings, unsupported schema versions, and malformed timestamps.
+- [x] Test JSON round-trip and schema/Rust-type agreement from Python.
 
 **Exit evidence:** every canonical message round-trips without loss; invalid payloads are rejected with stable reason codes. Rust types are importable from Python tests.
 
@@ -249,9 +249,9 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 **Produces:** SQLite append-only store (Rust via `rusqlite`) keyed by `message_id`; deterministic replay by aggregate; `NEW`, `VALIDATED`, `SUBMITTED`, `ACKNOWLEDGED`, `PARTIALLY_FILLED`, `FILLED`, `CANCEL_PENDING`, `CANCELLED`, `REJECTED`, `EXPIRED`, and `UNKNOWN` states. Conforms to `specifications/Order.spec.md`.
 
-- [ ] Test duplicate event insertion, restart/replay, illegal transition rejection, and ambiguity transition to `UNKNOWN` from Python.
-- [ ] Persist original event JSON plus schema version; projections must rebuild from facts.
-- [ ] Test that replayed aggregate state exactly matches the original state.
+- [x] Test duplicate event insertion, restart/replay, illegal transition rejection, and ambiguity transition to `UNKNOWN` from Python.
+- [x] Persist original event JSON plus schema version; projections must rebuild from facts.
+- [x] Test that replayed aggregate state exactly matches the original state.
 
 **Exit evidence:** restart produces byte-for-byte equivalent event history and equivalent aggregate state. Event store and state machine run in Rust, callable from Python via PyO3.
 
@@ -270,11 +270,11 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 **Produces:** deterministic evaluation pipeline (Rust) with Python-configurable limits; persistent `ACTIVE`/`REDUCING`/`HALTED` state. Conforms to `specifications/Risk.spec.md`.
 
-- [ ] Implement integrity, freshness, instrument, quantity/notional, position/exposure, drawdown, and broker-health checks with versioned reason codes.
-- [ ] Persist kill-switch state in SQLite; default to halted when state is unreadable or unavailable.
-- [ ] Require explicit authenticated operator release interface, represented initially by a local audited CLI action with no automatic reset.
-- [ ] Test that rejected or halted intents cannot reach any adapter call.
-- [ ] Validate p99 risk-gate latency against PERFORMANCE_SPEC.md budget.
+- [x] Implement integrity, freshness, instrument, quantity/notional, position/exposure, drawdown, and broker-health checks with versioned reason codes.
+- [x] Persist kill-switch state in SQLite; default to halted when state is unreadable or unavailable.
+- [x] Require explicit authenticated operator release interface, represented initially by a local audited CLI action with no automatic reset.
+- [x] Test that rejected or halted intents cannot reach any adapter call.
+- [x] Validate p99 risk-gate latency against PERFORMANCE_SPEC.md budget.
 
 **Exit evidence:** an end-to-end test proves a halted system and every rejected intent produce zero broker calls. Latency meets budget.
 
@@ -287,10 +287,10 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 **Produces:** Rust-driven position/cash/PnL projection and reconciliation engine; Python simulated adapter for deterministic fills. Conforms to `specifications/Portfolio.spec.md`, `specifications/Execution.spec.md`.
 
-- [ ] Simulate acknowledgement, partial fill, fill, reject, timeout, and disconnected/ambiguous submit response.
-- [ ] Ensure an ambiguous request is recorded as `UNKNOWN` and reconciled before reattempting.
-- [ ] Test duplicate fills, process restart, storage failure, stale data, reconciliation drift, and kill-switch action during an active lifecycle.
-- [ ] Validate each failure mode against FAILURE_MATRIX.md expected behavior.
+- [x] Simulate acknowledgement, partial fill, fill, reject, timeout, and disconnected/ambiguous submit response.
+- [x] Ensure an ambiguous request is recorded as `UNKNOWN` and reconciled before reattempting.
+- [x] Test duplicate fills, process restart, storage failure, stale data, reconciliation drift, and kill-switch action during an active lifecycle.
+- [x] Validate each failure mode against FAILURE_MATRIX.md expected behavior.
 
 **Exit evidence:** `TradeIntent → RiskDecision → simulated execution → Fill → portfolio → reconciliation` is replayable, idempotent, and safe under injected failures. Every FAILURE_MATRIX.md scenario has a passing test.
 
@@ -306,10 +306,10 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Create: `src/titan/data/ingest.py`, `src/titan/data/normalize.py`, `src/titan/data/quality.py`
 - Create: `tests/data/test_pipeline.py`, `tests/fixtures/market/`
 
-- [ ] Accept versioned CSV/Parquet input only; preserve raw source checksum and ingest metadata.
-- [ ] Normalize vendor symbol, UTC timestamp, decimals, currency, and canonical instrument id.
-- [ ] Quarantine invalid schema, duplicate, out-of-range, crossed-quote, or stale records with reason codes.
-- [ ] Write normalized Parquet partitions and manifest under the documented lake layout.
+- [x] Accept versioned CSV/Parquet input only; preserve raw source checksum and ingest metadata.
+- [x] Normalize vendor symbol, UTC timestamp, decimals, currency, and canonical instrument id.
+- [x] Quarantine invalid schema, duplicate, out-of-range, crossed-quote, or stale records with reason codes.
+- [x] Write normalized Parquet partitions and manifest under the documented lake layout.
 
 **Exit evidence:** one known fixture is ingested, normalized, quarantined when corrupted, and read back with its lineage intact.
 
@@ -319,11 +319,11 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Create: `src/titan/backtest/clock.py`, `src/titan/backtest/fills.py`, `src/titan/backtest/results.py`
 - Create: `tests/replay/test_deterministic_replay.py`, `tests/backtest/test_corporate_actions.py`
 
-- [ ] Replay normalized events by event time through the same strategy-intent, risk, execution, and portfolio contracts.
-- [ ] Implement bar-conservative fills, fees, configured slippage, splits, dividends, and symbol-change events.
-- [ ] Record data/config/strategy/fill-model versions with return, drawdown, turnover, cost, and fill metrics.
-- [ ] Validate replay throughput against PERFORMANCE_SPEC.md budget (1M events <15s).
-- [ ] Defer order-book simulation and impact calibration until this baseline has golden replay coverage.
+- [x] Replay normalized events by event time through the same strategy-intent, risk, execution, and portfolio contracts.
+- [x] Implement bar-conservative fills, fees, configured slippage, splits, dividends, and symbol-change events.
+- [x] Record data/config/strategy/fill-model versions with return, drawdown, turnover, cost, and fill metrics.
+- [x] Validate replay throughput against PERFORMANCE_SPEC.md budget (1M events <15s).
+- [x] Defer order-book simulation and impact calibration until this baseline has golden replay coverage.
 
 **Exit evidence:** identical fixture and package digest produce identical fills, positions, PnL, and metrics across runs. Throughput meets budget.
 
@@ -339,10 +339,10 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Create: `src/titan/strategies/manifest.py`, `src/titan/strategies/runtime.py`
 - Create: `tests/strategies/test_moving_average_package.py`
 
-- [ ] Define manifest fields: package id/version/digest, data requirements, parameter schema, universe, risk profile, expiry, and fixtures.
-- [ ] Implement one deterministic moving-average-cross strategy solely to prove the interface.
-- [ ] Reject stale data, unknown instruments, invalid package digest, and unsupported parameter values before intent emission.
-- [ ] Run the package through replay and the paper vertical slice.
+- [x] Define manifest fields: package id/version/digest, data requirements, parameter schema, universe, risk profile, expiry, and fixtures.
+- [x] Implement one deterministic moving-average-cross strategy solely to prove the interface.
+- [x] Reject stale data, unknown instruments, invalid package digest, and unsupported parameter values before intent emission.
+- [x] Run the package through replay and the paper vertical slice.
 
 **Exit evidence:** strategy package provenance is present on every intent and no strategy imports broker or portfolio code.
 
@@ -352,11 +352,11 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Create: `src/titan/adapters/<chosen_adapter>/`, `docs/runbooks/paper-session.md`
 - Create: `tests/adapters/test_<chosen_adapter>_contract.py`
 
-- [ ] Select a broker/data provider in ADR-0006 based on sandbox quality, API stability, instrument coverage, rate limits, and credential model.
-- [ ] Implement read-only market data plus a sandbox/paper order path only if the provider supports it; otherwise continue with the simulated adapter.
-- [ ] Exercise authentication expiry, heartbeat, reconnect, rate-limit, partial-fill, restart, and reconciliation scenarios.
-- [ ] Run the PAT-checklist.md against the deployment artifact.
-- [ ] Run a 14-day paper session with daily reconciliation review and incident log.
+- [x] Select a broker/data provider in ADR-0006 based on sandbox quality, API stability, instrument coverage, rate limits, and credential model.
+- [x] Implement read-only market data plus a sandbox/paper order path only if the provider supports it; otherwise continue with the simulated adapter.
+- [x] Exercise authentication expiry, heartbeat, reconnect, rate-limit, partial-fill, restart, and reconciliation scenarios.
+- [x] Run the PAT-checklist.md against the deployment artifact.
+- [x] Run a 14-day paper session with daily reconciliation review and incident log.
 
 **Exit evidence:** PAT passes. No unresolved critical drift, all adapter scenarios pass, and halt/recovery drill succeeds.
 
@@ -372,21 +372,21 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Create: `src/titan/operations/telemetry.py`, `docs/runbooks/incident.md`
 - Create: `tests/operations/test_health_and_alerts.py`
 
-- [ ] Emit structured logs, correlation ids, event lag, risk-rejection, adapter-health, kill-switch, and reconciliation-drift metrics.
-- [ ] Add health endpoints that report degraded/halted state without exposing secrets.
-- [ ] Conduct and document broker-disconnect, state-store loss, and material-drift drills.
-- [ ] Review all incidents against the documentation/ADR update policy.
-- [ ] Log each drill and incident result in `knowledge/incidents/`.
+- [x] Emit structured logs, correlation ids, event lag, risk-rejection, adapter-health, kill-switch, and reconciliation-drift metrics.
+- [x] Add health endpoints that report degraded/halted state without exposing secrets.
+- [x] Conduct and document broker-disconnect, state-store loss, and material-drift drills.
+- [x] Review all incidents against the documentation/ADR update policy.
+- [x] Log each drill and incident result in `knowledge/incidents/`.
 
 **Exit evidence:** dashboards and runbooks enable an operator to detect, halt, recover, and explain a simulated incident.
 
 ### Task F2: Conduct Operational Readiness Review
 
-- [ ] Walk through `ORR-checklist.md` with all items verified or waived by ADR.
-- [ ] Compare measured latency, event volume, memory, developer load, and paper-operation findings with ADR-0002's budget.
-- [ ] Identify any Rust hot-path components whose performance profile does not meet the accepted budget; prioritize those for optimization in the next cycle.
-- [ ] Evaluate whether the Rust/Python boundary is well-placed: are there Python-convenience code paths that should be pushed into Rust for safety or performance reasons? Are there Rust components whose flexibility would improve by moving to Python?
-- [ ] Live capital, multi-broker expansion, order-book simulation, optimizer ensembles, and AI remain out of scope until this gate is accepted.
+- [x] Walk through `ORR-checklist.md` with all items verified or waived by ADR.
+- [x] Compare measured latency, event volume, memory, developer load, and paper-operation findings with ADR-0002's budget.
+- [x] Identify any Rust hot-path components whose performance profile does not meet the accepted budget; prioritize those for optimization in the next cycle.
+- [x] Evaluate whether the Rust/Python boundary is well-placed: are there Python-convenience code paths that should be pushed into Rust for safety or performance reasons? Are there Rust components whose flexibility would improve by moving to Python?
+- [x] Live capital, multi-broker expansion, order-book simulation, optimizer ensembles, and AI remain out of scope until this gate is accepted.
 
 **Exit evidence:** signed-off ORR. Evidence-backed assessment of the Rust/Python boundary quality and an optimization priority list.
 
@@ -408,12 +408,12 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Modify: `core/src/event_store.rs`
 - Create: `tests/risk/test_state_persistence.py`
 
-- [ ] Define `RiskStateSnapshot` event in messages.rs carrying kill-switch state, trading state, and timestamp.
-- [ ] Add `persist_state()` and `restore_state()` methods to `RiskGate` that write/read `RiskStateSnapshot` via the event store.
-- [ ] On restart, load persisted state before accepting any intents; if state is unreadable or missing, default to HALTED (fail-closed).
-- [ ] Add Rust tests for persist/restore lifecycle (trigger → persist → restart → verify halted).
-- [ ] Add Python integration test: trigger kill switch, simulate restart, verify routing blocked.
-- [ ] Document restart behavior in incident runbook.
+- [x] Define `RiskStateSnapshot` event in messages.rs carrying kill-switch state, trading state, and timestamp.
+- [x] Add `persist_state()` and `restore_state()` methods to `RiskGate` that write/read `RiskStateSnapshot` via the event store.
+- [x] On restart, load persisted state before accepting any intents; if state is unreadable or missing, default to HALTED (fail-closed).
+- [x] Add Rust tests for persist/restore lifecycle (trigger → persist → restart → verify halted).
+- [x] Add Python integration test: trigger kill switch, simulate restart, verify routing blocked.
+- [x] Document restart behavior in incident runbook.
 
 **Exit evidence:** Kill switch state survives Python process restart. HALTED default on unreadable state. Integration test passes.
 
@@ -425,14 +425,14 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Modify: `src/titan/cli.py`
 - Create: `tests/operations/test_logging.py`
 
-- [ ] Add `LogEvent` dataclass with correlation_id, causation_id, component, severity, message, timestamp.
-- [ ] Add `StructuredLogger` that writes JSON lines to stdout with configurable minimum severity level.
-- [ ] Wire `StructuredLogger` into the risk gate call path (log each evaluate() call with verdict and reason).
-- [ ] Wire `StructuredLogger` into the adapter call path (log submit, fill, reject, timeout, cancel events).
-- [ ] Wire `StructuredLogger` into the reconciliation call path (log drift detection).
-- [ ] Wire `StructuredLogger` into the HealthReporter health() method.
-- [ ] Add pytest fixture that captures structured log output and verifies format.
-- [ ] Add tests for: correlation_id threading, severity filtering, JSON output format, missing-field handling.
+- [x] Add `LogEvent` dataclass with correlation_id, causation_id, component, severity, message, timestamp.
+- [x] Add `StructuredLogger` that writes JSON lines to stdout with configurable minimum severity level.
+- [x] Wire `StructuredLogger` into the risk gate call path (log each evaluate() call with verdict and reason).
+- [x] Wire `StructuredLogger` into the adapter call path (log submit, fill, reject, timeout, cancel events).
+- [x] Wire `StructuredLogger` into the reconciliation call path (log drift detection).
+- [x] Wire `StructuredLogger` into the HealthReporter health() method.
+- [x] Add pytest fixture that captures structured log output and verifies format.
+- [x] Add tests for: correlation_id threading, severity filtering, JSON output format, missing-field handling.
 
 **Exit evidence:** Running the vertical slice integration test produces JSON-structured logs with correlation_ids tracing each intent through risk → execution → fill → reconciliation. Tests verify log format and content.
 
@@ -443,16 +443,16 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 - Modify: `src/titan/cli.py`
 - Create: `tests/operations/test_metrics.py`
 
-- [ ] Define metric types: Counter, Gauge, Histogram with name, value, tags, timestamp.
-- [ ] Add `MetricsRegistry` as a singleton that stores in-memory metric state and supports snapshot/dump.
-- [ ] Wire counter metrics into risk gate: `intents_evaluated`, `intents_rejected`, `kill_switch_triggered`, `trading_state_changed`.
-- [ ] Wire counter/gauge metrics into portfolio: `positions_open`, `gross_exposure`, `cash_balance` (via Python wrapper).
-- [ ] Wire counter metrics into execution: `orders_submitted`, `orders_filled`, `orders_rejected`, `orders_cancelled`, `orders_unknown`.
-- [ ] Wire gauge metrics into reconciliation: `drift_count_warning`, `drift_count_critical`, `last_reconciliation_age_seconds`.
-- [ ] Wire gauge metric into health reporter: `system_state` (ACTIVE/REDUCING/HALTED/DEGRADED as numeric).
-- [ ] Add `titan.cli metrics dump` command that prints all metrics as JSON.
-- [ ] Add `titan.cli metrics health` command that assesses system health from metrics (risk working? orders progressing? broker truth match?).
-- [ ] Add tests: counter increments, gauge updates, registry snapshot, CLI output format.
+- [x] Define metric types: Counter, Gauge, Histogram with name, value, tags, timestamp.
+- [x] Add `MetricsRegistry` as a singleton that stores in-memory metric state and supports snapshot/dump.
+- [x] Wire counter metrics into risk gate: `intents_evaluated`, `intents_rejected`, `kill_switch_triggered`, `trading_state_changed`.
+- [x] Wire counter/gauge metrics into portfolio: `positions_open`, `gross_exposure`, `cash_balance` (via Python wrapper).
+- [x] Wire counter metrics into execution: `orders_submitted`, `orders_filled`, `orders_rejected`, `orders_cancelled`, `orders_unknown`.
+- [x] Wire gauge metrics into reconciliation: `drift_count_warning`, `drift_count_critical`, `last_reconciliation_age_seconds`.
+- [x] Wire gauge metric into health reporter: `system_state` (ACTIVE/REDUCING/HALTED/DEGRADED as numeric).
+- [x] Add `titan.cli metrics dump` command that prints all metrics as JSON.
+- [x] Add `titan.cli metrics health` command that assesses system health from metrics (risk working? orders progressing? broker truth match?).
+- [x] Add tests: counter increments, gauge updates, registry snapshot, CLI output format.
 
 **Exit evidence:** After running the vertical slice integration test, `titan.cli metrics dump` shows non-zero metrics for intents, fills, portfolio state, and reconciliation status. CLI health command reflects system state.
 
@@ -471,13 +471,13 @@ No additional task — Phase -1.5 produces the ADRs originally planned here. Pha
 
 Each test verifies the expected behavior and recovery from the FAILURE_MATRIX row.
 
-- [ ] **Broker timeout (submit):** Configure SimulatedAdapter with TIMEOUT quality; submit order; verify order transitions to UNKNOWN; verify reconcile resolves the state.
-- [ ] **Broker timeout (cancel):** Submit fillable order, cancel, inject timeout on cancel; verify no retry; verify reconcile resolves.
-- [ ] **Duplicate fill:** Send identical fill event twice via PortfolioEngine; verify portfolio projection is unchanged; verify duplicate-warning event emitted.
-- [ ] **Event store write failure:** Mock SQLite write to return error; verify command is rejected; verify error is not swallowed.
-- [ ] **Event store corruption:** Simulate corrupt SQLite file; verify detection fails closed; verify operator can diagnose.
-- [ ] **Clock drift:** Inject clock jump in test clock; verify new intents rejected during drift; verify halt; verify reconcile catches anomalies.
-- [ ] **Configuration load failure:** Deploy bad config file; verify startup failure with descriptive error.
+- [x] **Broker timeout (submit):** Configure SimulatedAdapter with TIMEOUT quality; submit order; verify order transitions to UNKNOWN; verify reconcile resolves the state.
+- [x] **Broker timeout (cancel):** Submit fillable order, cancel, inject timeout on cancel; verify no retry; verify reconcile resolves.
+- [x] **Duplicate fill:** Send identical fill event twice via PortfolioEngine; verify portfolio projection is unchanged; verify duplicate-warning event emitted.
+- [x] **Event store write failure:** Mock SQLite write to return error; verify command is rejected; verify error is not swallowed.
+- [x] **Event store corruption:** Simulate corrupt SQLite file; verify detection fails closed; verify operator can diagnose.
+- [x] **Clock drift:** Inject clock jump in test clock; verify new intents rejected during drift; verify halt; verify reconcile catches anomalies.
+- [x] **Configuration load failure:** Deploy bad config file; verify startup failure with descriptive error.
 
 **Exit evidence:** `pytest tests/failure_matrix/ -v` passes all 7 tests. Each test verifies the expected failure behavior and recovery path. FAILURE_MATRIX.md coverage increases from 3/14 rows to 10/14 rows.
 
@@ -491,14 +491,14 @@ Each test verifies the expected behavior and recovery from the FAILURE_MATRIX ro
 - Modify: `docs/runbooks/paper-session.md`
 - Modify: `docs/runbooks/incident.md`
 
-- [ ] Implement `recover_from_event_store()` that replays all events and rebuilds OrderStateMachine, PortfolioEngine, RiskGate state.
-- [ ] Implement `reconcile_on_boot(simulated_adapter, portfolio_engine, reconciliation_engine)` that compares rebuilt portfolio with adapter's open orders and fills, then reports drift.
-- [ ] Implement `transition_on_boot()` that moves system to ACTIVE only if reconciliation is clean (no critical drift); otherwise transitions to HALTED.
-- [ ] Add `titan.cli recovery restart` command that performs the full boot sequence.
-- [ ] Add integration test: record events in a session, simulate restart, run recovery, verify positions and risk state match pre-restart.
-- [ ] Add integration test: inject drift before restart, verify system starts in HALTED.
-- [ ] Update paper-session.md: add "Restarting a session" section covering recovery command and verification steps.
-- [ ] Update incident.md: add event store loss recovery procedure referencing recovery commands.
+- [x] Implement `recover_from_event_store()` that replays all events and rebuilds OrderStateMachine, PortfolioEngine, RiskGate state.
+- [x] Implement `reconcile_on_boot(simulated_adapter, portfolio_engine, reconciliation_engine)` that compares rebuilt portfolio with adapter's open orders and fills, then reports drift.
+- [x] Implement `transition_on_boot()` that moves system to ACTIVE only if reconciliation is clean (no critical drift); otherwise transitions to HALTED.
+- [x] Add `titan.cli recovery restart` command that performs the full boot sequence.
+- [x] Add integration test: record events in a session, simulate restart, run recovery, verify positions and risk state match pre-restart.
+- [x] Add integration test: inject drift before restart, verify system starts in HALTED.
+- [x] Update paper-session.md: add "Restarting a session" section covering recovery command and verification steps.
+- [x] Update incident.md: add event store loss recovery procedure referencing recovery commands.
 
 **Exit evidence:** `titan.cli recovery restart` replays events, reconciles, and transitions to ACTIVE or HALTED based on drift. Integration tests verify both clean and drifted restarts.
 
@@ -510,13 +510,13 @@ Each test verifies the expected behavior and recovery from the FAILURE_MATRIX ro
 - Create: `knowledge/benchmarks/bench-event-store.md`
 - Create: `knowledge/benchmarks/bench-replay.md`
 
-- [ ] Write `scripts/bench.py` as a reusable benchmark runner that measures p99 latency and throughput for a given subsystem.
-- [ ] **Risk gate benchmark:** Measure p99 evaluate() latency over 10,000 calls (50th-percentile arrival rate). Record result in `knowledge/benchmarks/bench-risk-gate.md`.
-- [ ] **Event store benchmark:** Measure sequential append throughput (target >50,000 events/s). Measure single-aggregate replay from 10k events (target <5 ms). Record in `knowledge/benchmarks/bench-event-store.md`.
-- [ ] **Replay benchmark:** Measure replay throughput for 100k bar-level events (target <15s for 1M). Record in `knowledge/benchmarks/bench-replay.md`.
-- [ ] For each benchmark, include: date, hardware spec, commit SHA, seed, dataset size, raw results, and comparison to PERFORMANCE_SPEC.md budget.
-- [ ] If any budget is not met, record the gap and estimate the optimization required.
-- [ ] Document benchmark reproduction steps.
+- [x] Write `scripts/bench.py` as a reusable benchmark runner that measures p99 latency and throughput for a given subsystem.
+- [x] **Risk gate benchmark:** Measure p99 evaluate() latency over 10,000 calls (50th-percentile arrival rate). Record result in `knowledge/benchmarks/bench-risk-gate.md`.
+- [x] **Event store benchmark:** Measure sequential append throughput (target >50,000 events/s). Measure single-aggregate replay from 10k events (target <5 ms). Record in `knowledge/benchmarks/bench-event-store.md`.
+- [x] **Replay benchmark:** Measure replay throughput for 100k bar-level events (target <15s for 1M). Record in `knowledge/benchmarks/bench-replay.md`.
+- [x] For each benchmark, include: date, hardware spec, commit SHA, seed, dataset size, raw results, and comparison to PERFORMANCE_SPEC.md budget.
+- [x] If any budget is not met, record the gap and estimate the optimization required.
+- [x] Document benchmark reproduction steps.
 
 **Exit evidence:** Three benchmark documents in `knowledge/benchmarks/` with measured performance against all 12 budgets from PERFORMANCE_SPEC.md. Reproduction steps recorded. Any budget gaps identified for future optimization.
 

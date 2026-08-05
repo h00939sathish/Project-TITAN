@@ -1,0 +1,346 @@
+[
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "dual-ma",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "fast": 10,
+      "slow": 100
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0304,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.03 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.711916"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "dual-ma",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "fast": 30,
+      "slow": 100
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0077,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.01 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.765151"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "ma-crossover",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "fast": 10,
+      "slow": 100
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.184,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.18 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.781931"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "ma-crossover",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "fast": 30,
+      "slow": 100
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.00 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.808722"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "rsi",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 14,
+      "oversold": 30.0,
+      "overbought": 65.0
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.454,
+      "avg_plateau_coverage_pct": 50.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": true,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.45 < 0.7",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.872566"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "rsi",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 30,
+      "oversold": 30.0,
+      "overbought": 70.0
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.2275,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.23 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:23.932615"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "bollinger",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 50,
+      "std_dev_multiplier": 2.0
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.3679,
+      "avg_plateau_coverage_pct": 11.11,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.37 < 0.7",
+        "Average Plateau Coverage 11.1% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:24.203557"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "bollinger",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 20,
+      "std_dev_multiplier": 1.5
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.1888,
+      "avg_plateau_coverage_pct": 27.78,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": true,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.19 < 0.7",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:24.551456"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "orb",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "atr_period": 10,
+      "min_volume_ratio": 1.0,
+      "breakout_mult": 1.0
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.00 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:24.835334"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "orb",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "atr_period": 10,
+      "min_volume_ratio": 1.0,
+      "breakout_mult": 1.0
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.00 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:25.251716"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "vwap-reversion",
+    "timeframe": "15m",
+    "universe": [
+      "EURUSD"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 20,
+      "std_dev": 1.5
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.00 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:25.289533"
+  },
+  {
+    "experiment_id": "EXP-00007",
+    "question": "Does a longer horizon reduce microstructure noise and reveal robust parameter plateaus on 15m and 1h data?",
+    "strategy_id": "vwap-reversion",
+    "timeframe": "1h",
+    "universe": [
+      "EURUSD",
+      "SPY"
+    ],
+    "train_ratio": 0.6,
+    "best_params": {
+      "window": 20,
+      "std_dev": 1.5
+    },
+    "scorecard": {
+      "avg_plateau_stability": 0.0,
+      "avg_plateau_coverage_pct": 0.0,
+      "cross_instrument_consistency_pct": 0.0,
+      "walk_forward_passed": false,
+      "bootstrap_passed": false,
+      "passed_all_checks": false,
+      "rejection_reasons": [
+        "Average Plateau Stability 0.00 < 0.7",
+        "Average Plateau Coverage 0.0% < 20.0%",
+        "Cross-Instrument Consistency 0.0% < 75.0%"
+      ]
+    },
+    "created_at": "2026-07-31T05:00:25.344445"
+  }
+]

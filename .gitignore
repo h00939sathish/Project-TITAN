@@ -1,32 +1,119 @@
-# Python
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-*.whl
-.venv/
-
-# Rust
+# Rust build artifacts
 core/target/
+target/
 
-# Maturin
+# Python build artifacts
+*.pyc
+__pycache__/
 *.so
 *.pyd
-*.dylib
-*.pdb
+dist/
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
 
 # IDE
-.vscode/
 .idea/
+.vscode/
+*.swp
+*.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# Node
+node_modules/
+package-lock.json
+package.json
 
-# Environment
+# OpenCode
+.opencode/
+opencode.json
+
+# TITAN runtime artifacts
+.titan_state.db
+.titan_state.json
+.titan_paper_pid
+.titan_paper_monitor.log
+session_config.json
+
+# Dashboard
+dashboard/
+.dashboard_err.log
+.dashboard_out.log
+
+# Logs
+logs/
+titan-*.log
+*.metrics*.json
+metrics-*.json
+
+# Research / generated data
+research_data/
+qualification_output/
+incident-evidence/
+graphify-out/
+
+# SDD report diffs
+.superpowers/
+
+# Supervisor artifacts
+.supervisors/
+
+# Generated reports (root-level .md)
+ROOT_CAUSE_ANALYSIS.md
+TECHNICAL_DEBT.md
+REVIEW_PACKAGE.md
+EXECUTIVE_SUMMARY.md
+CAPABILITY_GAP_REPORT.md
+BEST_OF_BREED_MATRIX.md
+FEATURE_MATRIX.md
+MISSING_FEATURES.md
+PERFORMANCE_REPORT.md
+SECURITY_REPORT.md
+UNDERENGINEERING_REPORT.md
+OVERENGINEERING_REPORT.md
+SIMILAR_PROJECT_COMPARISON.md
+POST_REVIEW_REPORT.md
+AUDIT_FIX_PLAN.md
+MASTER_AUDIT.md
+NEWPLAN.md
+IMPLEMENTATION_PLAN.md
+IMPLEMENTATION_PRIORITY.md
+ARCHITECTURE_GAPS.md
+ADOPTION_STRATEGY.md
+BUG_MATRIX.md
+IDEA.md
+TESTING_GAPS.md
+OVERENGINEERING.md
+UNDERENGINEERING.md
+
+# Environment variables & secrets
 .env
+.env.*
 .env.local
 
-# Generated
-lake/
-artifacts/
+# Diff / debug artifacts
+diff.txt
+diff_utf8.txt
+cargo_test_output.txt
+# local runtime artifacts (added before push)
+.titan_state*
+*.pyd.bak
+.research_tmp/
+_oa_verify.json
+
+# large binary/debug + research data kept local only
+*.pdb
+research/dukascopy_1m_ba/
+research/tws_daily/
+research/tws_history/
+research/cot/
+research/neg_results/configs/
+
+# session runtime + build artifacts
+paper_session_console.log
+paper_session_restarts.log
+metrics-*.json
+dist_wheels/
+*.pyd.old
+*.pyd.bak2

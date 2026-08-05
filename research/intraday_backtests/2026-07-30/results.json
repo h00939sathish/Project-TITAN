@@ -1,0 +1,258 @@
+{
+  "SPY": {
+    "5m": {
+      "rows": 3000,
+      "from": "2026-06-05T17:55:00+00:00",
+      "to": "2026-07-29T20:30:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 180,
+          "qty": 13,
+          "total_return_pct": -0.74,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.49
+        },
+        "mean-reversion": {
+          "trades": 133,
+          "qty": 13,
+          "total_return_pct": 0.16,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.39
+        },
+        "time-series-momentum": {
+          "trades": 278,
+          "qty": 13,
+          "total_return_pct": -0.96,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.27
+        },
+        "volatility-regime": {
+          "trades": 118,
+          "qty": 13,
+          "total_return_pct": -0.15,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.08
+        },
+        "dual-ma": {
+          "trades": 180,
+          "qty": 13,
+          "total_return_pct": -0.74,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.49
+        }
+      }
+    },
+    "15m": {
+      "rows": 1062,
+      "from": "2026-06-05T17:45:00+00:00",
+      "to": "2026-07-29T20:30:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 64,
+          "qty": 13,
+          "total_return_pct": -0.42,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.81
+        },
+        "mean-reversion": {
+          "trades": 56,
+          "qty": 13,
+          "total_return_pct": 0.49,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.73
+        },
+        "time-series-momentum": {
+          "trades": 118,
+          "qty": 13,
+          "total_return_pct": -0.79,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.44
+        },
+        "volatility-regime": {
+          "trades": 72,
+          "qty": 13,
+          "total_return_pct": 0.19,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.42
+        },
+        "dual-ma": {
+          "trades": 66,
+          "qty": 13,
+          "total_return_pct": -0.43,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.8
+        }
+      }
+    },
+    "1h": {
+      "rows": 309,
+      "from": "2026-06-05T17:00:00+00:00",
+      "to": "2026-07-29T20:00:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 20,
+          "qty": 13,
+          "total_return_pct": -0.31,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.92
+        },
+        "mean-reversion": {
+          "trades": 15,
+          "qty": 13,
+          "total_return_pct": 0.22,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.45
+        },
+        "time-series-momentum": {
+          "trades": 34,
+          "qty": 13,
+          "total_return_pct": -0.26,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.97
+        },
+        "volatility-regime": {
+          "trades": 12,
+          "qty": 13,
+          "total_return_pct": -0.17,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 2.06
+        },
+        "dual-ma": {
+          "trades": 20,
+          "qty": 13,
+          "total_return_pct": -0.31,
+          "buy_hold_pct": -2.23,
+          "vs_bh": 1.92
+        }
+      }
+    }
+  },
+  "EURUSD": {
+    "5m": {
+      "rows": 3000,
+      "from": "2026-07-15T16:15:00+00:00",
+      "to": "2026-07-30T05:10:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 181,
+          "qty": 8741,
+          "total_return_pct": -0.26,
+          "buy_hold_pct": 0.16,
+          "vs_bh": -0.42
+        },
+        "mean-reversion": {
+          "trades": 104,
+          "qty": 8741,
+          "total_return_pct": -0.15,
+          "buy_hold_pct": 0.16,
+          "vs_bh": -0.31
+        },
+        "time-series-momentum": {
+          "trades": 237,
+          "qty": 8741,
+          "total_return_pct": -0.35,
+          "buy_hold_pct": 0.16,
+          "vs_bh": -0.51
+        },
+        "volatility-regime": {
+          "trades": 193,
+          "qty": 8741,
+          "total_return_pct": -0.3,
+          "buy_hold_pct": 0.16,
+          "vs_bh": -0.46
+        },
+        "dual-ma": {
+          "trades": 185,
+          "qty": 8741,
+          "total_return_pct": -0.28,
+          "buy_hold_pct": 0.16,
+          "vs_bh": -0.44
+        }
+      }
+    },
+    "15m": {
+      "rows": 1000,
+      "from": "2026-07-15T16:15:00+00:00",
+      "to": "2026-07-30T05:00:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 68,
+          "qty": 8738,
+          "total_return_pct": -0.1,
+          "buy_hold_pct": 0.14,
+          "vs_bh": -0.24
+        },
+        "mean-reversion": {
+          "trades": 40,
+          "qty": 8738,
+          "total_return_pct": -0.06,
+          "buy_hold_pct": 0.14,
+          "vs_bh": -0.2
+        },
+        "time-series-momentum": {
+          "trades": 100,
+          "qty": 8738,
+          "total_return_pct": -0.15,
+          "buy_hold_pct": 0.14,
+          "vs_bh": -0.29
+        },
+        "volatility-regime": {
+          "trades": 63,
+          "qty": 8738,
+          "total_return_pct": -0.05,
+          "buy_hold_pct": 0.14,
+          "vs_bh": -0.19
+        },
+        "dual-ma": {
+          "trades": 70,
+          "qty": 8738,
+          "total_return_pct": -0.1,
+          "buy_hold_pct": 0.14,
+          "vs_bh": -0.24
+        }
+      }
+    },
+    "1h": {
+      "rows": 252,
+      "from": "2026-07-15T16:00:00+00:00",
+      "to": "2026-07-30T05:00:00+00:00",
+      "strategies": {
+        "ma-crossover": {
+          "trades": 19,
+          "qty": 8737,
+          "total_return_pct": -0.12,
+          "buy_hold_pct": 0.11,
+          "vs_bh": -0.24
+        },
+        "mean-reversion": {
+          "trades": 16,
+          "qty": 8737,
+          "total_return_pct": 0.02,
+          "buy_hold_pct": 0.11,
+          "vs_bh": -0.09
+        },
+        "time-series-momentum": {
+          "trades": 25,
+          "qty": 8737,
+          "total_return_pct": -0.06,
+          "buy_hold_pct": 0.11,
+          "vs_bh": -0.17
+        },
+        "volatility-regime": {
+          "trades": 10,
+          "qty": 8737,
+          "total_return_pct": 0.01,
+          "buy_hold_pct": 0.11,
+          "vs_bh": -0.1
+        },
+        "dual-ma": {
+          "trades": 21,
+          "qty": 8737,
+          "total_return_pct": -0.15,
+          "buy_hold_pct": 0.11,
+          "vs_bh": -0.26
+        }
+      }
+    }
+  }
+}

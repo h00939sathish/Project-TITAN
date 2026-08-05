@@ -1,0 +1,15 @@
+{
+  "strategy_id": "momentum-v1",
+  "strategy_package_digest": "abcdef123456",
+  "account_id": "acc-1",
+  "instrument_id": "BTCUSD.COINBASE",
+  "side": "BUY",
+  "quantity": "1.5",
+  "price": "50000.00",
+  "stop_price": null,
+  "order_type": "LIMIT",
+  "time_in_force": "GTC",
+  "market_data_timestamp": "2026-07-13T23:12:00Z",
+  "risk_profile_version": "v1.2",
+  "expiry": "2026-07-14T23:12:00Z"
+}

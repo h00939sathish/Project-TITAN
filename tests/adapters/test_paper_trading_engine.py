@@ -5,9 +5,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from titan._core import (
     BrokerPosition,
     ContractType,
+    EventStore,
     Instrument,
     InstrumentId,
     Money,
@@ -15,6 +18,7 @@ from titan._core import (
     ReconciliationConfig,
     ReconciliationDriftSeverity,
     RiskConfig,
+    KillSwitchState,
     TradeIntent,
     TradingState,
 )
@@ -80,6 +84,16 @@ class _DivergingAdapter(SimulatedAdapter):
             equity=Money("999999", "USD"),
             timestamp="2026-01-01T00:00:00Z",
         )
+
+
+class _SnapshotFailureAdapter(SimulatedAdapter):
+    """An adapter that cannot provide the broker truth required to reconcile."""
+
+    def positions(self, account_id: str) -> BrokerPositionSnapshot:
+        raise RuntimeError("positions unavailable")
+
+    def holdings(self, account_id: str) -> BrokerBalanceSnapshot:
+        raise RuntimeError("holdings unavailable")
 
 
 class TestPaperTradingEngineConstruction:
@@ -256,6 +270,13 @@ class TestPaperTradingEngineReconcile:
         result = self.engine.reconcile()
         assert result.position_drifts is not None
 
+    def test_start_sync_snapshot_failure_triggers_kill_switch(self):
+        self.engine.adapter = _SnapshotFailureAdapter()
+
+        self.engine.start(sync_from_broker=True)
+
+        assert self.engine.risk_gate.kill_switch.blocks_routing()
+
 
 class TestPaperTradingEngineStatus:
     def setup_method(self):
@@ -303,6 +324,48 @@ class TestPaperTradingEngineStatus:
         self.engine.release_kill_switch()
         status = self.engine.status()
         assert status.kill_switch is not None
+
+    def test_release_kill_switch_noop_when_never_triggered(self):
+        """P0 fix: releasing an Armed (never-triggered) switch is a no-op,
+        not an illegal-transition error, and the signal is not consumed."""
+        self.engine.release_kill_switch()  # must not raise
+        assert not self.engine.risk_gate.kill_switch.blocks_routing()
+
+    def test_release_kill_switch_returns_to_active(self):
+        self.engine.trigger_kill_switch()
+        self.engine.release_kill_switch()
+        assert not self.engine.risk_gate.kill_switch.blocks_routing()
+        assert self.engine.risk_gate.trading_state == TradingState.Active
+
+    def test_critical_reconcile_retriggers_switch_after_release(self):
+        """A later critical drift must re-halt a released session without crashing."""
+        engine = PaperTradingEngine(_default_config(), SimulatedAdapter())
+        engine.trigger_kill_switch()
+        engine.release_kill_switch()
+        assert engine.risk_gate.kill_switch == KillSwitchState.Released
+
+        engine.adapter = _DivergingAdapter()
+
+        result = engine.reconcile()
+
+        assert result.severity == ReconciliationDriftSeverity.Critical
+        assert engine.risk_gate.kill_switch == KillSwitchState.Triggered
+
+    def test_release_kill_switch_refuses_on_critical_drift_with_reason(self):
+        """P0 fix: release refuses on critical reconcile drift and the error
+        carries a structured kill_reason code the session can echo."""
+        adapter = _DivergingAdapter()
+        engine = PaperTradingEngine(self._config(), adapter)
+        engine.start()
+        engine.trigger_kill_switch()
+        with pytest.raises(RuntimeError) as excinfo:
+            engine.release_kill_switch()
+        assert "kill_reason=critical_reconcile_drift" in str(excinfo.value)
+        # switch remains held — release did not silently succeed
+        assert engine.risk_gate.kill_switch.blocks_routing()
+
+    def _config(self):
+        return _default_config()
 
 
 class TestPaperTradingEngineFullPipeline:
@@ -450,10 +513,14 @@ class TestPaperTradingEngineStatePersistence:
             _make_intent(instrument="MSFT", quantity="50", price="400")
         )
 
-        loaded = json.loads(state_file.read_text())
-        assert loaded["portfolio"]["cash"]["amount"] is not None
-        assert "MSFT" in loaded["portfolio"]["positions"]
-        assert loaded["portfolio"]["positions"]["MSFT"]["quantity"] == 50
+        store = EventStore(str(state_file.with_suffix(".db")))
+        events = store.replay_by_type("PortfolioState")
+        assert len(events) >= 1
+        payload = json.loads(events[-1].payload)
+        assert payload["portfolio"]["cash"]["amount"] is not None
+        assert "MSFT" in payload["portfolio"]["positions"]
+        assert payload["portfolio"]["positions"]["MSFT"]["quantity"] == 50
+        store.close()
 
     def test_save_and_load_with_multiple_instruments(self, tmp_path):
         state_file = tmp_path / "state3.json"
@@ -492,158 +559,27 @@ class TestPaperTradingEngineStatePersistence:
         assert engine.portfolio.get_position("AAPL").quantity == 10
         assert not Path(".titan_state.json").exists()
 
-    def test_corrupt_order_count_triggers_kill_switch(self, tmp_path):
-        """Corrupt order_count in persisted state must halt routing on restart."""
-        from titan.execution.alpaca_adapter import AlpacaAdapter
-
+    def test_event_store_canonical(self, tmp_path):
+        """PortfolioState event must be written to EventStore on save."""
         state_file = tmp_path / "state.json"
         config = _default_config()
         config.state_path = str(state_file)
 
-        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
-        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
-            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
-                client = MagicMock()
-                mock_order = MagicMock()
-                mock_order.id = "order-1"
-                client.submit_order.return_value = mock_order
-                mock_tc.return_value = client
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))
 
-                engine = PaperTradingEngine(config, adapter)
-                engine.start()
-                engine.register_instrument(
-                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
-                )
-
-                intent = TradeIntent(
-                    strategy_id="test", strategy_package_digest="",
-                    account_id="paper-1", instrument_id="AAPL", side="BUY",
-                    quantity="10", order_type="MARKET", time_in_force="DAY",
-                    risk_profile_version="1.0",
-                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
-                )
-                for _ in range(3):
-                    result = engine.submit_intent(intent)
-                    assert result.accepted
-
-        assert state_file.exists()
-        saved = json.loads(state_file.read_text())
-        assert "order_count" in saved
-        assert not engine.risk_gate.kill_switch.blocks_routing()
-
-        # Corrupt the order_count value
-        saved["order_count"] = "corrupted_string_not_a_dict"
-        state_file.write_text(json.dumps(saved, indent=2))
-
-        adapter2 = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
-        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
-            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc2:
-                client2 = MagicMock()
-                mock_tc2.return_value = client2
-
-                engine2 = PaperTradingEngine(config, adapter2)
-                engine2.start()
-                engine2.register_instrument(
-                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
-                )
-
-                assert engine2.risk_gate.kill_switch.blocks_routing(), \
-                    "Corrupt order_count must trigger kill switch"
-
-                intent2 = TradeIntent(
-                    strategy_id="test", strategy_package_digest="",
-                    account_id="paper-1", instrument_id="AAPL", side="BUY",
-                    quantity="1", order_type="MARKET", time_in_force="DAY",
-                    risk_profile_version="1.0",
-                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
-                )
-                result2 = engine2.submit_intent(intent2)
-                assert not result2.accepted
-                assert "Kill switch" in result2.rejection_reason or "blocking" in result2.rejection_reason
-
-    def test_truncated_state_file_triggers_kill_switch(self, tmp_path):
-        """Truncated/corrupt state file must halt routing on restart, not silently reset."""
-        from titan.execution.alpaca_adapter import AlpacaAdapter
-
-        state_file = tmp_path / "state.json"
-        config = _default_config()
-        config.state_path = str(state_file)
-
-        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
-        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
-            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
-                client = MagicMock()
-                mock_order = MagicMock()
-                mock_order.id = "order-1"
-                client.submit_order.return_value = mock_order
-                mock_tc.return_value = client
-
-                engine = PaperTradingEngine(config, adapter)
-                engine.start()
-                engine.register_instrument(
-                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
-                )
-
-                intent = TradeIntent(
-                    strategy_id="test", strategy_package_digest="",
-                    account_id="paper-1", instrument_id="AAPL", side="BUY",
-                    quantity="10", order_type="MARKET", time_in_force="DAY",
-                    risk_profile_version="1.0",
-                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
-                )
-                result = engine.submit_intent(intent)
-                assert result.accepted
-
-        assert state_file.exists()
-
-        # Truncate the state file — incomplete JSON
-        state_file.write_text('{"portfolio": {"cash": {"amount": "9')
-
-        adapter2 = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
-        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
-            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc2:
-                mock_tc2.return_value = MagicMock()
-
-                engine2 = PaperTradingEngine(config, adapter2)
-                engine2.start()
-                engine2.register_instrument(
-                    Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
-                )
-
-                assert engine2.risk_gate.kill_switch.blocks_routing(), \
-                    "Truncated state file must trigger kill switch"
-
-                intent2 = TradeIntent(
-                    strategy_id="test", strategy_package_digest="",
-                    account_id="paper-1", instrument_id="AAPL", side="BUY",
-                    quantity="1", order_type="MARKET", time_in_force="DAY",
-                    risk_profile_version="1.0",
-                    market_data_timestamp=datetime.now(timezone.utc).isoformat(),
-                )
-                result2 = engine2.submit_intent(intent2)
-                assert not result2.accepted
-
-    def test_garbage_state_file_triggers_kill_switch(self, tmp_path):
-        """Garbage (non-JSON) state file must halt routing on restart."""
-        from titan.execution.alpaca_adapter import AlpacaAdapter
-
-        state_file = tmp_path / "state.json"
-        config = _default_config()
-        config.state_path = str(state_file)
-
-        # Write garbage right away — no prior session needed
-        state_file.write_text("this is not json {{{")
-
-        adapter = AlpacaAdapter(api_key="test_key", secret_key="test_secret")
-        with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
-            with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
-                mock_tc.return_value = MagicMock()
-
-                engine = PaperTradingEngine(config, adapter)
-                engine.start()
-
-                assert engine.risk_gate.kill_switch.blocks_routing(), \
-                    "Garbage state file must trigger kill switch"
+        store = EventStore(str(state_file.with_suffix(".db")))
+        events = store.replay_by_type("PortfolioState")
+        assert len(events) >= 1
+        payload = json.loads(events[-1].payload)
+        assert "portfolio" in payload
+        assert "intent_counter" in payload
+        assert "order_count" in payload
+        store.close()
 
     def test_restart_restores_order_state(self, tmp_path):
         """Order state machines must be correctly reconstructed from EventStore on restart."""

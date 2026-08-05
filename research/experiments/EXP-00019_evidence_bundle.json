@@ -1,0 +1,85 @@
+{
+ "experiment_id": "EXP-00019",
+ "canonical_research_question": "Does the intraday reversal signal (negative of the trailing 12h return) predict the next 1h return \u2014 and does it survive ~1 pip round-trip costs?",
+ "hypothesis": [
+  "reversal_signal_12h"
+ ],
+ "economic_mechanism": "Intraday mean reversion: short-horizon reversal after 12h moves",
+ "instruments": [
+  "EURUSD",
+  "GBPUSD"
+ ],
+ "governance_checks": {
+  "Sample size sufficient": "True",
+  "IC statistically significant": "IC 0.0298 below threshold 0.03",
+  "Bootstrap CI same sign": "True",
+  "Temporal consistency": "True",
+  "Survives transaction costs": "Net spread -0.0020 <= 0 after 10.0 bps"
+ },
+ "decision": "promote",
+ "results": {
+  "EURUSD": {
+   "ic": 0.0834,
+   "n": 12384,
+   "bootstrap_ci": [
+    0.0661,
+    0.1012
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4128,
+     "n": 4128,
+     "ic": 0.06597347671089283
+    },
+    {
+     "period": 1,
+     "start_idx": 4128,
+     "end_idx": 8256,
+     "n": 4128,
+     "ic": 0.0843523071725666
+    },
+    {
+     "period": 2,
+     "start_idx": 8256,
+     "end_idx": 12384,
+     "n": 4128,
+     "ic": 0.11382148531799796
+    }
+   ]
+  },
+  "GBPUSD": {
+   "ic": 0.0298,
+   "n": 12384,
+   "bootstrap_ci": [
+    0.0127,
+    0.0472
+   ],
+   "temporal": [
+    {
+     "period": 0,
+     "start_idx": 0,
+     "end_idx": 4128,
+     "n": 4128,
+     "ic": 0.04024284118562651
+    },
+    {
+     "period": 1,
+     "start_idx": 4128,
+     "end_idx": 8256,
+     "n": 4128,
+     "ic": 0.06580048296328875
+    },
+    {
+     "period": 2,
+     "start_idx": 8256,
+     "end_idx": 12384,
+     "n": 4128,
+     "ic": -0.0024711189030237283
+    }
+   ]
+  }
+ },
+ "execution_timestamp": "2026-08-01T17:05:11.835710+00:00"
+}
