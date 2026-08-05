@@ -504,9 +504,13 @@ class TestPaperTradingEngineStatePersistence:
         config = _default_config()
         config.state_path = str(state_file)
 
+        # NO initialization here ON PURPOSE: this test verifies fail-closed
+        # default recovery over a nonexistent state file (ADR-020). A fresh
+        # engine must start Triggered/Halted, never Armed.
         engine = PaperTradingEngine(config, SimulatedAdapter())
-        initialize_fresh(engine)
         engine.start(sync_from_broker=False)
+        assert engine.risk_gate.kill_switch.is_triggered()
+        assert not engine.risk_gate.trading_state.accepts_intents()
         assert engine.portfolio.get_cash_balance().amount == "100000"
         assert engine.portfolio.get_position("AAPL") is None
 

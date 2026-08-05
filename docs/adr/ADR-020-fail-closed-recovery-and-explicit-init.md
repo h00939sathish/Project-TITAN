@@ -1,6 +1,7 @@
 # ADR-020: Fail-closed recovery and explicit session initialization
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-08-05, review gate — recovery boundary, authorization
+  semantics, and fresh-build evidence confirmed)
 - **Date:** 2026-08-04
 - **Owners:** Architecture Council, Risk Owner
 - **Supersedes:** ADR-019's implicit `SessionStarted` bootstrap at engine construction (removed here)
@@ -37,7 +38,10 @@ genuinely brand-new environment. There is no safe way to auto-arm it.
    - nonce replay protection
    - durable audit event (`SessionInitialized`) on success
    - refusal (durably recorded as `InitializationRefused`) on missing /
-     incomplete / expired / replayed / conflicting-with-existing-state.
+     incomplete / expired / replayed / unbounded-expiry /
+     conflicting-with-existing-state / audit-write-failure.
+   - a refusal that cannot be durably persisted fails loudly (it is never
+     silently dropped).
 4. **Initialization cannot bypass release.** `initialize_new_session` refuses if a
    `RiskStateSnapshot` already exists (`initialization_conflicts_with_existing_state`),
    so it cannot be used to arm a killed session back to trade without going through

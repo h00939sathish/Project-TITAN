@@ -42,6 +42,12 @@ from titan._core import Money, ReconciliationConfig, RiskConfig
 from titan.execution import PaperConfig, PaperTradingEngine
 from titan.risk.session_initialization import InitializerApproval, SessionInitialization, new_nonce
 
+# scripts/ is not a package: make sibling imports resolve regardless of cwd
+# (invocation is always `python scripts/init_session.py`, but be robust).
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
 # Reuse the session runner's config/adapter construction so the initialized
 # store is byte-for-byte compatible with the session that will run on it.
 from paper_session import _bar_seconds, _build_adapter, _merge_config
@@ -134,27 +140,41 @@ def main() -> int:
     args = parser.parse_args()
 
     approvers = [a.strip() for a in args.approver if a and a.strip()]
-    if len(set(approvers)) < MIN_APPROVERS:
-        print(f"FATAL: initialization requires at least {MIN_APPROVERS} DISTINCT "
-              f"approvers (got {approvers})", flush=True)
-        return 1
-    if not args.rationale.strip():
-        print("FATAL: --rationale is required (durable audit field)", flush=True)
-        return 1
-    if args.expiry_min <= 0:
-        print("FATAL: --expiry-min must be positive", flush=True)
-        return 1
 
+    # Build the engine FIRST so EVERY refusal (including CLI validation
+    # failures below) is recorded as a durable InitializationRefused event
+    # before the process exits (ADR-020: refusal audit trail is mandatory).
     paper_config, state_path = _build_config(args)
     adapter = _build_adapter(args.mode, use_tws=False)
     engine = PaperTradingEngine(paper_config, adapter)
 
+    def _refuse(reason: str, message: str) -> int:
+        try:
+            engine._record_init_refusal(reason)
+        except RuntimeError as re:
+            print(f"FATAL: {message} (AND refusal could not be durably "
+                  f"recorded: {re})", flush=True)
+        else:
+            print(f"FATAL: {message}", flush=True)
+        engine._event_store.close()
+        return 1
+
+    if len(set(approvers)) < MIN_APPROVERS:
+        return _refuse(
+            "initialization_incomplete",
+            f"initialization requires at least {MIN_APPROVERS} DISTINCT "
+            f"approvers (got {approvers})")
+    if not args.rationale.strip():
+        return _refuse("initialization_incomplete",
+                       "--rationale is required (durable audit field)")
+    if args.expiry_min <= 0:
+        return _refuse("initialization_incomplete",
+                       "--expiry-min must be positive")
+
     try:
         _check_fresh(engine)
     except Exception as e:  # noqa: BLE001 - surface the refusal reason
-        print(f"FATAL: {e}", flush=True)
-        engine._event_store.close()
-        return 1
+        return _refuse("initialization_conflicts_with_existing_state", str(e))
 
     now = datetime.now(timezone.utc)
     init = SessionInitialization(

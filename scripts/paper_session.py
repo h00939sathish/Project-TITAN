@@ -688,18 +688,6 @@ def main() -> None:
     logger.info("phase_j", f"Session {session.session_id} started")
     print(f"Session {session.session_id} started — Phase J ({args.mode}) running", flush=True)
 
-
-    try:
-        session = engine.start(sync_from_broker=(args.mode == "broker-paper"))
-    except Exception as e:
-        print(f"FATAL: broker authentication failed: {e}", flush=True)
-        logger.error("phase_j", f"Broker auth failed: {e}")
-        if log_handler:
-            log_handler.close()
-        sys.exit(1)
-    logger.info("phase_j", f"Session {session.session_id} started")
-    print(f"Session {session.session_id} started — Phase J ({args.mode}) running", flush=True)
-
     if shadow:
         shadow._session_id = session.session_id
 

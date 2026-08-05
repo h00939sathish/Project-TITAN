@@ -132,6 +132,19 @@ class PaperTradingEngine:
         self._health_cache: Optional[tuple[float, bool]] = None
         self._health_cache_ttl = 5.0
         self._seen_init_nonces: set[str] = set()
+        # Reconstruct replay protection from durable events: a restart must
+        # not allow a previously-used initialization nonce to be replayed
+        # (nonce replay protection survives process restarts, ADR-020).
+        try:
+            for _ev in self._event_store.replay_by_type("SessionInitialized"):
+                try:
+                    _payload = json.loads(_ev.payload)
+                    if _payload.get("nonce"):
+                        self._seen_init_nonces.add(_payload["nonce"])
+                except Exception:
+                    continue
+        except Exception:
+            pass
         self._last_prices: dict[str, str] = {}
         self._price_history: dict[str, deque[float]] = {}
         self._order_metadata: dict[str, dict] = {}
@@ -1109,7 +1122,11 @@ class PaperTradingEngine:
             self.logger.warning("engine", "Kill switch triggered")
 
     def _record_init_refusal(self, reason: str) -> None:
-        """Durable audit record for a refused initialization."""
+        """Durable audit record for a refused initialization.
+
+        Durability is mandatory (ADR-020): if the refusal event cannot be
+        persisted, fail loudly instead of silently dropping the audit trail.
+        """
         try:
             self._event_store.append(EventEnvelope(
                 "InitializationRefused", "SessionInitialization", "system",
@@ -1117,8 +1134,14 @@ class PaperTradingEngine:
                 json.dumps({"ts": datetime.now(timezone.utc).isoformat(),
                             "reason": reason}),
             ))
-        except Exception:
-            pass
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    "engine",
+                    f"InitializationRefused NOT persisted (reason={reason}): {e}")
+            raise RuntimeError(
+                "initialization refusal not durably recorded "
+                f"(reason={reason}): {e}") from e
         if self.logger:
             self.logger.warning("engine", f"Session initialization refused: {reason}")
 
@@ -1134,29 +1157,56 @@ class PaperTradingEngine:
         gate is armed (Triggered/Halted -> Armed/Active) and an Armed risk
         snapshot is persisted so later restarts restore Armed.
         """
-        reason = validate_initialization(initialization, self._seen_init_nonces)
-        if reason:
-            self._record_init_refusal(reason)
-            raise RuntimeError(f"Cannot initialize session: kill_reason={reason}")
-        if self._event_store.replay_by_type("RiskStateSnapshot"):
-            self._record_init_refusal("initialization_conflicts_with_existing_state")
-            raise RuntimeError(
-                "Cannot initialize session: kill_reason="
-                "initialization_conflicts_with_existing_state")
+        # One locked transaction: validation, existing-state detection, the
+        # durable audit event, the state transition, and the nonce commit are
+        # all serialized so two concurrent callers cannot double-initialize.
         with self._lock:
-            self.risk_gate.initialize_armed()
+            reason = validate_initialization(initialization, self._seen_init_nonces)
+            if reason:
+                self._record_init_refusal(reason)
+                raise RuntimeError(f"Cannot initialize session: kill_reason={reason}")
+            if self._event_store.replay_by_type("RiskStateSnapshot"):
+                self._record_init_refusal("initialization_conflicts_with_existing_state")
+                raise RuntimeError(
+                    "Cannot initialize session: kill_reason="
+                    "initialization_conflicts_with_existing_state")
+
+            # Durable audit FIRST: never arm a gate without its audit trail.
+            # If the audit event cannot be persisted, refuse while the gate
+            # is still fail-closed held and no nonce has been consumed.
+            try:
+                self._event_store.append(EventEnvelope(
+                    "SessionInitialized", "SessionInitialization", "system",
+                    "titan_python",
+                    json.dumps({
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "approvers": [a.approver for a in initialization.approvers],
+                        "rationale": initialization.rationale,
+                        "nonce": initialization.nonce,
+                    }),
+                ))
+            except Exception as e:
+                if self.logger:
+                    self.logger.error("engine", f"SessionInitialized append failed: {e}")
+                raise RuntimeError(
+                    f"Cannot initialize session: kill_reason="
+                    f"initialization_audit_write_failed ({e})") from e
+
+            # Arm, then persist the Armed snapshot. On persistence failure,
+            # restore the held state so an Armed in-memory gate can never
+            # outlive a failed initialization.
+            self.risk_gate._initialize_armed()
+            try:
+                self._save_state()
+            except Exception as e:
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.risk_gate.trigger_kill_switch()
+                raise RuntimeError(
+                    f"Cannot initialize session: kill_reason="
+                    f"initialization_persistence_failed ({e})") from e
+
+            # Nonce committed LAST — only a fully-durable init consumes it.
             self._seen_init_nonces.add(initialization.nonce)
-            self._event_store.append(EventEnvelope(
-                "SessionInitialized", "SessionInitialization", "system",
-                "titan_python",
-                json.dumps({
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    "approvers": [a.approver for a in initialization.approvers],
-                    "rationale": initialization.rationale,
-                    "nonce": initialization.nonce,
-                }),
-            ))
-            self._save_state()
             if self.logger:
                 self.logger.info("engine", "Session initialized (explicit, audited)")
 

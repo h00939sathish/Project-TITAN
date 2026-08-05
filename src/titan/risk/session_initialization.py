@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 @dataclass
 class InitializerApproval:
@@ -76,9 +76,20 @@ class SessionInitialization:
         })
 
 
+# ADR-020: bounded expiry window. An authorization valid beyond this horizon
+# (from its issued_at) is refused as unbounded — "years-long" records are not
+# acceptable for a privileged safety action.
+MAX_INIT_TTL_SECONDS = 24 * 3600
+
+
 def validate(initialization: SessionInitialization | None,
              seen_nonces: set[str]) -> str:
-    """Return "" when valid, else a structured refusal reason code."""
+    """Return "" when valid, else a structured refusal reason code.
+
+    Codes: initialization_missing | initialization_incomplete |
+    initialization_replayed | initialization_expired |
+    initialization_expiry_unbounded
+    """
     if initialization is None:
         return "initialization_missing"
     if not initialization.nonce:
@@ -86,12 +97,26 @@ def validate(initialization: SessionInitialization | None,
     if initialization.nonce in seen_nonces:
         return "initialization_replayed"
     try:
-        if _parse_ts(initialization.expiry) <= datetime.now(timezone.utc):
-            return "initialization_expired"
+        expiry_dt = _parse_ts(initialization.expiry)
     except ValueError:
         return "initialization_expired"
-    distinct = {a.approver for a in initialization.approvers}
-    if len(distinct) < 2:
+    if expiry_dt <= datetime.now(timezone.utc):
+        return "initialization_expired"
+    if not initialization.issued_at:
+        return "initialization_incomplete"
+    try:
+        issued_dt = _parse_ts(initialization.issued_at)
+    except ValueError:
+        return "initialization_incomplete"
+    if expiry_dt > issued_dt + timedelta(seconds=MAX_INIT_TTL_SECONDS):
+        return "initialization_expiry_unbounded"
+    # Blank/whitespace-only approver identities do NOT count as distinct.
+    identities = {
+        a.approver.strip()
+        for a in initialization.approvers
+        if a.approver and a.approver.strip()
+    }
+    if len(identities) < 2:
         return "initialization_incomplete"
     if not initialization.rationale.strip():
         return "initialization_incomplete"

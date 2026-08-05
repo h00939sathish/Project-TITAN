@@ -354,8 +354,12 @@ impl RiskGate {
             .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
-    pub fn initialize_armed(&mut self) -> PyResult<()> {
-        // Explicit operator-controlled initialization of a NEW session.
+    pub fn _initialize_armed(&mut self) -> PyResult<()> {
+        // PRIVATE (underscore): the only sanctioned caller is the engine's
+        // audited initialize_new_session(), which enforces authorization,
+        // nonce replay protection, durable audit, and the "no existing risk
+        // state" rule BEFORE arming. Direct callers bypass that discipline,
+        // so this is intentionally not a public API.
         // Reaches Armed from any held state via the legal transitions and
         // sets trading state to Active. Never called implicitly by startup;
         // an empty store alone must never arm the gate.
@@ -386,10 +390,24 @@ impl RiskGate {
             }
             KillSwitchState::Armed => {}
         }
-        if self.trading_state != TradingState::Active {
-            self.trading_state
-                .transition(TradingState::Active)
-                .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        match self.trading_state {
+            // Reducing cannot transition directly to Active; go via the
+            // legal intermediate Halted (ADR-020: held state must always be
+            // restorable to Active through legal transitions).
+            TradingState::Reducing => {
+                self.trading_state
+                    .transition(TradingState::Halted)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+                self.trading_state
+                    .transition(TradingState::Active)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            }
+            other if other != TradingState::Active => {
+                self.trading_state
+                    .transition(TradingState::Active)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            }
+            _ => {}
         }
         Ok(())
     }
@@ -712,9 +730,20 @@ impl RiskGate {
     fn apply_snapshot(gate: &mut RiskGate, store: &event_store::EventStore) -> PyResult<()> {
         let snapshots = store.replay_by_type("RiskStateSnapshot")?;
         if let Some(latest) = snapshots.last() {
-            let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
-                PyRuntimeError::new_err(format!("Deserialize error: {}", e))
-            })?;
+            // A snapshot that cannot be parsed is UNREADABLE state: resolve
+            // it to Triggered/Halted (fail closed) rather than raising, per
+            // ADR-020 — unreadable risk state must never be an error path
+            // that a caller could mistake for "no state" and re-arm.
+            let snapshot: Option<RiskStateSnapshot> =
+                serde_json::from_str(&latest.payload).ok();
+            let snapshot = match snapshot {
+                Some(s) => s,
+                None => {
+                    gate.kill_switch = KillSwitchState::Triggered;
+                    gate.trading_state = TradingState::Halted;
+                    return Ok(());
+                }
+            };
             gate.kill_switch = serde_json::from_str(&format!("\"{}\"", snapshot.kill_switch_state))
                 .unwrap_or(KillSwitchState::Triggered);
             gate.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
