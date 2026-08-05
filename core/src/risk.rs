@@ -670,8 +670,8 @@ impl RiskGate {
         }
 
     fn apply_snapshot(gate: &mut RiskGate, store: &event_store::EventStore) -> PyResult<()> {
-        let events = store.replay_by_type("RiskStateSnapshot")?;
-        if let Some(latest) = events.last() {
+        let snapshots = store.replay_by_type("RiskStateSnapshot")?;
+        if let Some(latest) = snapshots.last() {
             let snapshot: RiskStateSnapshot = serde_json::from_str(&latest.payload).map_err(|e| {
                 PyRuntimeError::new_err(format!("Deserialize error: {}", e))
             })?;
@@ -679,12 +679,20 @@ impl RiskGate {
                 .unwrap_or(KillSwitchState::Triggered);
             gate.trading_state = serde_json::from_str(&format!("\"{}\"", snapshot.trading_state))
                 .unwrap_or(TradingState::Halted);
+            return Ok(());
         }
-        // No snapshot events: this is a genuinely fresh session (no kill was
-        // ever persisted), so keep the gate's constructed defaults (Active /
-        // Armed). Only a snapshot that EXISTS but is corrupt/wrong-typed is
-        // fail-closed to Triggered/Halted above. Do not force Halted on an
-        // empty store — that would permanently halt every first-run engine.
+        // No risk snapshot persisted. A snapshot that EXISTS but is corrupt is
+        // fail-closed above. With NO snapshot we must distinguish a genuinely
+        // fresh session from a killed session whose state was lost:
+        //   - store has events (engine appended SessionStarted at boot) -> a
+        //     live session that never persisted risk state yet -> keep defaults
+        //   - store completely empty -> may be a killed session after state
+        //     loss -> FAIL CLOSED (Triggered/Halted) so a halted session can
+        //     never silently restart trading.
+        if store.replay_all()?.is_empty() {
+            gate.kill_switch = KillSwitchState::Triggered;
+            gate.trading_state = TradingState::Halted;
+        }
         Ok(())
     }
 }

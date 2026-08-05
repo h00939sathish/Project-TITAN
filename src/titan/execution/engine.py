@@ -110,9 +110,17 @@ class PaperTradingEngine:
         self.logger = logger
         store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
-        # Fail-closed restore: load_or_default forces Triggered/Halted when the
-        # store is empty or corrupt, so a killed session never silently restarts
-        # trading. (restore_state is fail-open and must not be used here.)
+        # A genuinely fresh session (empty store) appends a SessionStarted
+        # bootstrap event so the risk gate restores Armed/Active on first run.
+        # Without it, load_or_default fails closed (Triggered/Halted) on an
+        # empty store — a killed session whose state was lost must never
+        # silently restart trading. (restore_state is fail-open and must not
+        # be used here.)
+        if not self._event_store.replay_all():
+            self._event_store.append(EventEnvelope(
+                "SessionStarted", "Engine", "system", "titan_python",
+                json.dumps({"started_at": datetime.now(timezone.utc).isoformat()}),
+            ))
         self.risk_gate = RiskGate.load_or_default(config.risk_config, self._event_store)
         self.portfolio = PortfolioEngine(config.currency, Money(config.starting_capital, config.currency))
 
