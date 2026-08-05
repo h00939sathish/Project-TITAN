@@ -12,6 +12,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 from dotenv import load_dotenv
+from fixtures.session_init import initialize_fresh
 
 from titan._core import (
     ContractType,
@@ -272,6 +273,7 @@ class TestFailClosed:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -315,6 +317,7 @@ class TestFailClosed:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -345,6 +348,7 @@ class TestFailClosed:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="bad", secret_key="creds")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
         intent = TradeIntent(
             strategy_id="test", strategy_package_digest="",
             account_id="paper-1", instrument_id="SPY", side="BUY",
@@ -362,6 +366,7 @@ class TestFailClosed:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
         with patch.object(adapter, "heartbeat", return_value=AdapterHealth(
             connected=False, session_state=AdapterSessionState.DISCONNECTED,
         )):
@@ -381,6 +386,7 @@ class TestFailClosed:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
         with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
             client_instance = MagicMock()
             mock_tc.return_value = client_instance
@@ -561,6 +567,7 @@ class TestDailyReconciliation:
         pc = PaperConfig(risk_config=rc, state_path=_tmp_state_path())
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
         with patch.object(adapter, "positions", return_value=BrokerPositionSnapshot(
             account_id="paper-1", positions=[], timestamp="2026-07-14T00:00:00Z",
         )):
@@ -634,6 +641,7 @@ class TestOneOrderExecution:
             state_path=state_path,
         )
         engine = PaperTradingEngine(pc, adapter)
+        initialize_fresh(engine)
         session = engine.start()
         assert session.state == AdapterSessionState.CONNECTED
         print(f"\n[CERT] Engine started, session={session.session_id}")
@@ -763,6 +771,7 @@ class TestKillSwitchPersistence:
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
                 mock_tc.return_value = MagicMock()
                 engine = PaperTradingEngine(config, adapter)
+                initialize_fresh(engine)
                 engine.start()
                 engine.trigger_kill_switch()
 
@@ -787,6 +796,7 @@ class TestKillSwitchPersistence:
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
                 mock_tc.return_value = MagicMock()
                 engine = PaperTradingEngine(config, adapter)
+                initialize_fresh(engine)
                 engine.start()
 
     def test_kill_switch_persists_through_broker_sync(self, tmp_path):
@@ -802,6 +812,7 @@ class TestKillSwitchPersistence:
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
                 mock_tc.return_value = MagicMock()
                 engine = PaperTradingEngine(config, adapter)
+                initialize_fresh(engine)
                 engine.start()
                 engine.trigger_kill_switch()
 
@@ -834,6 +845,7 @@ class TestBrokerSubmitFailure:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -881,6 +893,7 @@ class TestUnfilledOrderGuard:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         # Directly test _resolve_fills
         intent = ApprovedOrderIntent(
@@ -934,6 +947,7 @@ class TestTimestampPreValidation:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -963,6 +977,7 @@ class TestTimestampPreValidation:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -999,6 +1014,7 @@ class TestReconciliationDriftHalts:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -1039,6 +1055,7 @@ class TestReconciliationDriftHalts:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -1079,6 +1096,7 @@ class TestTimestampUtcOffset:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -1105,6 +1123,7 @@ class TestTimestampUtcOffset:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -1127,6 +1146,7 @@ class TestTimestampUtcOffset:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:
@@ -1158,6 +1178,7 @@ class TestUnfilledOrderRecorded:
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
 
         with patch.object(AlpacaAdapter, '_in_regular_session', return_value=True):
             with patch("titan.execution.alpaca_adapter.TradingClient") as mock_tc:

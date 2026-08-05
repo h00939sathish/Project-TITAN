@@ -354,6 +354,46 @@ impl RiskGate {
             .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
+    pub fn initialize_armed(&mut self) -> PyResult<()> {
+        // Explicit operator-controlled initialization of a NEW session.
+        // Reaches Armed from any held state via the legal transitions and
+        // sets trading state to Active. Never called implicitly by startup;
+        // an empty store alone must never arm the gate.
+        match self.kill_switch {
+            KillSwitchState::Triggered => {
+                self.kill_switch
+                    .transition(KillSwitchState::Releasing)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+                self.kill_switch
+                    .transition(KillSwitchState::Released)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+                self.kill_switch
+                    .transition(KillSwitchState::Armed)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            }
+            KillSwitchState::Releasing => {
+                self.kill_switch
+                    .transition(KillSwitchState::Released)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+                self.kill_switch
+                    .transition(KillSwitchState::Armed)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            }
+            KillSwitchState::Released => {
+                self.kill_switch
+                    .transition(KillSwitchState::Armed)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            }
+            KillSwitchState::Armed => {}
+        }
+        if self.trading_state != TradingState::Active {
+            self.trading_state
+                .transition(TradingState::Active)
+                .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        }
+        Ok(())
+    }
+
     pub fn persist_state(&mut self, store: &event_store::EventStore) -> PyResult<()> {
         let snapshot = RiskStateSnapshot {
             message_id: format!("snap-{}", Uuid::now_v7()),
@@ -681,18 +721,13 @@ impl RiskGate {
                 .unwrap_or(TradingState::Halted);
             return Ok(());
         }
-        // No risk snapshot persisted. A snapshot that EXISTS but is corrupt is
-        // fail-closed above. With NO snapshot we must distinguish a genuinely
-        // fresh session from a killed session whose state was lost:
-        //   - store has events (engine appended SessionStarted at boot) -> a
-        //     live session that never persisted risk state yet -> keep defaults
-        //   - store completely empty -> may be a killed session after state
-        //     loss -> FAIL CLOSED (Triggered/Halted) so a halted session can
-        //     never silently restart trading.
-        if store.replay_all()?.is_empty() {
-            gate.kill_switch = KillSwitchState::Triggered;
-            gate.trading_state = TradingState::Halted;
-        }
+        // No RiskStateSnapshot present at all (missing, unreadable, or
+        // deleted): fail closed. Risk state is authoritative; its absence
+        // must never be read as "safe to trade". A genuinely new environment
+        // reaches Armed only via the explicit, audited initialize_new_session
+        // command - never implicitly from an empty store.
+        gate.kill_switch = KillSwitchState::Triggered;
+        gate.trading_state = TradingState::Halted;
         Ok(())
     }
 }

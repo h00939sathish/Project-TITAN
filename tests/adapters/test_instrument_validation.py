@@ -4,6 +4,7 @@ from titan._core import (
 from titan.execution.engine import PaperConfig, PaperTradingEngine
 from titan.execution.simulated_adapter import SimulatedAdapter
 from datetime import datetime, timezone
+from fixtures.session_init import initialize_fresh
 
 
 def _config() -> PaperConfig:
@@ -31,6 +32,7 @@ def _intent(side="BUY", quantity="1", price="1500.00") -> TradeIntent:
 class TestInstrumentValidation:
     def test_valid_order_passes_validation(self):
         engine = PaperTradingEngine(_config(), SimulatedAdapter())
+        initialize_fresh(engine)
         instr = Instrument(InstrumentId("ES", "CME"), "0.25", 1, "50", ContractType.Future, "USD", 2)
         engine.register_instrument(instr, "ES")
         engine.start()
@@ -39,6 +41,7 @@ class TestInstrumentValidation:
 
     def test_bad_tick_rejected(self):
         engine = PaperTradingEngine(_config(), SimulatedAdapter())
+        initialize_fresh(engine)
         instr = Instrument(InstrumentId("ES", "CME"), "0.25", 1, "50", ContractType.Future, "USD", 2)
         engine.register_instrument(instr, "ES")
         engine.start()
@@ -48,6 +51,7 @@ class TestInstrumentValidation:
 
     def test_bad_lot_rejected(self):
         engine = PaperTradingEngine(_config(), SimulatedAdapter())
+        initialize_fresh(engine)
         instr = Instrument(InstrumentId("ES", "CME"), "0.25", 100, "50", ContractType.Future, "USD", 2)
         engine.register_instrument(instr, "ES")
         engine.start()
@@ -57,6 +61,7 @@ class TestInstrumentValidation:
 
     def test_unregistered_instrument_rejected(self):
         engine = PaperTradingEngine(_config(), SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         result = engine.submit_intent(_intent("BUY", "1", "1500.00"))
         assert not result.accepted

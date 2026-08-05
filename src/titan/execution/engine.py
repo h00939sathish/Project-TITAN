@@ -36,6 +36,10 @@ from titan._core import (
 )
 
 from titan.operations.logging import StructuredLogger, LogSeverity
+from titan.risk.session_initialization import (
+    SessionInitialization,
+    validate as validate_initialization,
+)
 
 # Order statuses that mean "still alive at the broker" — a working order must
 # NEVER be rejected/cancelled locally (the broker may fill it any moment).
@@ -110,17 +114,11 @@ class PaperTradingEngine:
         self.logger = logger
         store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
-        # A genuinely fresh session (empty store) appends a SessionStarted
-        # bootstrap event so the risk gate restores Armed/Active on first run.
-        # Without it, load_or_default fails closed (Triggered/Halted) on an
-        # empty store — a killed session whose state was lost must never
-        # silently restart trading. (restore_state is fail-open and must not
-        # be used here.)
-        if not self._event_store.replay_all():
-            self._event_store.append(EventEnvelope(
-                "SessionStarted", "Engine", "system", "titan_python",
-                json.dumps({"started_at": datetime.now(timezone.utc).isoformat()}),
-            ))
+        # Fail-closed restore: missing/unreadable/deleted risk state restores
+        # Triggered/Halted - a session must never silently restart trading.
+        # There is NO automatic bootstrap here: a genuinely new environment
+        # reaches Armed only via the explicit, audited initialize_new_session
+        # command. (restore_state is fail-open and must not be used here.)
         self.risk_gate = RiskGate.load_or_default(config.risk_config, self._event_store)
         self.portfolio = PortfolioEngine(config.currency, Money(config.starting_capital, config.currency))
 
@@ -133,6 +131,7 @@ class PaperTradingEngine:
         self._intent_counter: int = 0
         self._health_cache: Optional[tuple[float, bool]] = None
         self._health_cache_ttl = 5.0
+        self._seen_init_nonces: set[str] = set()
         self._last_prices: dict[str, str] = {}
         self._price_history: dict[str, deque[float]] = {}
         self._order_metadata: dict[str, dict] = {}
@@ -434,7 +433,11 @@ class PaperTradingEngine:
             except Exception:
                 if self.logger:
                     self.logger.error("engine", "Corrupt state file — halting routing")
-                self.risk_gate.trigger_kill_switch()
+                # Fail closed, but idempotently: with strict recovery the gate is
+                # ALREADY Triggered/Halted here (empty/corrupt store restored
+                # fail-closed), so only trigger when routing is not yet blocked.
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.risk_gate.trigger_kill_switch()
                 return True
 
         snapshot = self._read_latest_portfolio_snapshot()
@@ -1104,6 +1107,58 @@ class PaperTradingEngine:
         kill_switch_triggered.inc()
         if self.logger:
             self.logger.warning("engine", "Kill switch triggered")
+
+    def _record_init_refusal(self, reason: str) -> None:
+        """Durable audit record for a refused initialization."""
+        try:
+            self._event_store.append(EventEnvelope(
+                "InitializationRefused", "SessionInitialization", "system",
+                "titan_python",
+                json.dumps({"ts": datetime.now(timezone.utc).isoformat(),
+                            "reason": reason}),
+            ))
+        except Exception:
+            pass
+        if self.logger:
+            self.logger.warning("engine", f"Session initialization refused: {reason}")
+
+    def initialize_new_session(self,
+                               initialization: Optional[SessionInitialization] = None) -> None:
+        """Explicit, operator-controlled initialization of a NEW session.
+
+        Distinct from ordinary startup and NEVER triggered by an empty store.
+        Same authorization discipline as release: missing / incomplete /
+        expired / replayed initialization refuses, durably recorded. Refuses
+        when risk state already exists (initialization must not be usable to
+        bypass the release discipline on an existing session). On success the
+        gate is armed (Triggered/Halted -> Armed/Active) and an Armed risk
+        snapshot is persisted so later restarts restore Armed.
+        """
+        reason = validate_initialization(initialization, self._seen_init_nonces)
+        if reason:
+            self._record_init_refusal(reason)
+            raise RuntimeError(f"Cannot initialize session: kill_reason={reason}")
+        if self._event_store.replay_by_type("RiskStateSnapshot"):
+            self._record_init_refusal("initialization_conflicts_with_existing_state")
+            raise RuntimeError(
+                "Cannot initialize session: kill_reason="
+                "initialization_conflicts_with_existing_state")
+        with self._lock:
+            self.risk_gate.initialize_armed()
+            self._seen_init_nonces.add(initialization.nonce)
+            self._event_store.append(EventEnvelope(
+                "SessionInitialized", "SessionInitialization", "system",
+                "titan_python",
+                json.dumps({
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "approvers": [a.approver for a in initialization.approvers],
+                    "rationale": initialization.rationale,
+                    "nonce": initialization.nonce,
+                }),
+            ))
+            self._save_state()
+            if self.logger:
+                self.logger.info("engine", "Session initialized (explicit, audited)")
 
     def release_kill_switch(self) -> None:
         """Resume a halted session.
