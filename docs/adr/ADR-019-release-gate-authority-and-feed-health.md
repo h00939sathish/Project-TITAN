@@ -1,6 +1,7 @@
 # ADR-019: Kill-switch release requires dual approved-human authorization and verified data-feed health
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-08-05, review gate — authority model,
+  feed-health contract, and fresh-build evidence confirmed)
 - **Date:** 2026-08-04
 - **Owners:** Architecture Council, Risk Owner, Execution Platform
 - **Decision scope:** The `HALTED` → release transition in `PaperTradingEngine.release_kill_switch` and the market-data health predicate that gates it

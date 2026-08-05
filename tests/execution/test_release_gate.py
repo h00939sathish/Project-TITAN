@@ -8,6 +8,8 @@ from titan.execution import PaperConfig
 from titan.data.feed_health import FeedHealthVerdict
 from titan.execution import PaperTradingEngine
 from titan.execution import SimulatedAdapter, SimFillQuality
+from fixtures.session_init import initialize_fresh
+
 from titan.risk.release_authorization import (
     ReleaseApproval,
     ReleaseAuthorization,
@@ -66,6 +68,9 @@ class TestReleaseGate:
 
     def _triggered_engine(self, feed_fn):
         eng = PaperTradingEngine(_config(), _adapter(), feed_health=feed_fn)
+        # Strict recovery (ADR-020): a fresh engine starts fail-closed held;
+        # explicitly initialize it (test-only fixture) before arming/trigger.
+        initialize_fresh(eng)
         eng.start()
         # Isolate the release-gate logic from adapter/reconcile details: stub a
         # clean reconcile and a healthy adapter so only auth + feed-health +
