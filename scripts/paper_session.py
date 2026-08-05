@@ -772,6 +772,7 @@ def main() -> None:
                         auth_file.read_text(encoding="utf-8"))
                 except Exception:
                     authorization = None
+            released_ok = False
             try:
                 engine.release_kill_switch(authorization)
                 # Idempotent: release is a no-op if the switch was not held.
@@ -782,12 +783,17 @@ def main() -> None:
                           "causal condition still live", flush=True)
                 else:
                     print("kill switch RELEASED (authorized)", flush=True)
+                    released_ok = True
             except Exception as e:
                 # Exception carries kill_reason=<code> from engine.release_kill_switch
                 print(f"kill switch release REFUSED: {e}", flush=True)
             finally:
                 release_file.unlink(missing_ok=True)
-                auth_file.unlink(missing_ok=True)
+                if released_ok:
+                    # Consume the authorization ONLY on success. A refused
+                    # release (transient feed/adapter/reconcile) must not
+                    # destroy a still-valid record the operator can retry.
+                    auth_file.unlink(missing_ok=True)
 
         # Reconnect guard: if TWS drops (restart, network), re-authenticate and
         # re-import broker truth so the next reconcile starts from a consistent

@@ -507,13 +507,15 @@ class PaperTradingEngine:
         key = instrument_id or instrument.instrument_id.symbol
         self.instruments[key] = instrument
 
-    def _check_adapter_health(self) -> bool:
+    def _check_adapter_health(self, force: bool = False) -> bool:
         """Check adapter health. Returns True if healthy, False if down.
 
-        On first failure, auto-triggers kill switch (fail-closed).
+        On first failure, auto-triggers kill switch (fail-closed). Pass
+        force=True to bypass the short TTL cache (used by the release gate's
+        TOCTOU re-check so it reads live state, not a cached verdict).
         """
         now = time.monotonic()
-        if self._health_cache and (now - self._health_cache[0]) < self._health_cache_ttl:
+        if not force and self._health_cache and (now - self._health_cache[0]) < self._health_cache_ttl:
             return self._health_cache[1]
         try:
             health = self.adapter.heartbeat()
@@ -1283,8 +1285,9 @@ class PaperTradingEngine:
         if code:
             self._record_release_refusal(code)
             raise RuntimeError(f"Cannot release kill switch: kill_reason={code}")
-        if authorization is not None and authorization.nonce:
-            self._seen_release_nonces.add(authorization.nonce)
+        # NOTE: the nonce is NOT consumed here. It is marked seen only on a
+        # successful release commit, so a refusal (transient feed/adapter/
+        # reconcile hiccup) does not burn a still-valid authorization record.
 
     def release_kill_switch(
         self, authorization: Optional[ReleaseAuthorization] = None
@@ -1296,78 +1299,85 @@ class PaperTradingEngine:
         (refuse on Critical drift) -> adapter health -> data-feed health
         (fail-closed) -> TOCTOU re-verification -> Released -> Active commit.
         Original kill trigger cause is preserved; every refusal is recorded
-        separately in the durable ledger.
+        separately in the durable ledger. The gate + commit run under
+        self._lock so the TOCTOU re-checks and the transition are atomic
+        against the background poller thread.
         """
-        # 0) Not held -> nothing to release. No-op, not an error.
         if not self.risk_gate.kill_switch.blocks_routing():
             if self.logger:
                 self.logger.info("engine", "Kill switch release: not held (no-op)")
             return
 
-        # 0a) Authorization authority model (two approved humans, etc.).
-        self._require_release_authorization(authorization)
+        with self._lock:
+            # 0a) Authorization authority model (two approved humans, etc.).
+            self._require_release_authorization(authorization)
 
-        # 1) Held: refuse on genuine critical drift, with a reason code.
-        result = self.reconcile()
-        if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
-            self._record_release_refusal("critical_reconcile_drift", {
-                "position_drifts": len(result.position_drifts),
-                "cash_drift": result.cash_drift,
-            })
-            raise RuntimeError(
-                f"Cannot release kill switch: "
-                f"kill_reason=critical_reconcile_drift "
-                f"({len(result.position_drifts)} position drifts, "
-                f"cash drift {result.cash_drift})"
-            )
+            # 1) Held: refuse on genuine critical drift, with a reason code.
+            result = self.reconcile()
+            if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
+                self._record_release_refusal("critical_reconcile_drift", {
+                    "position_drifts": len(result.position_drifts),
+                    "cash_drift": result.cash_drift,
+                })
+                raise RuntimeError(
+                    f"Cannot release kill switch: "
+                    f"kill_reason=critical_reconcile_drift "
+                    f"({len(result.position_drifts)} position drifts, "
+                    f"cash drift {result.cash_drift})"
+                )
 
-        # 2) Broker adapter health — an ADDITIONAL predicate, not the fix.
-        if not self._check_adapter_health():
-            self._record_release_refusal("adapter_down")
-            raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down")
+            # 2) Broker adapter health — an ADDITIONAL predicate, not the fix.
+            if not self._check_adapter_health():
+                self._record_release_refusal("adapter_down")
+                raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down")
 
-        # 3) Verified control health (ADR-019): data-feed snapshot, fail-closed.
-        verdict = self._evaluate_feed_health()
-        if not verdict.healthy:
-            self._record_release_refusal(verdict.reason, {"watermarks": verdict.watermarks})
-            raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict.reason}")
+            # 3) Verified control health (ADR-019): data-feed snapshot, fail-closed.
+            verdict = self._evaluate_feed_health()
+            if not verdict.healthy:
+                self._record_release_refusal(verdict.reason, {"watermarks": verdict.watermarks})
+                raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict.reason}")
 
-        # 4) TOCTOU: re-verify everything immediately before the commit.
-        if not self.risk_gate.kill_switch.is_triggered():
-            self._record_release_refusal("state_changed")
-            raise RuntimeError("Cannot release kill switch: kill_reason=state_changed")
-        result2 = self.reconcile()
-        if result2.severity is not None and result2.severity == ReconciliationDriftSeverity.Critical:
-            self._record_release_refusal("critical_reconcile_drift_toctou")
-            raise RuntimeError("Cannot release kill switch: kill_reason=critical_reconcile_drift_toctou")
-        if not self._check_adapter_health():
-            self._record_release_refusal("adapter_down_toctou")
-            raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down_toctou")
-        verdict2 = self._evaluate_feed_health()
-        if not verdict2.healthy:
-            self._record_release_refusal(verdict2.reason, {"watermarks": verdict2.watermarks})
-            raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict2.reason}")
+            # 4) TOCTOU: re-verify everything immediately before the commit,
+            #    bypassing caches so the re-check is a fresh live read.
+            if not self.risk_gate.kill_switch.is_triggered():
+                self._record_release_refusal("state_changed")
+                raise RuntimeError("Cannot release kill switch: kill_reason=state_changed")
+            result2 = self.reconcile()
+            if result2.severity is not None and result2.severity == ReconciliationDriftSeverity.Critical:
+                self._record_release_refusal("critical_reconcile_drift_toctou")
+                raise RuntimeError("Cannot release kill switch: kill_reason=critical_reconcile_drift_toctou")
+            if not self._check_adapter_health(force=True):
+                self._record_release_refusal("adapter_down_toctou")
+                raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down_toctou")
+            verdict2 = self._evaluate_feed_health()
+            if not verdict2.healthy:
+                self._record_release_refusal(verdict2.reason, {"watermarks": verdict2.watermarks})
+                raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict2.reason}")
 
-        # 5) Commit the transition: Triggered -> Releasing -> Released -> Active.
-        if self.risk_gate.kill_switch.is_triggered():
-            self.risk_gate.release_initiated()
-        self.risk_gate.release_completed()
-        if self.risk_gate.trading_state != TradingState.Active:
-            self.risk_gate.set_trading_state(TradingState.Active)
-        self._save_state()
-        try:
-            self._event_store.append(EventEnvelope(
-                "KillSwitchReleased", "KillSwitchRelease", "system", "titan_python",
-                json.dumps({
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    "correlation": self._kill_correlation,
-                    "authorization_nonce": authorization.nonce if authorization else "",
-                }),
-            ))
-        except Exception:
-            pass
-        if self.logger:
-            self.logger.info("engine", "Kill switch released")
+            # 5) Commit the transition: Triggered -> Releasing -> Released -> Active.
+            #    Consume the nonce ONLY on success so a refusal (transient feed /
+            #    adapter / reconcile hiccup) does not burn a still-valid record.
+            if self.risk_gate.kill_switch.is_triggered():
+                self.risk_gate.release_initiated()
+            self.risk_gate.release_completed()
+            if self.risk_gate.trading_state != TradingState.Active:
+                self.risk_gate.set_trading_state(TradingState.Active)
+            if authorization is not None and authorization.nonce:
+                self._seen_release_nonces.add(authorization.nonce)
+            self._save_state()
+            try:
+                self._event_store.append(EventEnvelope(
+                    "KillSwitchReleased", "KillSwitchRelease", "system", "titan_python",
+                    json.dumps({
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "correlation": self._kill_correlation,
+                        "authorization_nonce": authorization.nonce if authorization else "",
+                    }),
+                ))
+            except Exception:
+                pass
+            if self.logger:
+                self.logger.info("engine", "Kill switch released")
 
     def _resolve_fills(
         self,

@@ -95,8 +95,20 @@ def validate(
         return "release_not_authorized"
 
     now = now_iso or datetime.now(timezone.utc).isoformat()
-    if auth.expiry and auth.expiry <= now:
-        return "authorization_expired"
+    if auth.expiry:
+        # Compare as datetimes, never lexicographically: producers may write
+        # different offsets (Z vs +00:00) or precisions.
+        try:
+            exp = datetime.fromisoformat(auth.expiry.replace("Z", "+00:00"))
+            now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if now_dt.tzinfo is None:
+                now_dt = now_dt.replace(tzinfo=timezone.utc)
+            if exp <= now_dt:
+                return "authorization_expired"
+        except ValueError:
+            return "authorization_expired"
 
     # Two distinct authorized approvers.
     names = {a.approver.strip() for a in auth.approvers if a.approver.strip()}

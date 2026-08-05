@@ -130,5 +130,19 @@ class FeedHealthSnapshot:
                 return FeedHealthVerdict(
                     False, "instrument_uncovered", watermarks, checked_at
                 )
+            # ADR-019: "no completed bar OR watermark older than the threshold"
+            # -> instrument_uncovered. Parse the ISO watermark and compare age.
+            try:
+                parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - parsed).total_seconds() > self._stale_after_s:
+                    return FeedHealthVerdict(
+                        False, "instrument_uncovered", watermarks, checked_at
+                    )
+            except ValueError:
+                return FeedHealthVerdict(
+                    False, "instrument_uncovered", watermarks, checked_at
+                )
 
         return FeedHealthVerdict(True, "", watermarks, checked_at)

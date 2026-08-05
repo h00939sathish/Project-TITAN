@@ -54,7 +54,10 @@ transport hint that an operator intends a release; it never authorizes one.
 
 A release must be authorized by a `ReleaseAuthorization` record satisfying:
 
-- **Two distinct authorized approvers** — after reconciliation.
+- **Two distinct authorized approvers** — the record is signed by two distinct
+  authorized humans. Approvals are typically granted after a human-reviewed
+  reconciliation, but the engine's gate verifies the record **before** running
+  its own reconciliation and re-verifies every predicate itself (§3).
 - **Incident/kill-trigger correlation** — the record references the kill incident /
   original trigger (a correlation id or the trigger code).
 - **Root-cause / scope assessment** — the record carries an assessment reference.

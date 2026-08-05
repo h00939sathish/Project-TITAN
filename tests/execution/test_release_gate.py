@@ -72,7 +72,7 @@ class TestReleaseGate:
         # TOCTOU are under test (adapter/reconcile interplay is covered by the
         # existing engine suites).
         eng.reconcile = lambda: TestReleaseGate._Clean()
-        eng._check_adapter_health = lambda: True
+        eng._check_adapter_health = lambda force=False: True
         eng.trigger_kill_switch()
         return eng
 
@@ -105,13 +105,12 @@ class TestReleaseGate:
 
     def test_toctou_feed_degrades_before_commit(self):
         calls = {"n": 0}
-        state = {"healthy": True}
 
         def flaky_feed():
             calls["n"] += 1
             # first evaluation (step 3) is healthy; the TOCTOU re-check (step 4)
             # sees the feed degrade -> refuse, never commit.
-            if calls["n"] >= 2 or not state["healthy"]:
+            if calls["n"] >= 2:
                 return FeedHealthVerdict(False, "feed_stale", {},
                                          datetime.now(timezone.utc).isoformat())
             return FeedHealthVerdict(True, "", {}, datetime.now(timezone.utc).isoformat())
@@ -120,6 +119,28 @@ class TestReleaseGate:
         with pytest.raises(RuntimeError, match="feed_stale"):
             eng.release_kill_switch(_auth(corr=eng._kill_correlation))
         # switch was NEVER released (state not committed)
+        assert eng.risk_gate.kill_switch.blocks_routing()
+
+    def test_expired_authorization_refused(self):
+        eng = self._triggered_engine(_healthy_feed())
+        auth = _auth(corr=eng._kill_correlation)
+        auth.expiry = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        with pytest.raises(RuntimeError, match="authorization_expired"):
+            eng.release_kill_switch(auth)
+        assert eng.risk_gate.kill_switch.blocks_routing()
+
+    def test_single_approver_refused(self):
+        eng = self._triggered_engine(_healthy_feed())
+        auth = _auth(corr=eng._kill_correlation)
+        auth.approvers = auth.approvers[:1]
+        with pytest.raises(RuntimeError, match="authorization_incomplete"):
+            eng.release_kill_switch(auth)
+        assert eng.risk_gate.kill_switch.blocks_routing()
+
+    def test_correlation_mismatch_refused(self):
+        eng = self._triggered_engine(_healthy_feed())
+        with pytest.raises(RuntimeError, match="authorization_mismatch"):
+            eng.release_kill_switch(_auth(corr="ks-other-incident"))
         assert eng.risk_gate.kill_switch.blocks_routing()
 
     def test_successful_release(self):
