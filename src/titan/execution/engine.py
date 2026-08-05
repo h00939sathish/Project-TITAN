@@ -85,6 +85,9 @@ class PaperConfig:
     account_id: str = "paper-1"
     client_order_prefix: str = "tit-paper-"
     state_path: str = ".titan_state.json"
+    # Authorized approver identities (init/release two-person gate). When
+    # non-empty, every asserted approver must be a member (ADR-020).
+    authorized_approvers: tuple[str, ...] = ()
     use_twap: bool = False
     twap_slice_count: int = 5
     twap_duration_seconds: int = 60
@@ -415,7 +418,12 @@ class PaperTradingEngine:
                 Money(saved_pnl["amount"], saved_pnl["currency"])
             )
 
-    def _save_state(self) -> None:
+    def _save_state(self, raise_on_error: bool = False) -> None:
+        """Persist portfolio + risk state. Default suppresses write errors
+        (best-effort for routine saves); pass raise_on_error=True from paths
+        that MUST be durable (e.g. session initialization) so a failed write
+        fails closed instead of silently leaving an Armed gate without its
+        durable risk snapshot (ADR-020)."""
         if not self.config.state_path:
             return
 
@@ -425,13 +433,15 @@ class PaperTradingEngine:
             with self._lock:
                 path.write_text(json.dumps(state, indent=2), encoding="utf-8")
         except Exception:
-            pass
+            if raise_on_error:
+                raise
 
         self._append_state_snapshot()
         try:
             self.risk_gate.persist_state(self._event_store)
         except Exception:
-            pass
+            if raise_on_error:
+                raise
 
     def _load_state(self) -> bool:
         if not self.config.state_path:
@@ -1161,7 +1171,10 @@ class PaperTradingEngine:
         # durable audit event, the state transition, and the nonce commit are
         # all serialized so two concurrent callers cannot double-initialize.
         with self._lock:
-            reason = validate_initialization(initialization, self._seen_init_nonces)
+            reason = validate_initialization(
+                initialization, self._seen_init_nonces,
+                authorized_approvers=self.config.authorized_approvers,
+            )
             if reason:
                 self._record_init_refusal(reason)
                 raise RuntimeError(f"Cannot initialize session: kill_reason={reason}")
@@ -1197,7 +1210,7 @@ class PaperTradingEngine:
             # outlive a failed initialization.
             self.risk_gate._initialize_armed()
             try:
-                self._save_state()
+                self._save_state(raise_on_error=True)
             except Exception as e:
                 if not self.risk_gate.kill_switch.blocks_routing():
                     self.risk_gate.trigger_kill_switch()

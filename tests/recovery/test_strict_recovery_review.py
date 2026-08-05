@@ -132,6 +132,42 @@ class TestBoundedExpiry:
         assert validate(init, set()) == "initialization_expired"
 
 
+class TestCodexFindings:
+    def test_future_dated_authorization_refused(self):
+        """Codex P2: issued_at in the future must be refused (would otherwise
+        sidestep the bounded-expiry window)."""
+        future = datetime.now(timezone.utc) + timedelta(days=30)
+        init = _init(new_nonce("future"), issued_at=future.isoformat())
+        assert validate(init, set()) == "initialization_expired"
+
+    def test_approver_not_in_registry_refused(self):
+        """Codex P1: with an authorized-approvers registry configured, an
+        approver outside it must be refused."""
+        init = _init(new_nonce("unauthed"))
+        assert validate(init, set(), authorized_approvers={"alice"}) ==             "initialization_unauthorized_approver"
+        assert validate(init, set(), authorized_approvers={"alice", "bob"}) == ""
+
+    def test_init_fails_closed_when_snapshot_persistence_fails(self):
+        """Codex P1: if the Armed risk snapshot cannot be durably persisted,
+        initialization must fail closed (held gate, no success) - never an
+        Armed in-memory gate without its durable record."""
+        import tempfile as _tf
+        td = _tf.mkdtemp()
+        cfg = _config(td, "persist.json")
+        engine = PaperTradingEngine(cfg, SimulatedAdapter())
+
+        def boom():
+            raise RuntimeError("event store write failed (test)")
+
+        engine._save_state = boom  # type: ignore[assignment]
+        init = _init(new_nonce("persist"))
+        with pytest.raises(RuntimeError, match="initialization_persistence_failed"):
+            engine.initialize_new_session(init)
+        assert engine.risk_gate.kill_switch.blocks_routing()
+        assert init.nonce not in engine._seen_init_nonces
+        engine._event_store.close()
+
+
 class TestBlankApprovers:
     def test_blank_approver_does_not_count_as_distinct(self):
         now = datetime.now(timezone.utc)

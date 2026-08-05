@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 @dataclass
@@ -83,12 +84,18 @@ MAX_INIT_TTL_SECONDS = 24 * 3600
 
 
 def validate(initialization: SessionInitialization | None,
-             seen_nonces: set[str]) -> str:
+             seen_nonces: set[str],
+             authorized_approvers: Optional[set[str]] = None) -> str:
     """Return "" when valid, else a structured refusal reason code.
 
     Codes: initialization_missing | initialization_incomplete |
     initialization_replayed | initialization_expired |
-    initialization_expiry_unbounded
+    initialization_expiry_unbounded | initialization_unauthorized_approver
+
+    ``authorized_approvers`` (when provided) is the registry of identities
+    permitted to authorize an initialization; every asserted approver must be
+    a member (RISK_POLICY two-person gate must name AUTHORIZED humans, not any
+    two arbitrary strings).
     """
     if initialization is None:
         return "initialization_missing"
@@ -96,11 +103,12 @@ def validate(initialization: SessionInitialization | None,
         return "initialization_incomplete"
     if initialization.nonce in seen_nonces:
         return "initialization_replayed"
+    now_dt = datetime.now(timezone.utc)
     try:
         expiry_dt = _parse_ts(initialization.expiry)
     except ValueError:
         return "initialization_expired"
-    if expiry_dt <= datetime.now(timezone.utc):
+    if expiry_dt <= now_dt:
         return "initialization_expired"
     if not initialization.issued_at:
         return "initialization_incomplete"
@@ -108,7 +116,14 @@ def validate(initialization: SessionInitialization | None,
         issued_dt = _parse_ts(initialization.issued_at)
     except ValueError:
         return "initialization_incomplete"
-    if expiry_dt > issued_dt + timedelta(seconds=MAX_INIT_TTL_SECONDS):
+    # Reject future-dated authorizations (a caller could otherwise set
+    # issued_at years ahead + expiry minutes later to sidestep the window),
+    # allowing only a small clock-skew tolerance.
+    if issued_dt > now_dt + timedelta(minutes=5):
+        return "initialization_expired"
+    # Bounded expiry against NOW (the record's effective window must not
+    # extend far beyond validation time), not merely against its own issued_at.
+    if expiry_dt > now_dt + timedelta(seconds=MAX_INIT_TTL_SECONDS):
         return "initialization_expiry_unbounded"
     # Blank/whitespace-only approver identities do NOT count as distinct.
     identities = {
@@ -118,6 +133,10 @@ def validate(initialization: SessionInitialization | None,
     }
     if len(identities) < 2:
         return "initialization_incomplete"
+    if authorized_approvers:
+        authorized = {str(x).strip() for x in authorized_approvers}
+        if not identities.issubset(authorized):
+            return "initialization_unauthorized_approver"
     if not initialization.rationale.strip():
         return "initialization_incomplete"
     return ""

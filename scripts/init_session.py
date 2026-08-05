@@ -32,6 +32,7 @@ prints the audit record (nonce, approvers, rationale, state path).
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -141,10 +142,27 @@ def main() -> int:
 
     approvers = [a.strip() for a in args.approver if a and a.strip()]
 
+    # The two-person gate must name AUTHORIZED humans, not any two strings
+    # (RISK_POLICY / ADR-020). The operator command requires an authorized-
+    # approvers registry and refuses to run without one.
+    authorized_raw = os.environ.get("TITAN_AUTHORIZED_APPROVERS", "")
+    authorized = {x.strip() for x in authorized_raw.split(",") if x and x.strip()}
+    if not authorized:
+        print("FATAL: TITAN_AUTHORIZED_APPROVERS must be set (comma-separated "
+              "registry of identities authorized to initialize a session)",
+              flush=True)
+        return 1
+    unknown = [a for a in approvers if a not in authorized]
+    if unknown:
+        print(f"FATAL: approver(s) {unknown} are not in the authorized registry "
+              f"{sorted(authorized)}", flush=True)
+        return 1
+
     # Build the engine FIRST so EVERY refusal (including CLI validation
     # failures below) is recorded as a durable InitializationRefused event
     # before the process exits (ADR-020: refusal audit trail is mandatory).
     paper_config, state_path = _build_config(args)
+    paper_config.authorized_approvers = tuple(sorted(authorized))
     adapter = _build_adapter(args.mode, use_tws=False)
     engine = PaperTradingEngine(paper_config, adapter)
 
