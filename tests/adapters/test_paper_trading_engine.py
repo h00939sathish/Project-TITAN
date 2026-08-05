@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fixtures.session_init import initialize_fresh
 
 from titan._core import (
     BrokerPosition,
@@ -132,6 +133,7 @@ class TestPaperTradingEngineSubmitIntent:
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
         self.engine.start()
         for sym in ("AAPL", "MSFT"):
             self.engine.register_instrument(
@@ -212,6 +214,7 @@ class TestPaperTradingEngineRisk:
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
         self.engine.start()
         for sym in ("AAPL", "MSFT"):
             self.engine.register_instrument(
@@ -251,6 +254,7 @@ class TestPaperTradingEngineReconcile:
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
         self.engine.start()
 
     def test_reconcile_empty_portfolio(self):
@@ -284,6 +288,7 @@ class TestPaperTradingEngineStatus:
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
         self.engine.start()
         for sym in ("AAPL", "MSFT"):
             self.engine.register_instrument(
@@ -340,6 +345,7 @@ class TestPaperTradingEngineStatus:
     def test_critical_reconcile_retriggers_switch_after_release(self):
         """A later critical drift must re-halt a released session without crashing."""
         engine = PaperTradingEngine(_default_config(), SimulatedAdapter())
+        initialize_fresh(engine)
         engine.trigger_kill_switch()
         engine.release_kill_switch()
         assert engine.risk_gate.kill_switch == KillSwitchState.Released
@@ -356,6 +362,7 @@ class TestPaperTradingEngineStatus:
         carries a structured kill_reason code the session can echo."""
         adapter = _DivergingAdapter()
         engine = PaperTradingEngine(self._config(), adapter)
+        initialize_fresh(engine)
         engine.start()
         engine.trigger_kill_switch()
         with pytest.raises(RuntimeError) as excinfo:
@@ -376,6 +383,7 @@ class TestPaperTradingEngineFullPipeline:
         self.adapter = SimulatedAdapter()
         self.adapter.set_default_fill_quality(SimFillQuality.IMMEDIATE_FULL)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
 
     def test_full_buy_sell_reconcile_cycle(self):
         self.engine.start()
@@ -406,6 +414,7 @@ class TestPaperTradingEngineFullPipeline:
         config = _default_config()
         adapter = _DivergingAdapter()
         engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
         engine.start()
         for sym in ("AAPL", "MSFT"):
             engine.register_instrument(
@@ -466,6 +475,7 @@ class TestPaperTradingEngineStatePersistence:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         engine.register_instrument(
             Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
@@ -494,8 +504,13 @@ class TestPaperTradingEngineStatePersistence:
         config = _default_config()
         config.state_path = str(state_file)
 
+        # NO initialization here ON PURPOSE: this test verifies fail-closed
+        # default recovery over a nonexistent state file (ADR-020). A fresh
+        # engine must start Triggered/Halted, never Armed.
         engine = PaperTradingEngine(config, SimulatedAdapter())
         engine.start(sync_from_broker=False)
+        assert engine.risk_gate.kill_switch.is_triggered()
+        assert not engine.risk_gate.trading_state.accepts_intents()
         assert engine.portfolio.get_cash_balance().amount == "100000"
         assert engine.portfolio.get_position("AAPL") is None
 
@@ -505,6 +520,7 @@ class TestPaperTradingEngineStatePersistence:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         engine.register_instrument(
             Instrument(InstrumentId("MSFT", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
@@ -528,6 +544,7 @@ class TestPaperTradingEngineStatePersistence:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         for sym in ("AAPL", "MSFT"):
             engine.register_instrument(
@@ -551,6 +568,7 @@ class TestPaperTradingEngineStatePersistence:
         config = _default_config()
         config.state_path = ""
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         engine.register_instrument(
             Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
@@ -566,6 +584,7 @@ class TestPaperTradingEngineStatePersistence:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         engine.register_instrument(
             Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
@@ -588,6 +607,7 @@ class TestPaperTradingEngineStatePersistence:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, SimulatedAdapter())
+        initialize_fresh(engine)
         engine.start()
         engine.register_instrument(
             Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)

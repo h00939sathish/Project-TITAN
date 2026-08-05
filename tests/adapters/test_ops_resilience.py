@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from fixtures.session_init import initialize_fresh
 
 from titan._core import (
     BrokerPosition,
@@ -186,6 +187,7 @@ def test_restart_reconstruction_positions_and_orders():
         state_path = str(Path(tmp) / "state.json")
         adapter = FakeAdapter()
         engine = _engine(adapter, state_path)
+        initialize_fresh(engine)
         engine.start(sync_from_broker=False)
         result = engine.submit_intent(_make_intent())
         assert result.accepted
@@ -211,6 +213,7 @@ def test_restart_reconstruction_positions_and_orders():
 def test_burst_20_orders_no_duplicates_no_deadlock():
     adapter = FakeAdapter()
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     client_ids = set()
     for i in range(20):
@@ -243,6 +246,7 @@ def test_partial_fill_accounting():
         order_status="PartiallyFilled",
     )
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     result = engine.submit_intent(_make_intent())
     assert result.accepted
@@ -264,6 +268,7 @@ def test_partial_fill_accounting():
 def test_holdings_timeout_no_phantom_cash_drift():
     adapter = FakeAdapter()
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     engine.submit_intent(_make_intent())  # engine long AAPL 100 @150
     adapter.broker_positions = [BrokerPosition("AAPL", "BUY", 100)]  # broker agrees
@@ -279,6 +284,7 @@ def test_holdings_timeout_no_phantom_cash_drift():
 def test_positions_timeout_fail_closed():
     adapter = FakeAdapter()
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     engine.submit_intent(_make_intent())
     adapter.timeout_positions = True
@@ -297,6 +303,7 @@ def test_kill_switch_survives_restart():
         state_path = str(Path(td) / "state.json")
         adapter = FakeAdapter()
         engine = _engine(adapter, state_path=state_path)
+        initialize_fresh(engine)
         engine.start(sync_from_broker=False)
         engine.trigger_kill_switch()   # persists RiskStateSnapshot (Triggered)
         engine.stop()
@@ -315,18 +322,23 @@ def test_kill_switch_survives_restart():
         engine2.stop()
 
 
-def test_fresh_engine_starts_active():
-    """A brand-new store (no prior snapshot) must start Active/Armed — the
-    fail-closed policy applies only to corrupt/existing state, not first run."""
-    with tempfile.TemporaryDirectory() as td:
-        state_path = str(Path(td) / "state.json")
-        adapter = FakeAdapter()
-        engine = _engine(adapter, state_path=state_path)
-        engine.start(sync_from_broker=False)
-        st = engine.status()
-        assert not st.kill_switch.is_triggered()
-        assert st.trading_state == TradingState.Active
-        engine.stop()
+def test_fresh_engine_starts_fail_closed_until_explicit_init():
+    """Strict recovery: a fresh engine with no prior risk state starts
+    Triggered/Halted (fail closed) and becomes Armed/Active only after the
+    explicit, audited initialize_new_session command - never implicitly."""
+    adapter = FakeAdapter()
+    engine = PaperTradingEngine(_config(""), adapter)
+    engine.register_instrument(
+        Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+    )
+    engine.start(sync_from_broker=False)
+    st = engine.status()
+    assert st.kill_switch.is_triggered()            # fail-closed startup
+    assert not st.trading_state.accepts_intents()   # Halted
+    initialize_fresh(engine)                        # explicit operator-controlled init
+    assert not engine.risk_gate.kill_switch.blocks_routing()
+    assert engine.risk_gate.trading_state == TradingState.Active
+    engine.stop()
 
 
 # ── 5. External cancellation detected via poll loop ─────────────────────────
@@ -341,6 +353,7 @@ def test_external_cancel_detected():
         order_status="Submitted",       # order left working at the broker
     )
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     result = engine.submit_intent(_make_intent())
     assert result.accepted
@@ -362,6 +375,7 @@ def test_external_cancel_detected():
 def test_kill_switch_release_cycle():
     adapter = FakeAdapter()
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     engine.submit_intent(_make_intent())          # engine long AAPL 100 @150
     adapter.broker_positions = [BrokerPosition("AAPL", "BUY", 100)]  # broker agrees
@@ -384,6 +398,7 @@ def test_kill_switch_release_cycle():
 def test_kill_switch_release_refused_on_real_drift():
     adapter = FakeAdapter()
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     engine.submit_intent(_make_intent())          # engine long AAPL 100
     # Broker reports FLAT while the engine holds 100 -> genuine drift.
@@ -407,6 +422,7 @@ def test_working_order_stays_pending():
         order_status="Submitted",
     )
     engine = _engine(adapter)
+    initialize_fresh(engine)
     engine.start(sync_from_broker=False)
     result = engine.submit_intent(_make_intent())
     assert result.accepted

@@ -36,6 +36,10 @@ from titan._core import (
 )
 
 from titan.operations.logging import StructuredLogger, LogSeverity
+from titan.risk.session_initialization import (
+    SessionInitialization,
+    validate as validate_initialization,
+)
 
 # Order statuses that mean "still alive at the broker" — a working order must
 # NEVER be rejected/cancelled locally (the broker may fill it any moment).
@@ -81,6 +85,9 @@ class PaperConfig:
     account_id: str = "paper-1"
     client_order_prefix: str = "tit-paper-"
     state_path: str = ".titan_state.json"
+    # Authorized approver identities (init/release two-person gate). When
+    # non-empty, every asserted approver must be a member (ADR-020).
+    authorized_approvers: tuple[str, ...] = ()
     use_twap: bool = False
     twap_slice_count: int = 5
     twap_duration_seconds: int = 60
@@ -110,17 +117,11 @@ class PaperTradingEngine:
         self.logger = logger
         store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
-        # A genuinely fresh session (empty store) appends a SessionStarted
-        # bootstrap event so the risk gate restores Armed/Active on first run.
-        # Without it, load_or_default fails closed (Triggered/Halted) on an
-        # empty store — a killed session whose state was lost must never
-        # silently restart trading. (restore_state is fail-open and must not
-        # be used here.)
-        if not self._event_store.replay_all():
-            self._event_store.append(EventEnvelope(
-                "SessionStarted", "Engine", "system", "titan_python",
-                json.dumps({"started_at": datetime.now(timezone.utc).isoformat()}),
-            ))
+        # Fail-closed restore: missing/unreadable/deleted risk state restores
+        # Triggered/Halted - a session must never silently restart trading.
+        # There is NO automatic bootstrap here: a genuinely new environment
+        # reaches Armed only via the explicit, audited initialize_new_session
+        # command. (restore_state is fail-open and must not be used here.)
         self.risk_gate = RiskGate.load_or_default(config.risk_config, self._event_store)
         self.portfolio = PortfolioEngine(config.currency, Money(config.starting_capital, config.currency))
 
@@ -133,6 +134,20 @@ class PaperTradingEngine:
         self._intent_counter: int = 0
         self._health_cache: Optional[tuple[float, bool]] = None
         self._health_cache_ttl = 5.0
+        self._seen_init_nonces: set[str] = set()
+        # Reconstruct replay protection from durable events: a restart must
+        # not allow a previously-used initialization nonce to be replayed
+        # (nonce replay protection survives process restarts, ADR-020).
+        try:
+            for _ev in self._event_store.replay_by_type("SessionInitialized"):
+                try:
+                    _payload = json.loads(_ev.payload)
+                    if _payload.get("nonce"):
+                        self._seen_init_nonces.add(_payload["nonce"])
+                except Exception:
+                    continue
+        except Exception:
+            pass
         self._last_prices: dict[str, str] = {}
         self._price_history: dict[str, deque[float]] = {}
         self._order_metadata: dict[str, dict] = {}
@@ -403,7 +418,12 @@ class PaperTradingEngine:
                 Money(saved_pnl["amount"], saved_pnl["currency"])
             )
 
-    def _save_state(self) -> None:
+    def _save_state(self, raise_on_error: bool = False) -> None:
+        """Persist portfolio + risk state. Default suppresses write errors
+        (best-effort for routine saves); pass raise_on_error=True from paths
+        that MUST be durable (e.g. session initialization) so a failed write
+        fails closed instead of silently leaving an Armed gate without its
+        durable risk snapshot (ADR-020)."""
         if not self.config.state_path:
             return
 
@@ -413,13 +433,15 @@ class PaperTradingEngine:
             with self._lock:
                 path.write_text(json.dumps(state, indent=2), encoding="utf-8")
         except Exception:
-            pass
+            if raise_on_error:
+                raise
 
         self._append_state_snapshot()
         try:
             self.risk_gate.persist_state(self._event_store)
         except Exception:
-            pass
+            if raise_on_error:
+                raise
 
     def _load_state(self) -> bool:
         if not self.config.state_path:
@@ -434,7 +456,11 @@ class PaperTradingEngine:
             except Exception:
                 if self.logger:
                     self.logger.error("engine", "Corrupt state file — halting routing")
-                self.risk_gate.trigger_kill_switch()
+                # Fail closed, but idempotently: with strict recovery the gate is
+                # ALREADY Triggered/Halted here (empty/corrupt store restored
+                # fail-closed), so only trigger when routing is not yet blocked.
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.risk_gate.trigger_kill_switch()
                 return True
 
         snapshot = self._read_latest_portfolio_snapshot()
@@ -1104,6 +1130,98 @@ class PaperTradingEngine:
         kill_switch_triggered.inc()
         if self.logger:
             self.logger.warning("engine", "Kill switch triggered")
+
+    def _record_init_refusal(self, reason: str) -> None:
+        """Durable audit record for a refused initialization.
+
+        Durability is mandatory (ADR-020): if the refusal event cannot be
+        persisted, fail loudly instead of silently dropping the audit trail.
+        """
+        try:
+            self._event_store.append(EventEnvelope(
+                "InitializationRefused", "SessionInitialization", "system",
+                "titan_python",
+                json.dumps({"ts": datetime.now(timezone.utc).isoformat(),
+                            "reason": reason}),
+            ))
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    "engine",
+                    f"InitializationRefused NOT persisted (reason={reason}): {e}")
+            raise RuntimeError(
+                "initialization refusal not durably recorded "
+                f"(reason={reason}): {e}") from e
+        if self.logger:
+            self.logger.warning("engine", f"Session initialization refused: {reason}")
+
+    def initialize_new_session(self,
+                               initialization: Optional[SessionInitialization] = None) -> None:
+        """Explicit, operator-controlled initialization of a NEW session.
+
+        Distinct from ordinary startup and NEVER triggered by an empty store.
+        Same authorization discipline as release: missing / incomplete /
+        expired / replayed initialization refuses, durably recorded. Refuses
+        when risk state already exists (initialization must not be usable to
+        bypass the release discipline on an existing session). On success the
+        gate is armed (Triggered/Halted -> Armed/Active) and an Armed risk
+        snapshot is persisted so later restarts restore Armed.
+        """
+        # One locked transaction: validation, existing-state detection, the
+        # durable audit event, the state transition, and the nonce commit are
+        # all serialized so two concurrent callers cannot double-initialize.
+        with self._lock:
+            reason = validate_initialization(
+                initialization, self._seen_init_nonces,
+                authorized_approvers=self.config.authorized_approvers,
+            )
+            if reason:
+                self._record_init_refusal(reason)
+                raise RuntimeError(f"Cannot initialize session: kill_reason={reason}")
+            if self._event_store.replay_by_type("RiskStateSnapshot"):
+                self._record_init_refusal("initialization_conflicts_with_existing_state")
+                raise RuntimeError(
+                    "Cannot initialize session: kill_reason="
+                    "initialization_conflicts_with_existing_state")
+
+            # Durable audit FIRST: never arm a gate without its audit trail.
+            # If the audit event cannot be persisted, refuse while the gate
+            # is still fail-closed held and no nonce has been consumed.
+            try:
+                self._event_store.append(EventEnvelope(
+                    "SessionInitialized", "SessionInitialization", "system",
+                    "titan_python",
+                    json.dumps({
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "approvers": [a.approver for a in initialization.approvers],
+                        "rationale": initialization.rationale,
+                        "nonce": initialization.nonce,
+                    }),
+                ))
+            except Exception as e:
+                if self.logger:
+                    self.logger.error("engine", f"SessionInitialized append failed: {e}")
+                raise RuntimeError(
+                    f"Cannot initialize session: kill_reason="
+                    f"initialization_audit_write_failed ({e})") from e
+
+            # Arm, then persist the Armed snapshot. On persistence failure,
+            # restore the held state so an Armed in-memory gate can never
+            # outlive a failed initialization.
+            self.risk_gate._initialize_armed()
+            try:
+                self._save_state(raise_on_error=True)
+            except Exception as e:
+                if not self.risk_gate.kill_switch.blocks_routing():
+                    self.risk_gate.trigger_kill_switch()
+                raise RuntimeError(
+                    f"Cannot initialize session: kill_reason="
+                    f"initialization_persistence_failed ({e})") from e
+
+            # Nonce committed LAST — only a fully-durable init consumes it.
+            self._seen_init_nonces.add(initialization.nonce)
+            if self.logger:
+                self.logger.info("engine", "Session initialized (explicit, audited)")
 
     def release_kill_switch(self) -> None:
         """Resume a halted session.

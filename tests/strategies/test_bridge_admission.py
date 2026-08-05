@@ -11,6 +11,7 @@ Gates covered:
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fixtures.session_init import initialize_fresh
 
 import titan.strategies.registrations  # noqa: F401
 from titan._core import (
@@ -39,6 +40,7 @@ def _engine() -> PaperTradingEngine:
         currency="USD", starting_capital="100000", account_id="test-1", state_path="",
     )
     engine = PaperTradingEngine(cfg, SimulatedAdapter())
+    initialize_fresh(engine)
     engine.start()
     engine.register_instrument(
         Instrument(InstrumentId("SPY", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)

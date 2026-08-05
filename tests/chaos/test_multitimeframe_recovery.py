@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from fixtures.session_init import initialize_fresh
 
 from titan._core import (
     ContractType,
@@ -48,6 +49,7 @@ class TestMultiTimeframeRecovery:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, FakeIBKRPaperAdapter(FakeTransport()))
+        initialize_fresh(engine)
         engine.start()
         for sym in ("SPY",):
             engine.register_instrument(
@@ -75,6 +77,7 @@ class TestMultiTimeframeRecovery:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, FakeIBKRPaperAdapter(FakeTransport()))
+        initialize_fresh(engine)
         engine.start()
         engine.stop()
 
@@ -84,6 +87,7 @@ class TestMultiTimeframeRecovery:
 
     def test_empty_portfolio_reconciles(self, _base_config):
         engine = PaperTradingEngine(_base_config, FakeIBKRPaperAdapter(FakeTransport()))
+        initialize_fresh(engine)
         engine.start()
         result = engine.reconcile()
         assert result is not None
@@ -92,6 +96,7 @@ class TestMultiTimeframeRecovery:
         cfg = _base_config
         cfg.state_path = str(tmp_path / "reconnect_state.json")
         engine = PaperTradingEngine(cfg, FakeIBKRPaperAdapter(FakeTransport()))
+        initialize_fresh(engine)
         engine.start()
         engine.stop()
 
@@ -115,6 +120,9 @@ class TestMultiTimeframeRecovery:
         config = _base_config
         config.state_path = str(state_file)
 
+        # No initialization here ON PURPOSE: this test verifies that a corrupt
+        # state file fails closed and halts routing. Initializing would persist
+        # an Armed snapshot and bypass the corrupt-state path.
         engine = PaperTradingEngine(config, FakeIBKRPaperAdapter(FakeTransport()))
         engine.start()
         assert engine.risk_gate.kill_switch.blocks_routing()
@@ -125,6 +133,7 @@ class TestMultiTimeframeRecovery:
         config.state_path = str(state_file)
 
         engine = PaperTradingEngine(config, FakeIBKRPaperAdapter(FakeTransport()))
+        initialize_fresh(engine)
         engine.start()
         engine.trigger_kill_switch()
 

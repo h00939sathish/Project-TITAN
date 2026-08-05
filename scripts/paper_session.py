@@ -687,6 +687,7 @@ def main() -> None:
         sys.exit(1)
     logger.info("phase_j", f"Session {session.session_id} started")
     print(f"Session {session.session_id} started — Phase J ({args.mode}) running", flush=True)
+
     if shadow:
         shadow._session_id = session.session_id
 
