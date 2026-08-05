@@ -42,9 +42,15 @@ genuinely brand-new environment. There is no safe way to auto-arm it.
    `RiskStateSnapshot` already exists (`initialization_conflicts_with_existing_state`),
    so it cannot be used to arm a killed session back to trade without going through
    the release discipline.
-5. **Distinct from ordinary startup.** Initialization is an explicit operator action
-   (CLI `--init ...` on `paper_session.py`, or a direct method call); it is never
-   triggered implicitly by an empty store.
+5. **Distinct from ordinary startup — a dedicated command.** Initialization is a
+   privileged, irreversible safety action, NOT a paper_session startup flag. It is
+   invoked only via the standalone operator command
+   `python scripts/init_session.py --state-path <session state> --approver A --approver B
+   --rationale "..."` (interactive confirmation unless `--yes`; refuses on fewer
+   than two distinct approvers, missing rationale, or existing risk state). A
+   dedicated command makes intent, authorization, auditing, and operator runbooks
+   unambiguous and reduces accidental invocation. It is never triggered implicitly
+   by an empty store.
 6. **Tests may use an explicit test-only initialization fixture.** Production
    defaults remain fail-closed; the fixture only arms engines under test.
 

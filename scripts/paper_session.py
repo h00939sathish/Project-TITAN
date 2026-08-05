@@ -358,24 +358,6 @@ def main() -> None:
         help="Session mode: simulation | paper-preflight | broker-paper (Alpaca, requires .env credentials)",
     )
     parser.add_argument(
-        "--init", action="store_true",
-        help="Explicitly initialize a NEW session (operator-controlled, audited; refuses if risk "
-             "state already exists). Requires --init-approver x2 and --init-rationale. Never "
-             "implied by an empty store.",
-    )
-    parser.add_argument(
-        "--init-approver", action="append",
-        help="Initialization approver (provide at least twice, distinct)",
-    )
-    parser.add_argument(
-        "--init-rationale", default="",
-        help="Initialization rationale (durable audit field)",
-    )
-    parser.add_argument(
-        "--init-expiry-min", type=int, default=15,
-        help="Initialization authorization lifetime in minutes (bounded expiry)",
-    )
-    parser.add_argument(
         "--instruments", default="SPY,QQQ",
         help="Comma-separated instrument list (default: SPY,QQQ)",
     )
@@ -718,32 +700,6 @@ def main() -> None:
     logger.info("phase_j", f"Session {session.session_id} started")
     print(f"Session {session.session_id} started — Phase J ({args.mode}) running", flush=True)
 
-    if args.init:
-        # Explicit operator-controlled initialization of a NEW environment.
-        # Distinct from ordinary startup; never implied by an empty store.
-        try:
-            from datetime import datetime, timedelta, timezone
-            from titan.risk.release_authorization import ReleaseApproval
-            from titan.risk.session_initialization import (
-                SessionInitialization, new_nonce)
-            now = datetime.now(timezone.utc)
-            init = SessionInitialization(
-                approvers=[ReleaseApproval(a.strip(), now.isoformat())
-                           for a in (args.init_approver or [])],
-                rationale=args.init_rationale,
-                issued_at=now.isoformat(),
-                expiry=(now + timedelta(minutes=args.init_expiry_min)).isoformat(),
-                nonce=new_nonce(),
-            )
-            engine.initialize_new_session(init)
-            print(f"Session INITIALIZED (audited; approvers={args.init_approver})",
-                  flush=True)
-        except Exception as e:
-            print(f"FATAL: session initialization refused: {e}", flush=True)
-            logger.error("phase_j", f"Session init failed: {e}")
-            if log_handler:
-                log_handler.close()
-            sys.exit(1)
     if shadow:
         shadow._session_id = session.session_id
 
