@@ -259,9 +259,7 @@ class PaperTradingEngine:
                 self.logger.warning("engine", f"Startup sync: position fetch failed: {exc}")
 
         if snapshot_fetch_failed:
-            if not self.risk_gate.kill_switch.blocks_routing():
-                self.risk_gate.trigger_kill_switch()
-                kill_switch_triggered.inc()
+            self.trigger_kill_switch(reason="startup_broker_sync_failed")
             return
 
         if broker_cash is not None:
@@ -425,7 +423,7 @@ class PaperTradingEngine:
             else:
                 if self.logger:
                     self.logger.error("engine", "Corrupt order_count state — halting routing")
-                self.risk_gate.trigger_kill_switch()
+                self.trigger_kill_switch(reason="corrupt_order_count_state")
 
         saved_pnl = pf.get("realized_pnl", {})
         if saved_pnl and saved_pnl["amount"] != self.portfolio.realized_pnl.amount:
@@ -474,8 +472,7 @@ class PaperTradingEngine:
                 # Fail closed, but idempotently: with strict recovery the gate is
                 # ALREADY Triggered/Halted here (empty/corrupt store restored
                 # fail-closed), so only trigger when routing is not yet blocked.
-                if not self.risk_gate.kill_switch.blocks_routing():
-                    self.risk_gate.trigger_kill_switch()
+                self.trigger_kill_switch(reason="corrupt_portfolio_snapshot")
                 return True
 
         snapshot = self._read_latest_portfolio_snapshot()
@@ -1074,9 +1071,7 @@ class PaperTradingEngine:
                                                       "drift_count": len(result.position_drifts),
                                                       "severity": str(result.severity),
                                                       "action": "trigger_kill_switch"})
-                if not self.risk_gate.kill_switch.blocks_routing():
-                    self.risk_gate.trigger_kill_switch()
-                    kill_switch_triggered.inc()
+                self.trigger_kill_switch(reason="release_re_trigger_causal_condition")
                 self._save_state()
             elif self.logger:
                 from titan.operations._logging_integration import log_reconciliation
@@ -1140,14 +1135,38 @@ class PaperTradingEngine:
                 }
             return stats
 
-    def trigger_kill_switch(self) -> None:
+    def trigger_kill_switch(self, reason: str = "operator_or_system_trigger") -> None:
         if self._kill_correlation is None:
             self._kill_correlation = f"ks-{uuid.uuid4().hex[:12]}"
-        self.risk_gate.trigger_kill_switch()
-        self._save_state()
+        if not self.risk_gate.kill_switch.is_triggered():
+            self.risk_gate.trigger_kill_switch()
+            # Durable audit event: recorded ONLY on a real transition, so a
+            # held/restored gate (fail-closed) never mints spurious triggers.
+            try:
+                self._event_store.append(EventEnvelope(
+                    "KillSwitchTriggered", "RiskControl", self._kill_correlation,
+                    "titan_python",
+                    json.dumps({
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "reason": reason,
+                        "correlation_id": self._kill_correlation,
+                    }),
+                ))
+            except Exception as e:
+                if self.logger:
+                    self.logger.error("engine", f"KillSwitchTriggered append failed: {e}")
+        # Snapshot save is best-effort here: the durable event is already
+        # appended above, and a save failure must not mask the trigger outcome
+        # (e.g. the init-persistence-failure path re-raises its own error).
+        try:
+            self._save_state()
+        except Exception as e:
+            if self.logger:
+                self.logger.error("engine", f"KillSwitchTriggered state save failed: {e}")
         kill_switch_triggered.inc()
         if self.logger:
-            self.logger.warning("engine", "Kill switch triggered")
+            self.logger.warning("engine", f"Kill switch triggered: reason={reason}")
+
 
     def _record_init_refusal(self, reason: str) -> None:
         """Durable audit record for a refused initialization.
@@ -1230,8 +1249,7 @@ class PaperTradingEngine:
             try:
                 self._save_state(raise_on_error=True)
             except Exception as e:
-                if not self.risk_gate.kill_switch.blocks_routing():
-                    self.risk_gate.trigger_kill_switch()
+                self.trigger_kill_switch(reason="initialization_persistence_failed")
                 raise RuntimeError(
                     f"Cannot initialize session: kill_reason="
                     f"initialization_persistence_failed ({e})") from e

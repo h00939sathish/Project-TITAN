@@ -1,7 +1,13 @@
-"""Tests for the SQLite-backed event store."""
-
 import os
+import sys
+from pathlib import Path
+
+_SRC = str(Path(__file__).parent.parent / "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
 import tempfile
+
 
 from titan._core import EventEnvelope, EventStore
 
@@ -124,3 +130,25 @@ class TestEventStore:
         # Verify exactly match
         assert m1.current == m2.current
         assert m1.current == OrderState.Filled
+
+    def test_trigger_kill_switch_records_durable_event_with_reason(self) -> None:
+        import json
+        from titan.execution.engine import PaperTradingEngine, PaperConfig
+        from titan.execution.simulated_adapter import SimulatedAdapter
+        from titan._core import RiskConfig, Money, ReconciliationConfig
+        from tests.fixtures.session_init import initialize_fresh
+
+        risk = RiskConfig([], Money("100000", "USD"), 100, 100, Money("1000000", "USD"), 0.10, Money("5000", "USD"), 5000, 60000)
+        config = PaperConfig(risk_config=risk, reconciliation_config=ReconciliationConfig(), currency="USD", starting_capital="100000", account_id="ks-test-1", state_path="")
+        engine = PaperTradingEngine(config, SimulatedAdapter())
+        # Arm the fresh engine (ADR-020): a genuine Armed -> Triggered transition
+        # is required for the durable KillSwitchTriggered event to be recorded.
+        initialize_fresh(engine)
+        engine.trigger_kill_switch(reason="test_critical_reconciliation_drift")
+
+        events = engine._event_store.replay_by_type("KillSwitchTriggered")
+        assert len(events) == 1
+        payload = json.loads(events[0].payload)
+        assert payload["reason"] == "test_critical_reconciliation_drift"
+        assert payload["correlation_id"].startswith("ks-")
+
