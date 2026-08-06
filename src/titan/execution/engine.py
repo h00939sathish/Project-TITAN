@@ -9,7 +9,7 @@ from collections import Counter, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from titan._core import (
     ApprovedOrderIntent,
@@ -36,6 +36,11 @@ from titan._core import (
 )
 
 from titan.operations.logging import StructuredLogger, LogSeverity
+from titan.data.feed_health import FeedHealthVerdict
+from titan.risk.release_authorization import (
+    ReleaseAuthorization,
+    validate as validate_release_auth,
+)
 from titan.risk.session_initialization import (
     SessionInitialization,
     validate as validate_initialization,
@@ -111,10 +116,14 @@ class PaperTradingEngine:
     """
 
     def __init__(self, config: PaperConfig, adapter: BrokerAdapter,
-                 logger: Optional[StructuredLogger] = None):
+                 logger: Optional[StructuredLogger] = None,
+                 feed_health: Optional[Callable[[], FeedHealthVerdict]] = None):
         self.config = config
         self.adapter = adapter
         self.logger = logger
+        # Read-only market-data health provider for the release gate (ADR-019).
+        # None => release fails closed with feed_health_absent.
+        self._feed_health = feed_health
         store_path = config.state_path.replace(".json", ".db") if config.state_path else ":memory:"
         self._event_store = EventStore(store_path)
         # Fail-closed restore: missing/unreadable/deleted risk state restores
@@ -160,6 +169,12 @@ class PaperTradingEngine:
         self._lock = threading.RLock()
         self._poller_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        # Kill-switch release gate state (ADR-019): correlation of the current
+        # trigger, nonces of already-consumed authorizations (replay protection),
+        # and the durable refusal ledger (kept separate from the kill reason).
+        self._kill_correlation: Optional[str] = None
+        self._seen_release_nonces: set[str] = set()
+        self._release_refusals: list[dict] = []
 
 
     def _restore_order_states(self) -> None:
@@ -492,13 +507,15 @@ class PaperTradingEngine:
         key = instrument_id or instrument.instrument_id.symbol
         self.instruments[key] = instrument
 
-    def _check_adapter_health(self) -> bool:
+    def _check_adapter_health(self, force: bool = False) -> bool:
         """Check adapter health. Returns True if healthy, False if down.
 
-        On first failure, auto-triggers kill switch (fail-closed).
+        On first failure, auto-triggers kill switch (fail-closed). Pass
+        force=True to bypass the short TTL cache (used by the release gate's
+        TOCTOU re-check so it reads live state, not a cached verdict).
         """
         now = time.monotonic()
-        if self._health_cache and (now - self._health_cache[0]) < self._health_cache_ttl:
+        if not force and self._health_cache and (now - self._health_cache[0]) < self._health_cache_ttl:
             return self._health_cache[1]
         try:
             health = self.adapter.heartbeat()
@@ -1124,7 +1141,8 @@ class PaperTradingEngine:
             return stats
 
     def trigger_kill_switch(self) -> None:
-
+        if self._kill_correlation is None:
+            self._kill_correlation = f"ks-{uuid.uuid4().hex[:12]}"
         self.risk_gate.trigger_kill_switch()
         self._save_state()
         kill_switch_triggered.inc()
@@ -1223,42 +1241,143 @@ class PaperTradingEngine:
             if self.logger:
                 self.logger.info("engine", "Session initialized (explicit, audited)")
 
-    def release_kill_switch(self) -> None:
-        """Resume a halted session.
+    def _evaluate_feed_health(self) -> FeedHealthVerdict:
+        """Fail-closed feed-health verdict. No provider => feed_health_absent."""
+        if self._feed_health is None:
+            return FeedHealthVerdict(False, "feed_health_absent", {},
+                                     datetime.now(timezone.utc).isoformat())
+        try:
+            verdict = self._feed_health()
+        except Exception:
+            return FeedHealthVerdict(False, "feed_health_error", {},
+                                     datetime.now(timezone.utc).isoformat())
+        return verdict if verdict is not None else FeedHealthVerdict(
+            False, "feed_health_error", {}, datetime.now(timezone.utc).isoformat())
 
-        Idempotent by design: if the kill switch is not held (state Armed or
-        Released), the release is a no-op and returns cleanly instead of
-        trying an illegal state transition (the Rust machine only allows
-        Triggered -> Releasing -> Released). When held, it reconciles first
-        and refuses on critical drift, surfacing a structured reason so a
-        caller can echo why the release was denied.
+    def _record_release_refusal(self, reason: str, details: Optional[dict] = None) -> None:
+        """Durable release-refusal audit entry, kept separate from the kill reason."""
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "correlation": self._kill_correlation,
+            "reason": reason,
+            "details": details or {},
+        }
+        self._release_refusals.append(entry)
+        try:
+            self._event_store.append(EventEnvelope(
+                "ReleaseRefusal", "KillSwitchRelease", "system", "titan_python",
+                json.dumps(entry),
+            ))
+        except Exception:
+            pass
+        if self.logger:
+            self.logger.warning("engine", f"Kill switch release refused: {reason}")
+
+    def _require_release_authorization(
+        self, authorization: Optional[ReleaseAuthorization]
+    ) -> None:
+        """Enforce the RISK_POLICY release authority model (ADR-019)."""
+        code = validate_release_auth(
+            authorization,
+            self._kill_correlation,
+            seen_nonces=self._seen_release_nonces,
+        )
+        if code:
+            self._record_release_refusal(code)
+            raise RuntimeError(f"Cannot release kill switch: kill_reason={code}")
+        # NOTE: the nonce is NOT consumed here. It is marked seen only on a
+        # successful release commit, so a refusal (transient feed/adapter/
+        # reconcile hiccup) does not burn a still-valid authorization record.
+
+    def release_kill_switch(
+        self, authorization: Optional[ReleaseAuthorization] = None
+    ) -> None:
+        """Release the kill switch under the ADR-019 / RISK_POLICY gate.
+
+        Sequence: not-held no-op -> authorization (two approved humans,
+        correlation, assessment+remediation, expiry, nonce) -> reconcile
+        (refuse on Critical drift) -> adapter health -> data-feed health
+        (fail-closed) -> TOCTOU re-verification -> Released -> Active commit.
+        Original kill trigger cause is preserved; every refusal is recorded
+        separately in the durable ledger. The gate + commit run under
+        self._lock so the TOCTOU re-checks and the transition are atomic
+        against the background poller thread.
         """
-        # 1) Not held -> nothing to release. No-op, not an error.
         if not self.risk_gate.kill_switch.blocks_routing():
             if self.logger:
                 self.logger.info("engine", "Kill switch release: not held (no-op)")
             return
 
-        # 2) Held: refuse on genuine critical drift, with a reason code.
-        result = self.reconcile()
-        if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
-            raise RuntimeError(
-                f"Cannot release kill switch: "
-                f"kill_reason=critical_reconcile_drift "
-                f"({len(result.position_drifts)} position drifts, "
-                f"cash drift {result.cash_drift})"
-            )
+        with self._lock:
+            # 0a) Authorization authority model (two approved humans, etc.).
+            self._require_release_authorization(authorization)
 
-        # 3) Complete the transition. Covers both held states: Triggered needs
-        #    the initiator step, Releasing jumps straight to completion.
-        if self.risk_gate.kill_switch.is_triggered():
-            self.risk_gate.release_initiated()
-        self.risk_gate.release_completed()
-        if self.risk_gate.trading_state != TradingState.Active:
-            self.risk_gate.set_trading_state(TradingState.Active)
-        self._save_state()
-        if self.logger:
-            self.logger.info("engine", "Kill switch released")
+            # 1) Held: refuse on genuine critical drift, with a reason code.
+            result = self.reconcile()
+            if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
+                self._record_release_refusal("critical_reconcile_drift", {
+                    "position_drifts": len(result.position_drifts),
+                    "cash_drift": result.cash_drift,
+                })
+                raise RuntimeError(
+                    f"Cannot release kill switch: "
+                    f"kill_reason=critical_reconcile_drift "
+                    f"({len(result.position_drifts)} position drifts, "
+                    f"cash drift {result.cash_drift})"
+                )
+
+            # 2) Broker adapter health — an ADDITIONAL predicate, not the fix.
+            if not self._check_adapter_health():
+                self._record_release_refusal("adapter_down")
+                raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down")
+
+            # 3) Verified control health (ADR-019): data-feed snapshot, fail-closed.
+            verdict = self._evaluate_feed_health()
+            if not verdict.healthy:
+                self._record_release_refusal(verdict.reason, {"watermarks": verdict.watermarks})
+                raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict.reason}")
+
+            # 4) TOCTOU: re-verify everything immediately before the commit,
+            #    bypassing caches so the re-check is a fresh live read.
+            if not self.risk_gate.kill_switch.is_triggered():
+                self._record_release_refusal("state_changed")
+                raise RuntimeError("Cannot release kill switch: kill_reason=state_changed")
+            result2 = self.reconcile()
+            if result2.severity is not None and result2.severity == ReconciliationDriftSeverity.Critical:
+                self._record_release_refusal("critical_reconcile_drift_toctou")
+                raise RuntimeError("Cannot release kill switch: kill_reason=critical_reconcile_drift_toctou")
+            if not self._check_adapter_health(force=True):
+                self._record_release_refusal("adapter_down_toctou")
+                raise RuntimeError("Cannot release kill switch: kill_reason=adapter_down_toctou")
+            verdict2 = self._evaluate_feed_health()
+            if not verdict2.healthy:
+                self._record_release_refusal(verdict2.reason, {"watermarks": verdict2.watermarks})
+                raise RuntimeError(f"Cannot release kill switch: kill_reason={verdict2.reason}")
+
+            # 5) Commit the transition: Triggered -> Releasing -> Released -> Active.
+            #    Consume the nonce ONLY on success so a refusal (transient feed /
+            #    adapter / reconcile hiccup) does not burn a still-valid record.
+            if self.risk_gate.kill_switch.is_triggered():
+                self.risk_gate.release_initiated()
+            self.risk_gate.release_completed()
+            if self.risk_gate.trading_state != TradingState.Active:
+                self.risk_gate.set_trading_state(TradingState.Active)
+            if authorization is not None and authorization.nonce:
+                self._seen_release_nonces.add(authorization.nonce)
+            self._save_state()
+            try:
+                self._event_store.append(EventEnvelope(
+                    "KillSwitchReleased", "KillSwitchRelease", "system", "titan_python",
+                    json.dumps({
+                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "correlation": self._kill_correlation,
+                        "authorization_nonce": authorization.nonce if authorization else "",
+                    }),
+                ))
+            except Exception:
+                pass
+            if self.logger:
+                self.logger.info("engine", "Kill switch released")
 
     def _resolve_fills(
         self,
