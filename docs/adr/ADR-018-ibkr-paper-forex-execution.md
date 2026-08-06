@@ -1,6 +1,10 @@
 # ADR-018: Gate IBKR paper forex execution behind a dedicated broker boundary
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-08-06, Risk Owner decision — FX paper trading
+  enabled in the TITAN paper session; implementation on master: CASH/IDEALPRO
+  contracts (ibkr_adapter._contract, tws_feed), micro-lot sizing at the session
+  layer (paper_session.py:631-645), feed-health per-instrument coverage
+  certified for EURUSD/GBPUSD/XAUUSD; Forex.spec.md in force)
 - **Date:** 2026-07-29
 - **Owners:** Architecture Council, Risk Owner, Execution Platform
 - **Decision scope:** IBKR TWS/Gateway paper-only forex contract routing and reconciliation

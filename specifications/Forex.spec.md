@@ -1,7 +1,8 @@
 # Forex Broker Execution Specification
 
 > **Owner:** Execution Platform and Risk Owner
-> **Status:** Proposed — not approved for IBKR paper or live execution
+> **Status:** Accepted for IBKR **paper** execution (2026-08-06, Risk Owner).
+> Not approved for live execution; micro-lot sizing enforced at the session layer.
 > **Date:** 2026-07-29
 > **Depends on:** `Broker.spec.md`, `Risk.spec.md`, ADR-014, proposed ADR-018
 
