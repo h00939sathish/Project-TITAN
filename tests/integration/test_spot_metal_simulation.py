@@ -5,6 +5,7 @@ from titan._core import Money, ReconciliationConfig, RiskConfig, TradeIntent
 
 from titan.data.spot_metals import spot_metal_instrument
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
+from tests.fixtures.session_init import initialize_fresh
 
 
 def test_engine_rejects_unregistered_xauusd():
@@ -20,7 +21,9 @@ def test_engine_rejects_unregistered_xauusd():
         state_path="",
     )
     engine = PaperTradingEngine(config, SimulatedAdapter())
+    initialize_fresh(engine)
     engine.start()
+
 
     intent = TradeIntent(
         strategy_id="test", strategy_package_digest="v1",
@@ -51,8 +54,10 @@ def test_xauusd_round_trip_with_simulated_adapter():
     )
     engine = PaperTradingEngine(config, SimulatedAdapter())
     engine.register_instrument(inst)
+    initialize_fresh(engine)
     engine.start()
     engine._last_prices["XAUUSD"] = "2350.00"
+
 
     intent = TradeIntent(
         strategy_id="test", strategy_package_digest="v1",

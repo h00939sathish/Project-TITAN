@@ -30,15 +30,23 @@ class Hypothesis:
 
     id: str
     title: str
-    economic_rationale: str
-    strategy_id: str
-    instrument: str
-    universe: str
-    calendar: str
-    train_period: str
-    test_period: str
-    success_criteria: list[str]
-    failure_criteria: list[str]
+    economic_rationale: str = ""
+    strategy_id: str = ""
+    instrument: str = ""
+    universe: str = ""
+    calendar: str = ""
+    train_period: str = ""
+    test_period: str = ""
+    success_criteria: list[str] = field(default_factory=list)
+    failure_criteria: list[str] = field(default_factory=list)
+    category: str = "General"
+    mechanism: str = ""
+    economic_driver: str = ""
+    kill_criteria: tuple[str, ...] = ()
+    plausibility: int = 0
+    impact: int = 0
+    novelty: int = 0
+    effort: int = 0
     strategy_params: dict[str, Any] = field(default_factory=dict)
     costs: str = ""
     expected_trade_frequency: str = ""
@@ -60,18 +68,15 @@ class Hypothesis:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Hypothesis":
         """Rebuild a Hypothesis from the dict produced by to_dict()."""
-        return cls(**{k: v for k, v in d.items() if k in (
-            "id", "title", "economic_rationale", "strategy_id", "strategy_params",
-            "instrument", "universe", "calendar", "train_period", "test_period",
-            "success_criteria", "failure_criteria", "costs",
-            "expected_trade_frequency", "sample_adequacy_policy",
-            "path_b_evidence_standard", "status", "preregistered_at", "notes",
-        )})
+        valid_fields = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in d.items() if k in valid_fields})
+
 
     @property
     def priority_score(self) -> float:
-        """Placeholder priority — retained for back-compat with any callers."""
-        return 0.0
+        eff = max(self.effort, 1)
+        return (self.plausibility + self.impact + self.novelty) / eff
+
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

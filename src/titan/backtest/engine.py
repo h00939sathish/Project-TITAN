@@ -1,7 +1,7 @@
 """Replay engine: drives a historical bar loop through PaperTradingEngine."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 
@@ -12,6 +12,12 @@ from ..execution.backtest_adapter import BacktestAdapter
 from ..execution.engine import PaperConfig, PaperTradingEngine
 from ..backtest.fills import BarConservativeFillModel
 from .._core import ContractType, Instrument, InstrumentId, TradeIntent, Money, RiskConfig
+from ..risk.session_initialization import (
+    InitializerApproval,
+    SessionInitialization,
+    new_nonce as _init_nonce,
+)
+
 
 
 @dataclass
@@ -112,6 +118,17 @@ class ReplayEngine:
         for instr_id in instrument_ids:
             inst = Instrument(InstrumentId(instr_id, "BACKTEST"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
             engine.register_instrument(inst)
+        now = datetime.now(timezone.utc)
+        engine.initialize_new_session(SessionInitialization(
+            approvers=[
+                InitializerApproval("backtest-engine", now.isoformat()),
+                InitializerApproval("replay-runner", now.isoformat()),
+            ],
+            rationale="ReplayEngine explicitly arms its fresh in-memory session (ADR-020)",
+            issued_at=now.isoformat(),
+            expiry=(now + timedelta(minutes=30)).isoformat(),
+            nonce=_init_nonce("backtest"),
+        ))
         engine.start()
 
         result = BacktestResult()

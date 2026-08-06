@@ -6,6 +6,7 @@ from titan._core import ContractType, Money, ReconciliationConfig, RiskConfig, T
 
 from titan.data.forex_pairs import FOREX_SYMBOLS, forex_instrument
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
+from tests.fixtures.session_init import initialize_fresh
 
 
 def test_forex_instrument_registration():
@@ -48,6 +49,9 @@ def test_forex_market_order_through_engine():
 
     engine = PaperTradingEngine(config, SimulatedAdapter())
     engine.register_instrument(inst)
+    initialize_fresh(engine)
+    engine.start()
+
 
     # Register a price so risk checks pass
     engine._last_prices["EURUSD"] = "1.1000"

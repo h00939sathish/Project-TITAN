@@ -27,3 +27,5 @@ def initialize_fresh(engine) -> None:
         nonce=new_nonce("test"),
     )
     engine.initialize_new_session(init)
+
+

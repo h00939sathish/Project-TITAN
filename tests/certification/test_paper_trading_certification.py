@@ -5,6 +5,8 @@ from pathlib import Path
 from titan.data.approved import load_approved
 from titan.execution.engine import PaperTradingEngine, PaperConfig
 from titan.execution.simulated_adapter import SimulatedAdapter, SimFillQuality
+from tests.fixtures.session_init import initialize_fresh
+
 from titan._core import (
     PortfolioEngine,
     Money,
@@ -66,7 +68,9 @@ def test_multi_session_paper_execution_and_certification():
         Instrument(InstrumentId("SPY", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
     )
 
+    initialize_fresh(engine)
     engine.start()
+
 
     # Session 1: Submit TradeIntent
     now_iso = datetime.now(timezone.utc).isoformat()
