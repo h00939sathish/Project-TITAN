@@ -64,3 +64,23 @@ def test_promotion_gate_passes_when_all_mandatory_gates_satisfied(temp_db):
     assert gates_by_name["parameter_stability"]["passed"] is True
     assert gates_by_name["independent_replication"]["passed"] is True
     assert gates_by_name["portfolio_impact"]["passed"] is True
+
+def test_portfolio_impact_fails_closed_without_return_series(temp_db):
+    """Portfolio impact must NOT pass by default when no correlation metric and
+    no derivable return series exist (regression: old code returned True here)."""
+    db = ResearchDB(str(temp_db))
+    db.set_qualification(
+        strategy_id="no-signal-strategy",
+        status="WATCHLIST",
+        backtest_sharpe=1.5,
+        wf_sharpe=1.1,
+        notes="plateau_stability=0.85 replication_sharpe=1.20",  # no max_correlation
+    )
+    db.close()
+
+    gate = PromotionGate(db_path=temp_db, bars=[{"close": 100.0 + i} for i in range(20)])
+    result = gate.evaluate("no-signal-strategy")
+    gates_by_name = {g["name"]: g for g in result["gates"]}
+    # Strategy is not in the registry -> no return series derivable -> fail closed
+    assert gates_by_name["portfolio_impact"]["passed"] is False
+    assert result["passed"] is False
