@@ -19,6 +19,7 @@ from titan.execution.engine import PaperConfig, PaperTradingEngine
 from titan.runtime.events import MarketEvent, TradeProposal
 from titan.strategies.timeframes import Timeframe
 from tests.adapters.test_ibkr_paper_adapter import FakeIBKRPaperAdapter, FakeTransport
+from tests.fixtures.session_init import initialize_fresh
 
 
 class TestMultiTimeframePaperPath:
@@ -48,6 +49,9 @@ class TestMultiTimeframePaperPath:
         self.transport = FakeTransport()
         self.adapter = FakeIBKRPaperAdapter(self.transport)
         self.engine = PaperTradingEngine(self.config, self.adapter)
+        initialize_fresh(self.engine)
+        self.engine.start()
+
 
     def _bar_closed_event(
         self, instrument_id: str, timeframe: Timeframe, close: float
@@ -168,8 +172,10 @@ def engine_with_fake(tmp_path):
     )
     adapter = FakeIBKRPaperAdapter(FakeTransport())
     engine = PaperTradingEngine(config, adapter)
+    initialize_fresh(engine)
     engine.start()
     return engine
+
 
 
 @pytest.fixture

@@ -13,6 +13,7 @@ from titan._core import (
 )
 from titan.execution.simulated_adapter import SimulatedAdapter
 from titan.execution.engine import PaperConfig, PaperTradingEngine
+from tests.fixtures.session_init import initialize_fresh
 from titan.runtime.events import MarketEvent, StrategyDefinition, TriggerSpec, DecisionTrace
 from titan.runtime.evaluator import RuntimeEvaluator
 from titan.strategies.timeframes import Timeframe
@@ -124,7 +125,9 @@ def harness(tmp_path):
     )
     adapter = SimulatedAdapter()
     engine = PaperTradingEngine(config, adapter)
+    initialize_fresh(engine)
     engine.start()
+
 
     inst = Instrument(
         InstrumentId("SPY", "SMART"),

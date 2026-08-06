@@ -18,6 +18,8 @@ from titan.data.manifest import DataManifest
 from titan.data.normalize import normalize_row
 from titan.data.quality import validate_and_quarantine
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
+from tests.fixtures.session_init import initialize_fresh
+
 
 
 class TestForexDataPipelineRoundTrip:
@@ -67,7 +69,10 @@ class TestForexDataPipelineRoundTrip:
         )
         engine = PaperTradingEngine(config, SimulatedAdapter())
         engine.register_instrument(inst)
+        initialize_fresh(engine)
+        engine.start()
         engine._last_prices["EURUSD"] = "1.1000"
+
 
         intent = TradeIntent(
             strategy_id="test", strategy_package_digest="v1",
@@ -128,7 +133,10 @@ class TestGoldDataPipelineRoundTrip:
         )
         engine = PaperTradingEngine(config, SimulatedAdapter())
         engine.register_instrument(inst)
+        initialize_fresh(engine)
+        engine.start()
         engine._last_prices["XAUUSD"] = "2350.00"
+
 
         intent = TradeIntent(
             strategy_id="test", strategy_package_digest="v1",
@@ -190,7 +198,10 @@ class TestEquityDataPipelineRoundTrip:
         )
         engine = PaperTradingEngine(config, SimulatedAdapter())
         engine.register_instrument(inst)
+        initialize_fresh(engine)
+        engine.start()
         engine._last_prices["SPY"] = "500.00"
+
 
         intent = TradeIntent(
             strategy_id="test", strategy_package_digest="v1",
