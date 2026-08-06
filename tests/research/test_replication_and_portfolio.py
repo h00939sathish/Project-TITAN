@@ -50,3 +50,51 @@ def test_portfolio_impact_evaluator_adds_value():
     assert report.adds_portfolio_value
     assert report.incremental_sharpe > 0
     assert "[ADDS PORTFOLIO VALUE]" in report.summary()
+
+def test_replication_engine_computes_real_correlation():
+    engine = ReplicationEngine()
+    sc = OptimizationValidationScorecard(
+        strategy_id="orb", timeframe="15m", universe=("SPY", "QQQ"),
+        best_params={"oos_sharpe": 1.2}, avg_plateau_stability=0.8,
+        avg_plateau_coverage=0.25, cross_instrument_consistency=0.8,
+        walk_forward_passed=True, bootstrap_passed=True,
+        passed_all_checks=True, rejection_reasons=(),
+    )
+    primary = [0.001, 0.002, -0.001, 0.003, -0.002, 0.0015]
+    # Perfectly positively correlated replication series
+    same = [2.0 * x for x in primary]
+    rep_pos = engine.evaluate_replication(
+        "H-CORR", sc, sc, primary_returns=primary, replication_returns=same)
+    assert abs(rep_pos.correlation_between_returns - 1.0) < 1e-3
+    assert rep_pos.confidence_level == "HIGH"  # real OOS Sharpes in [1.0, 1.5)
+
+    neg = [-x for x in primary]
+    rep_neg = engine.evaluate_replication(
+        "H-CORR-N", sc, sc, primary_returns=primary, replication_returns=neg)
+    assert abs(rep_neg.correlation_between_returns + 1.0) < 1e-3
+
+
+def test_portfolio_impact_computes_real_drawdown_contribution():
+    evaluator = PortfolioImpactEvaluator()
+    # Baseline portfolio: smooth positive returns => ~zero drawdown
+    existing = [[0.005] * 8]
+    # Candidate crashes hard mid-series
+    crash = [0.005, 0.005, -0.50, 0.005, 0.005, 0.005, 0.005, 0.005]
+    report = evaluator.evaluate_candidate("CRASH", crash, existing)
+    # Real series math: equal-weighted combined series drops ~24.5% at the crash
+    assert report.marginal_drawdown_contribution_pct > 20.0
+    assert report.marginal_drawdown_contribution_pct < 30.0
+
+    # A benign candidate (no crash) contributes far less drawdown
+    benign = [0.005, -0.002, 0.003, 0.004, -0.001, 0.002, 0.003, -0.001]
+    report2 = evaluator.evaluate_candidate("BENIGN", benign, existing)
+    assert report2.marginal_drawdown_contribution_pct < report.marginal_drawdown_contribution_pct
+
+
+def test_portfolio_impact_fails_closed_without_return_series():
+    evaluator = PortfolioImpactEvaluator()
+    report = evaluator.evaluate_candidate("EMPTY", [])          # no candidate series
+    assert report.adds_portfolio_value is False
+    report2 = evaluator.evaluate_candidate("SHORT", [0.01, 0.01])  # < 5 obs
+    assert report2.adds_portfolio_value is False
+    assert report2.max_correlation_with_existing == 1.0

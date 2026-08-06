@@ -32,6 +32,30 @@ class PortfolioImpactReport:
         return "\n".join(lines)
 
 
+def _equity_curve(returns: list[float]) -> list[float]:
+    """Compound a return series into an equity curve (starts at 1.0)."""
+    curve: list[float] = []
+    eq = 1.0
+    for r in returns:
+        eq *= (1.0 + r)
+        curve.append(eq)
+    return curve
+
+
+def _max_drawdown_pct(returns: list[float]) -> float:
+    """Peak-to-trough max drawdown of a return series, in percent."""
+    if len(returns) < 2:
+        return 0.0
+    peak = 0.0
+    mdd = 0.0
+    for eq in _equity_curve(returns):
+        if eq > peak:
+            peak = eq
+        if peak > 0.0:
+            mdd = max(mdd, (peak - eq) / peak)
+    return mdd * 100.0
+
+
 def _compute_sharpe(returns: list[float], periods_per_year: float = 252.0) -> float:
     if not returns or len(returns) < 2:
         return 0.0
@@ -75,7 +99,7 @@ class PortfolioImpactEvaluator:
                 incremental_sharpe=round(cand_sharpe, 4),
                 max_correlation_with_existing=0.0,
                 diversification_benefit_pct=100.0 if adds_val else 0.0,
-                marginal_drawdown_contribution_pct=0.0,
+                marginal_drawdown_contribution_pct=round(_max_drawdown_pct(candidate_returns), 2),
                 adds_portfolio_value=adds_val,
             )
 
@@ -91,7 +115,7 @@ class PortfolioImpactEvaluator:
                 incremental_sharpe=round(cand_sharpe, 4),
                 max_correlation_with_existing=0.0,
                 diversification_benefit_pct=100.0 if adds_val else 0.0,
-                marginal_drawdown_contribution_pct=0.0,
+                marginal_drawdown_contribution_pct=round(_max_drawdown_pct(candidate_returns), 2),
                 adds_portfolio_value=adds_val,
             )
 
@@ -129,6 +153,15 @@ class PortfolioImpactEvaluator:
         div_benefit = ((comb_sharpe - ex_sharpe) / ex_sharpe * 100.0) if ex_sharpe > 0 else 0.0
         adds_value = inc_sharpe > 0.05 and max_corr < 0.50 and comb_sharpe >= 0.50
 
+        # Marginal drawdown contribution: % change in portfolio max drawdown
+        # from adding the candidate, computed from the real return series.
+        mdd_existing = _max_drawdown_pct(existing_combined)
+        mdd_combined = _max_drawdown_pct(combined_returns)
+        if mdd_existing > 1e-9:
+            marginal_dd = ((mdd_combined - mdd_existing) / mdd_existing) * 100.0
+        else:
+            marginal_dd = mdd_combined  # absolute when baseline has no drawdown
+
         return PortfolioImpactReport(
             candidate_id=candidate_id,
             existing_portfolio_sharpe=round(ex_sharpe, 4),
@@ -136,7 +169,7 @@ class PortfolioImpactEvaluator:
             incremental_sharpe=round(inc_sharpe, 4),
             max_correlation_with_existing=round(max_corr, 4),
             diversification_benefit_pct=round(max(0.0, div_benefit), 2),
-            marginal_drawdown_contribution_pct=round(max_corr * 10.0, 2),
+            marginal_drawdown_contribution_pct=round(marginal_dd, 2),
             adds_portfolio_value=adds_value,
         )
 
