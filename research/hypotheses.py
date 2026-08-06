@@ -65,6 +65,30 @@ hypotheses = [
       filter_expr="realized_vol_20 > 0.8",
     ),
 
+    # ── VOLATILITY: Vol-Weighted Carry (successor to rejected EXP-00023) ─
+    h(HypothesisClass.VOLATILITY,
+      id="EXP-00024",
+      question="Does inverse-volatility weighting rescue G10 carry after costs? "
+               "EXP-00023 (monthly G10 carry, 2018-07..2026-06) was REJECTED: "
+               "only mechanical accrual (+0.18%/mo, t=1.14, win 57%, maxDD "
+               "-13.5%) with no UIP spot anomaly. EXP-00024 scales carry "
+               "exposure by 1/max(sigma_t, 0.05) with weekly (not monthly) "
+               "rebalancing and asks whether risk-adjusted yield survives "
+               "10bps costs and cuts drawdown >=40% vs the naive baseline.",
+      economic_rationale="Carry accrual is stable mechanical yield but naive "
+               "long-high/short-low exposure is consumed by turnover and "
+               "left-tail crashes (EXP-00023, regime-compressed post-2008). "
+               "Volatility-scaling de-leverages during stress when carry "
+               "trades crash; if it cannot beat EXP-00023's baseline (t=1.14, "
+               "maxDD -13.5%) on OOS net Sharpe and drawdown, the vol-carry "
+               "hypothesis is falsified for this universe.",
+      dataset_id="fx_carry_rates_v1",
+      features=("rate_differential_t2", "realized_vol_21d", "vol_floor_0p05"),
+      target="forward_carry_adj_return_1w",
+      params={"expected_sign": 1.0, "rebalance": "weekly_wed_17utc",
+              "cost_bps": 10, "tenor": "1W", "baseline": "EXP-00023"},
+    ),
+
     # ── EXECUTION: Exact Replica of Live MA Crossover ──────────────────
     h(HypothesisClass.EXECUTION,
       id="EXP-00006",
