@@ -4,9 +4,11 @@ from datetime import datetime, timedelta, timezone
 
 from titan.data.feed_health import FeedHealthSnapshot
 
-# Recent watermark (staleness predicate rejects watermarks older than the
-# threshold; these tests exercise coverage, not the clock).
-_RECENT = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+# Recursively recent watermark helper. A module-level constant set at import
+# goes stale during a long suite (the 30s staleness threshold), so timestamp
+# is computed at call time.
+def _recent():
+    return (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
 
 
 class FakeFeed:
@@ -62,22 +64,24 @@ class TestFeedHealthSnapshot:
         assert v.reason == "instrument_uncovered"
 
     def test_partial_coverage_fails(self):
-        feed = FakeFeed(latest={"AAPL": (_RECENT, 100.0)})
+        t = _recent()
+        feed = FakeFeed(latest={"AAPL": (t, 100.0)})
         v = _snap(feed).evaluate()  # MSFT missing
         assert v.healthy is False
         assert v.reason == "instrument_uncovered"
         assert v.watermarks["MSFT"] is None
 
     def test_healthy_pass_reports_watermarks(self):
+        t = _recent()
         feed = FakeFeed(latest={
-            "AAPL": (_RECENT, 100.0),
-            "MSFT": (_RECENT, 300.0),
+            "AAPL": (t, 100.0),
+            "MSFT": (t, 300.0),
         })
         v = _snap(feed).evaluate()
         assert v.healthy is True
         assert v.reason == ""
-        assert v.watermarks["AAPL"] == _RECENT
-        assert v.watermarks["MSFT"] == _RECENT
+        assert v.watermarks["AAPL"] == t
+        assert v.watermarks["MSFT"] == t
 
     def test_missing_contract_fails_closed(self):
         class NoContract:
