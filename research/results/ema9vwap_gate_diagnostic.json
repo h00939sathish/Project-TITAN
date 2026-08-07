@@ -1,0 +1,61 @@
+{
+  "strategy_id": "traderdev-ema9-vwap",
+  "frame": "4h",
+  "real_is_sharpe": {
+    "EURUSD": 5.9253,
+    "GBPUSD": 7.1245
+  },
+  "gates": [
+    {
+      "gate": "base_qualification",
+      "passed": true,
+      "evidence": "IS Sharpe=5.93 >= 0.5",
+      "skipped": false
+    },
+    {
+      "gate": "walk_forward",
+      "passed": false,
+      "evidence": "No walk-forward data",
+      "skipped": false
+    },
+    {
+      "gate": "parameter_stability",
+      "passed": false,
+      "evidence": "Parameter plateau stability not evaluated (missing surface data)",
+      "skipped": false
+    },
+    {
+      "gate": "independent_replication",
+      "passed": true,
+      "evidence": "replication: corr=0.000, pSharpe=7.12, rSharpe=5.93, confidence=INSTITUTIONAL",
+      "skipped": false
+    },
+    {
+      "gate": "portfolio_impact",
+      "passed": true,
+      "evidence": "\u0394Sharpe=+2.010, max_corr=0.000, DD contribution=1.7%",
+      "skipped": false
+    },
+    {
+      "gate": "shadow_sufficiency",
+      "passed": false,
+      "evidence": "No shadow trades recorded",
+      "skipped": false
+    },
+    {
+      "gate": "shadow_performance",
+      "passed": false,
+      "evidence": "Insufficient data (0 trades)",
+      "skipped": true
+    },
+    {
+      "gate": "ensemble_regression",
+      "passed": true,
+      "evidence": "No qualified pool yet \u2014 nothing to regress against",
+      "skipped": true
+    }
+  ],
+  "overall_passed": false,
+  "walk_forward_note": "UNMET by design (Q2=option C): only tuned-on dataset available; a real WF needs fresh OOS.",
+  "temp_db": "C:\\Users\\h0093\\AppData\\Local\\Temp\\ema9vwap_gate_1s8pcyw4\\titan_research.db"
+}
