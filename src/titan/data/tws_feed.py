@@ -203,41 +203,41 @@ class TWSRealtimeFeed(EWrapper, EClient):
         self._subscribe()
 
 
-
     # ── ibapi callbacks (client thread) ─────────────────────────────────────
     def nextValidId(self, orderId: int) -> None:
         self._ready.set()
 
     def historicalData(self, req_id: int, bar) -> None:
-            instr = self._instr_by_req.get(req_id)
-            if instr is None:
-                return
-            # formatDate=2 → bar.date is epoch seconds (UTC)
-            ts = datetime.fromtimestamp(float(bar.date), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            close = float(bar.close)
-            ohlc = {
-                "timestamp": ts,
-                "open": float(bar.open),
-                "high": float(bar.high),
-                "low": float(bar.low),
-                "close": close,
-                "volume": int(float(bar.volume)) if bar.volume and float(bar.volume) > 0 else 0,
-            }
-            with self._lock:
-                self._last_update = time.monotonic()
-                self._has_any_bar = True
-                forming = self._forming.get(instr)
-                if forming is not None and forming[0] != ts:
-                    # previous bar completed → promote to completed list
-                    self._bars[instr].append(forming)
-                    fl = self._forming_ohlc.get(instr)
-                    if fl is not None:
-                        self._bars_ohlc[instr].append(fl)
-                    if len(self._bars[instr]) > self._window:
-                        self._bars[instr] = self._bars[instr][-self._window:]
-                        self._bars_ohlc[instr] = self._bars_ohlc[instr][-self._window:]
-                self._forming[instr] = (ts, close)
-                self._forming_ohlc[instr] = ohlc
+
+        instr = self._instr_by_req.get(req_id)
+        if instr is None:
+            return
+        # formatDate=2 → bar.date is epoch seconds (UTC)
+        ts = datetime.fromtimestamp(float(bar.date), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        close = float(bar.close)
+        ohlc = {
+            "timestamp": ts,
+            "open": float(bar.open),
+            "high": float(bar.high),
+            "low": float(bar.low),
+            "close": close,
+            "volume": int(float(bar.volume)) if bar.volume and float(bar.volume) > 0 else 0,
+        }
+        with self._lock:
+            self._last_update = time.monotonic()
+            self._has_any_bar = True
+            forming = self._forming.get(instr)
+            if forming is not None and forming[0] != ts:
+                # previous bar completed → promote to completed list
+                self._bars[instr].append(forming)
+                fl = self._forming_ohlc.get(instr)
+                if fl is not None:
+                    self._bars_ohlc[instr].append(fl)
+                if len(self._bars[instr]) > self._window:
+                    self._bars[instr] = self._bars[instr][-self._window:]
+                    self._bars_ohlc[instr] = self._bars_ohlc[instr][-self._window:]
+            self._forming[instr] = (ts, close)
+            self._forming_ohlc[instr] = ohlc
 
     def error(self, req_id: int, errorTime: int = -1, errorCode: int = 0,
               errorString: str = "", advancedOrderRejectJson: str = "") -> None:
@@ -292,7 +292,6 @@ class TWSRealtimeFeed(EWrapper, EClient):
             self._last_update = time.monotonic()
         finally:
             self._recovering = False
-
 
 
     def is_healthy(self, stale_after_s: float = 30.0) -> bool:
