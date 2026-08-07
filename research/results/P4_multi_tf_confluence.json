@@ -1,0 +1,52 @@
+{
+  "experiment": "P4_multi_tf_confluence",
+  "decision": "P4 FAIL",
+  "frozen": {
+    "sma_n": 20,
+    "vol_win": 30,
+    "pct_look": 150,
+    "pct_q": 0.5,
+    "cost_side_pips": 0.4
+  },
+  "kill_criteria": {
+    "min_trades": 60,
+    "bootstrap": 1000,
+    "block": 5
+  },
+  "results": {
+    "EURUSD": {
+      "n4h": 1610,
+      "gate_on": 452,
+      "trades_ungated": 47,
+      "trades_gated": 18,
+      "sharpe_ungated": 19.24935993537501,
+      "sharpe_gated": 14.53031539875475,
+      "bootstrap_ci": [
+        -0.0006431766634411135,
+        -0.0001571290295169811,
+        0.0
+      ],
+      "power_ok": false,
+      "significance_ok": false,
+      "absolute_ok": true,
+      "gated_is_robust_oos": true
+    },
+    "GBPUSD": {
+      "n4h": 1610,
+      "gate_on": 453,
+      "trades_ungated": 46,
+      "trades_gated": 20,
+      "sharpe_ungated": 21.125741499624393,
+      "sharpe_gated": 14.70347324885668,
+      "bootstrap_ci": [
+        -0.0012688225536669697,
+        -0.000364972554228254,
+        0.0
+      ],
+      "power_ok": false,
+      "significance_ok": false,
+      "absolute_ok": true,
+      "gated_is_robust_oos": true
+    }
+  }
+}
