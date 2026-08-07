@@ -92,6 +92,8 @@ class StrategyRunner:
         self._index: dict[str, int] = {i: 0 for i in instruments}
         self._prices: dict[str, list[float]] = {i: [] for i in instruments}
         self._bar_dates: dict[str, list[str]] = {i: [] for i in instruments}
+        # instr -> list of full-OHLC completed bars (for intrabar stop/trail)
+        self._ohlc: dict[str, list[dict]] = {i: [] for i in instruments}
         self._data_source: ApprovedDataSource | None = None
         self._live_feed = live_feed
         self._last_fetch = 0.0
@@ -198,6 +200,14 @@ class StrategyRunner:
         idx = self._index.get(instrument, 0)
         return dates[min(idx, len(dates) - 1)]
 
+    def current_bar_ohlc(self, instrument: str) -> dict | None:
+        """Latest completed bar as a full OHLC dict (for intrabar exits), or None."""
+        bars = self._ohlc.get(instrument)
+        if not bars:
+            return None
+        idx = self._index.get(instrument, 0)
+        return bars[min(idx, len(bars) - 1)]
+
     def tick(self) -> None:
         import time
         if self._intraday:
@@ -228,6 +238,10 @@ class StrategyRunner:
                 continue
             self._prices[instr] = [float(c) for _, c in bars]
             self._bar_dates[instr] = [ts for ts, _ in bars]
+            # Full-OHLC path: same completed bars, same order, so indexes line up.
+            ohlc_reader = getattr(self._live_feed, "completed_ohlc", None)
+            if ohlc_reader is not None:
+                self._ohlc[instr] = list(ohlc_reader(instr))
             self._index[instr] = max(0, len(bars) - 1)
 
     @property
@@ -853,6 +867,9 @@ def main() -> None:
             bar_date = strategies.current_bar_date(instr)
             if bar_date is None:
                 continue
+            # Full-OHLC bar for strategies that need intrabar stop/trail (None
+            # in daily/file modes where the runner has no OHLC stream).
+            bar_ohlc = strategies.current_bar_ohlc(instr)
             # Fire signals only during RTH (09:35-16:00 ET) for equities. FX spot
             # (EURUSD/GBPUSD) trades Sun 17:00 ET - Fri 17:00 ET with no intraday
             # gate. The TWS simulated preview account holds RTH-only DAY orders
@@ -884,11 +901,11 @@ def main() -> None:
             if not args.intraday and bar_date == today_str:
                 continue
             if pool:
-                intent = pool.on_price(instr, price, bar_date=bar_date)
+                intent = pool.on_price(instr, price, bar_date=bar_date, bar=bar_ohlc)
             else:
-                intent = bridge.on_price(instr, price, bar_date=bar_date) if bridge else None
+                intent = bridge.on_price(instr, price, bar_date=bar_date, bar=bar_ohlc) if bridge else None
             if shadow:
-                shadow.on_price(instr, price, bar_date=bar_date)
+                shadow.on_price(instr, price, bar_date=bar_date, bar=bar_ohlc)
             if intent is None:
                 continue
             # Fail-closed: never emit an intent while the feed is unhealthy/stalled.

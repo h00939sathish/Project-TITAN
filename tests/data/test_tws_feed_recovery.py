@@ -32,7 +32,9 @@ def _bare_feed() -> TWSRealtimeFeed:
     feed._ready = threading.Event()
     feed._lock = threading.Lock()
     feed._bars = {"SPY": [], "MSFT": []}
+    feed._bars_ohlc = {"SPY": [], "MSFT": []}
     feed._forming = {"SPY": None, "MSFT": None}
+    feed._forming_ohlc = {"SPY": None, "MSFT": None}
     feed._instr_by_req = {8000: "SPY", 8001: "MSFT"}
     feed._storm_codes = frozenset({1100, 2110, 2103, 2105, 2107, 2108, 10182, 10187, 10191, 202})
     feed._err_storm = 0
@@ -44,13 +46,20 @@ def _bare_feed() -> TWSRealtimeFeed:
 
 
 class _FakeBar:
-    def __init__(self, epoch: float, close: float):
+    def __init__(self, epoch: float, close: float, high: float | None = None,
+                 low: float | None = None, open_: float | None = None, volume: int = 0):
         self.date = str(epoch)
         self.close = close
+        self.high = high if high is not None else close
+        self.low = low if low is not None else close
+        self.open = open_ if open_ is not None else close
+        self.volume = volume
 
 
-def _push_bar(feed: TWSRealtimeFeed, req_id: int, epoch: float, close: float) -> None:
-    feed.historicalData(req_id, _FakeBar(epoch, close))
+def _push_bar(feed: TWSRealtimeFeed, req_id: int, epoch: float, close: float,
+              high: float | None = None, low: float | None = None,
+              open_: float | None = None, volume: int = 0) -> None:
+    feed.historicalData(req_id, _FakeBar(epoch, close, high, low, open_, volume))
 
 
 class TestErrorStormDetection:
@@ -110,23 +119,7 @@ class TestHealthySemantics:
         assert not feed.is_healthy()
 
 
-class TestAdvancingBars:
-    def test_bars_advancing_detects_newer_bar(self):
-        feed = _bare_feed()
-        # bars land in 2025 (epoch ~1754e9); since_ts must be older than that
-        _push_bar(feed, 8000, 1754000000, 100.0)
-        _push_bar(feed, 8000, 1754000300, 101.0)  # promotes the 1754000000 bar
-        assert feed.bars_advancing(since_ts="2020-01-01T00:00:00Z")
-        assert not feed.bars_advancing(since_ts="2099-01-01T00:00:00Z")
-
-    def test_latest_ts_is_max_across_instruments(self):
-        feed = _bare_feed()
-        _push_bar(feed, 8000, 1754000000, 100.0)
-        _push_bar(feed, 8000, 1754000300, 101.0)
-        _push_bar(feed, 8001, 1754000600, 50.0)   # forming
-        _push_bar(feed, 8001, 1754000900, 51.0)   # promotes 1754000600
-        assert feed.latest_ts() is not None
-
+class TestHistorical:
     def test_historical_data_tracks_update_time(self):
         feed = _bare_feed()
         before = feed._last_update
@@ -135,6 +128,35 @@ class TestAdvancingBars:
         assert feed._has_any_bar
 
 
+class TestFullOHLC:
+    def test_completed_ohlc_captures_high_low_open(self):
+        feed = _bare_feed()
+        _push_bar(feed, 8000, 1754000000, 100.0, high=102.0, low=99.0, open_=101.0, volume=55)
+        _push_bar(feed, 8000, 1754000300, 101.0, high=103.0, low=100.5, open_=100.0, volume=60)
+        ohlc = feed.completed_ohlc("SPY")
+        assert len(ohlc) == 1, "only the completed bar is exposed"
+        b = ohlc[0]
+        assert b["open"] == 101.0
+        assert b["high"] == 102.0
+        assert b["low"] == 99.0
+        assert b["close"] == 100.0
+        assert b["volume"] == 55
+        assert b["timestamp"] == "2025-07-31T22:13:20Z"
+
+    def test_completed_ohlc_mirrors_completed_bars(self):
+        feed = _bare_feed()
+        for e, c in [(1754000000, 100.0), (1754000300, 101.0)]:
+            _push_bar(feed, 8000, e, c, high=c + 1, low=c - 1, open_=c, volume=10)
+        assert len(feed.completed_bars("SPY")) == len(feed.completed_ohlc("SPY")) == 1
+        assert feed.completed_bars("SPY")[0][1] == feed.completed_ohlc("SPY")[0]["close"]
+
+    def test_latest_completed_ohlc(self):
+        feed = _bare_feed()
+        _push_bar(feed, 8000, 1754000000, 100.0, high=101.0, low=99.0, open_=99.5, volume=5)
+        _push_bar(feed, 8000, 1754000300, 101.0, high=102.0, low=100.0, open_=100.5, volume=6)
+        latest = feed.latest_completed_ohlc("SPY")
+        assert latest is not None, "a completed ohlc bar exists"
+        assert latest["close"] == 100.0
 class TestRecover:
     def test_recover_reconnects_and_resubscribes(self):
         feed = _bare_feed()

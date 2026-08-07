@@ -173,8 +173,12 @@ class TWSRealtimeFeed(EWrapper, EClient):
         self._lock = threading.Lock()
         # instr -> list of (iso_ts, close) for COMPLETED bars only
         self._bars: dict[str, list[tuple[str, float]]] = {i: [] for i in instruments}
+        # instr -> list of full-OHLC completed bars (same promotion lifecycle)
+        self._bars_ohlc: dict[str, list[dict]] = {i: [] for i in instruments}
         # instr -> (ts, close) of the currently forming bar (not exposed)
         self._forming: dict[str, tuple[str, float] | None] = {i: None for i in instruments}
+        # instr -> forming bar full OHLC (not exposed)
+        self._forming_ohlc: dict[str, dict | None] = {i: None for i in instruments}
         self._instr_by_req: dict[int, str] = {}
 
         # Feed-recovery state: disconnect/error storms must trigger a
@@ -199,18 +203,26 @@ class TWSRealtimeFeed(EWrapper, EClient):
         self._subscribe()
 
 
-
     # ── ibapi callbacks (client thread) ─────────────────────────────────────
     def nextValidId(self, orderId: int) -> None:
         self._ready.set()
 
     def historicalData(self, req_id: int, bar) -> None:
+
         instr = self._instr_by_req.get(req_id)
         if instr is None:
             return
         # formatDate=2 → bar.date is epoch seconds (UTC)
         ts = datetime.fromtimestamp(float(bar.date), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         close = float(bar.close)
+        ohlc = {
+            "timestamp": ts,
+            "open": float(bar.open),
+            "high": float(bar.high),
+            "low": float(bar.low),
+            "close": close,
+            "volume": int(float(bar.volume)) if bar.volume and float(bar.volume) > 0 else 0,
+        }
         with self._lock:
             self._last_update = time.monotonic()
             self._has_any_bar = True
@@ -218,9 +230,14 @@ class TWSRealtimeFeed(EWrapper, EClient):
             if forming is not None and forming[0] != ts:
                 # previous bar completed → promote to completed list
                 self._bars[instr].append(forming)
+                fl = self._forming_ohlc.get(instr)
+                if fl is not None:
+                    self._bars_ohlc[instr].append(fl)
                 if len(self._bars[instr]) > self._window:
                     self._bars[instr] = self._bars[instr][-self._window:]
+                    self._bars_ohlc[instr] = self._bars_ohlc[instr][-self._window:]
             self._forming[instr] = (ts, close)
+            self._forming_ohlc[instr] = ohlc
 
     def error(self, req_id: int, errorTime: int = -1, errorCode: int = 0,
               errorString: str = "", advancedOrderRejectJson: str = "") -> None:
@@ -268,12 +285,14 @@ class TWSRealtimeFeed(EWrapper, EClient):
                 raise ConnectionError("TWSRealtimeFeed: reconnect timed out")
             with self._lock:
                 self._forming = {i: None for i in self._instruments}
+                self._forming_ohlc = {i: None for i in self._instruments}
             self._subscribe()
             self._recovery_needed = False
             self._err_storm = 0
             self._last_update = time.monotonic()
         finally:
             self._recovering = False
+
 
     def is_healthy(self, stale_after_s: float = 30.0) -> bool:
         """False while recovering or when bar pushes have stalled beyond
@@ -317,6 +336,20 @@ class TWSRealtimeFeed(EWrapper, EClient):
         """Return completed bars as [(iso_ts, close)] — never the forming bar."""
         with self._lock:
             return list(self._bars.get(instr, []))
+
+    def completed_ohlc(self, instr: str) -> list[dict]:
+        """Return completed bars as full-OHLC dicts (open/high/low/close/volume).
+
+        Guaranteed to be the same bars and order as ``completed_bars`` (same
+        promotion lifecycle), so a strategy can use the OHLC path for intrabar
+        stop/trail logic without double-count. Never includes the forming bar.
+        """
+        with self._lock:
+            return list(self._bars_ohlc.get(instr, []))
+
+    def latest_completed_ohlc(self, instr: str) -> dict | None:
+        bars = self.completed_ohlc(instr)
+        return bars[-1] if bars else None
 
     def latest_completed(self, instr: str) -> tuple[str, float] | None:
         bars = self.completed_bars(instr)

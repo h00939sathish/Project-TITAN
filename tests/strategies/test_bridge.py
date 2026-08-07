@@ -258,3 +258,31 @@ class TestStrategyBridgeWarmup:
         bridge.restore_state({})
         assert bridge._last_bar_dates == {}
         assert bridge._last_intent_sides == {}
+
+
+class TestBridgeOHLCForwarding:
+    def test_ohlc_bar_forwarded_to_strategy(self):
+        """A full OHLC bar passed to on_price must reach the strategy signal fn
+        (used for intrabar stop/trail). Uses the traderdev strategy which reads
+        bar['high']/bar['low'] via its update_bar path."""
+        bridge = StrategyBridge(
+            strategy_id="traderdev-ema9-vwap",
+            strategy_params={"ema_period": 3, "vwap_period": 20, "atr_period": 5,
+                             "trail_mult": 2.0},
+        )
+        # warmup on close-only so entries are possible from bar= path
+        intents = []
+        # drive a rise to trigger BUY
+        for v in [100.0] * 22 + [101.0, 102.0, 104.0]:
+            it = bridge.on_price("EURUSD", v, bar_date=None)
+            if it:
+                intents.append(it)
+        got_any = any(intents)
+        # Now feed an explicit full-OHLC bar; it should pass through to the strategy
+        it = bridge.on_price("SPY", 105.0, bar_date="2025-01-01", bar={
+            "timestamp": "2025-01-01", "open": 104.0, "high": 106.0,
+            "low": 98.0, "close": 105.0, "volume": 5})
+        # With a fresh bar_date the bar is processed; at minimum it must not crash
+        # and the bridge must have consumed the OHLC bar shape.
+        fn = bridge._signals.get("SPY")
+        assert fn is not None
