@@ -98,3 +98,22 @@ def test_portfolio_impact_fails_closed_without_return_series():
     report2 = evaluator.evaluate_candidate("SHORT", [0.01, 0.01])  # < 5 obs
     assert report2.adds_portfolio_value is False
     assert report2.max_correlation_with_existing == 1.0
+
+
+def test_replication_fails_closed_on_self_referential_series():
+    """F1 regression: passing the SAME series object as primary_returns and
+    replication_returns must fail closed (correlation ~1.0 is not independent
+    replication)."""
+    engine = ReplicationEngine()
+    sc = OptimizationValidationScorecard(
+        strategy_id="orb", timeframe="15m", universe=("SPY", "QQQ"),
+        best_params={"oos_sharpe": 1.8}, avg_plateau_stability=0.85,
+        avg_plateau_coverage=0.3, cross_instrument_consistency=0.8,
+        walk_forward_passed=True, bootstrap_passed=True,
+        passed_all_checks=True, rejection_reasons=(),
+    )
+    series = [0.001, 0.002, -0.001, 0.003, -0.002, 0.0015]
+    report = engine.evaluate_replication(
+        "H-SELF", sc, sc, primary_returns=series, replication_returns=series)
+    assert report.replication_passed is False
+    assert report.confidence_level == "LOW"

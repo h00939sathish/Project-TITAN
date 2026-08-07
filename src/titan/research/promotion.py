@@ -78,10 +78,11 @@ def _strategy_return_series(
         if close is None:
             series.append(0.0)
             continue
-        try:
-            sig = signal_fn({"close": close})
-        except Exception:
-            sig = "HOLD"
+        # F7: do NOT swallow signal exceptions. A strategy that raises in its
+        # signal must fail the gate, not silently become a flat (0 return)
+        # series that looks artificially clean. Exceptions propagate to the
+        # caller (the gate), which then fails closed.
+        sig = signal_fn({"close": close})
         if sig == "BUY":
             pos = 1.0
         elif sig == "SELL":
@@ -263,15 +264,10 @@ class PromotionGate:
             return GateResult("parameter_stability", False, "No qualification record")
         stability = qual.get("plateau_stability")
         coverage = qual.get("plateau_coverage")
-        if stability is None or coverage is None:
-            # Check if recorded in notes/metadata JSON
-            notes = qual.get("notes", "")
-            if "plateau_stability=" in notes:
-                try:
-                    stability = float(notes.split("plateau_stability=")[1].split()[0])
-                    coverage = 0.25  # recorded default
-                except (ValueError, IndexError):
-                    pass
+        # F3: plateau stability MUST come from a real stored ParameterSurface
+        # evaluation. Parsing free-text notes (with a hardcoded coverage
+        # default) let a comment string satisfy the gate — removed. If either
+        # metric is absent, the gate fails closed.
         if stability is None:
             return GateResult("parameter_stability", False, "Parameter plateau stability not evaluated (missing surface data)")
         min_stab = self._criteria["min_plateau_stability"]
@@ -286,14 +282,7 @@ class PromotionGate:
         if not qual:
             return GateResult("independent_replication", False, "No qualification record")
         rep_sharpe = qual.get("replication_sharpe")
-        if rep_sharpe is None:
-            # Check if recorded in notes
-            notes = qual.get("notes", "")
-            if "replication_sharpe=" in notes:
-                try:
-                    rep_sharpe = float(notes.split("replication_sharpe=")[1].split()[0])
-                except (ValueError, IndexError):
-                    pass
+        # F3: no notes-string fallback. Only a real stored value counts.
         if rep_sharpe is None:
             # Live dual-experiment evaluation when two independent runs exist;
             # real OOS Sharpes come from the runs, correlation from the signal
@@ -330,13 +319,7 @@ class PromotionGate:
         if not qual:
             return GateResult("portfolio_impact", False, "No qualification record")
         max_corr = qual.get("max_correlation")
-        if max_corr is None:
-            notes = qual.get("notes", "")
-            if "max_correlation=" in notes:
-                try:
-                    max_corr = float(notes.split("max_correlation=")[1].split()[0])
-                except (ValueError, IndexError):
-                    pass
+        # F3: no notes-string fallback for max_correlation either.
         max_allowed_corr = self._criteria["max_correlation_with_existing"]
         if max_corr is None:
             # Live evaluation: real return series for the candidate and the
