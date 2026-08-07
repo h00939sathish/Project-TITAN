@@ -31,10 +31,14 @@ slowly and were masked by green test suites that encoded the bad behavior.
 
 ## Decision
 
-1. **Self-referential input is rejected.** `ReplicationEngine::evaluate_replication`
-   fails closed (LOW confidence, `replication_passed=False`) when the same
-   series object is passed as both primary and replication returns. A genuinely
-   independent second dataset/regime is required.
+1. **Self-referential / non-independent input is rejected.**
+   `ReplicationEngine::evaluate_replication` fails closed (LOW confidence,
+   `replication_passed=False`) when: (a) the same series object is passed as
+   both primary and replication returns, (b) a copied series is passed
+   (content-equal but a distinct object — same provenance), or (c) both sides
+   carry the same experiment ID (a single run presented as its own
+   replication). A genuinely independent second dataset/regime is required;
+   identical provenance is never independent.
 
 2. **No free-text gate metrics.** The three name gates read only real stored
    values; absence of a metric means the gate fails closed. The `notes`

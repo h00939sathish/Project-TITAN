@@ -48,15 +48,31 @@ class ReplicationEngine:
         p_sharpe = float(primary_scorecard.best_params.get("oos_sharpe", 0.0))
         r_sharpe = float(replication_scorecard.best_params.get("oos_sharpe", 0.0))
 
-        # Fail closed on self-referential input (F1): a return series cannot
-        # corroborate itself. The promotion gate previously passed the SAME
-        # series object as both primary and replication, yielding correlation
-        # ~1.0 and a trivially-passing "independent" replication check.
-        if (
+        # Fail closed on self-referential / non-independent input (F1): a return
+        # series cannot corroborate itself. The promotion gate previously passed
+        # the SAME series object as both primary and replication, yielding
+        # correlation ~1.0 and a trivially-passing "independent" replication
+        # check. This guard rejects BOTH the same-object case AND a copied
+        # series (content-equal but distinct object), plus identical experiment
+        # provenance (same exp id on both sides).
+        same_object = (
             primary_returns is not None
             and replication_returns is primary_returns
             and len(primary_returns) > 0
-        ):
+        )
+        copied_content = (
+            primary_returns is not None
+            and replication_returns is not None
+            and len(primary_returns) > 0
+            and len(primary_returns) == len(replication_returns)
+            and primary_returns == replication_returns
+        )
+        shared_exp = (
+            primary_exp_id
+            and primary_exp_id == replication_exp_id
+            and primary_exp_id != "EXP-PRIMARY"
+        )
+        if same_object or copied_content or shared_exp:
             return ReplicationReport(
                 hypothesis_id=hypothesis_id,
                 primary_experiment_id=primary_exp_id,
