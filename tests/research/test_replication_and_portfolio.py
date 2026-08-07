@@ -98,3 +98,62 @@ def test_portfolio_impact_fails_closed_without_return_series():
     report2 = evaluator.evaluate_candidate("SHORT", [0.01, 0.01])  # < 5 obs
     assert report2.adds_portfolio_value is False
     assert report2.max_correlation_with_existing == 1.0
+
+
+def test_replication_fails_closed_on_self_referential_series():
+    """F1 regression: passing the SAME series object as primary_returns and
+    replication_returns must fail closed (correlation ~1.0 is not independent
+    replication)."""
+    engine = ReplicationEngine()
+    sc = OptimizationValidationScorecard(
+        strategy_id="orb", timeframe="15m", universe=("SPY", "QQQ"),
+        best_params={"oos_sharpe": 1.8}, avg_plateau_stability=0.85,
+        avg_plateau_coverage=0.3, cross_instrument_consistency=0.8,
+        walk_forward_passed=True, bootstrap_passed=True,
+        passed_all_checks=True, rejection_reasons=(),
+    )
+    series = [0.001, 0.002, -0.001, 0.003, -0.002, 0.0015]
+    report = engine.evaluate_replication(
+        "H-SELF", sc, sc, primary_returns=series, replication_returns=series)
+    assert report.replication_passed is False
+    assert report.confidence_level == "LOW"
+
+
+def _selfref_scorecard():
+    return OptimizationValidationScorecard(
+        strategy_id="orb", timeframe="15m", universe=("SPY", "QQQ"),
+        best_params={"oos_sharpe": 1.8}, avg_plateau_stability=0.85,
+        avg_plateau_coverage=0.3, cross_instrument_consistency=0.8,
+        walk_forward_passed=True, bootstrap_passed=True,
+        passed_all_checks=True, rejection_reasons=(),
+    )
+
+
+def test_replication_fails_closed_on_copied_content_series():
+    """F1-provenance regression (CodeRabbit #15): a copied series — content-equal
+    to primary but a DISTINCT object — must fail closed as non-independent
+    replication. Identity alone is insufficient; shared provenance is the real
+    violation."""
+    engine = ReplicationEngine()
+    sc = _selfref_scorecard()
+    primary = [0.001, 0.002, -0.001, 0.003, -0.002, 0.0015]
+    copied = list(primary)  # distinct object, identical content
+    report = engine.evaluate_replication(
+        "H-COPY", sc, sc, primary_returns=primary, replication_returns=copied,
+        primary_exp_id="EXP-A", replication_exp_id="EXP-B",
+    )
+    assert report.replication_passed is False
+
+
+def test_replication_fails_closed_on_shared_experiment_provenance():
+    """F1-provenance regression: identical experiment IDs on both sides mean a
+    single run is being passed as its own replication — not independent."""
+    engine = ReplicationEngine()
+    sc = _selfref_scorecard()
+    primary = [0.001, 0.002, -0.001, 0.003, -0.002, 0.0015]
+    report = engine.evaluate_replication(
+        "PR-SHARED", sc, sc,
+        primary_returns=primary, replication_returns=[x * 2 for x in primary],
+        primary_exp_id="EXP-X", replication_exp_id="EXP-X",
+    )
+    assert report.replication_passed is False

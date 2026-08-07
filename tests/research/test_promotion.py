@@ -31,9 +31,11 @@ def test_promotion_gate_fails_closed_when_data_missing(temp_db):
     assert gates_by_name["independent_replication"]["passed"] is False
 
 
-def test_promotion_gate_passes_when_all_mandatory_gates_satisfied(temp_db):
+def test_promotion_gate_fails_closed_on_notes_only_metrics(temp_db):
+    """F3 regression: plateau/replication/correlation metrics stored ONLY as
+    free-text in `notes` must NOT satisfy the mandatory gates. With notes
+    parsing removed, the gate fails closed until real stored/derived data."""
     db = ResearchDB(str(temp_db))
-    # Insert complete qualification record with plateau stability & replication data
     db.set_qualification(
         strategy_id="test-strategy-qualified",
         status="WATCHLIST",
@@ -57,13 +59,13 @@ def test_promotion_gate_passes_when_all_mandatory_gates_satisfied(temp_db):
     gate = PromotionGate(db_path=temp_db, bars=[{"close": 100.0 + i} for i in range(20)])
     result = gate.evaluate("test-strategy-qualified")
 
-    assert result["passed"] is True
+    assert result["passed"] is False
     gates_by_name = {g["name"]: g for g in result["gates"]}
     assert gates_by_name["base_qualification"]["passed"] is True
     assert gates_by_name["walk_forward"]["passed"] is True
-    assert gates_by_name["parameter_stability"]["passed"] is True
-    assert gates_by_name["independent_replication"]["passed"] is True
-    assert gates_by_name["portfolio_impact"]["passed"] is True
+    assert gates_by_name["parameter_stability"]["passed"] is False  # notes-only
+    assert gates_by_name["independent_replication"]["passed"] is False
+    assert gates_by_name["portfolio_impact"]["passed"] is False
 
 def test_portfolio_impact_fails_closed_without_return_series(temp_db):
     """Portfolio impact must NOT pass by default when no correlation metric and
@@ -84,3 +86,24 @@ def test_portfolio_impact_fails_closed_without_return_series(temp_db):
     # Strategy is not in the registry -> no return series derivable -> fail closed
     assert gates_by_name["portfolio_impact"]["passed"] is False
     assert result["passed"] is False
+
+
+def test_strategy_return_series_propagates_signal_exceptions(monkeypatch):
+    """F7 regression: a strategy whose signal fn raises must FAIL the gate, not
+    silently become a flat (0-return) 'clean' series."""
+    import titan.research.promotion as promotion_mod
+    from titan.research.promotion import _strategy_return_series
+
+    class RaisingStrategy:
+        def __init__(self, params): self.params = params
+        def __call__(self, bar): raise RuntimeError("signal boom")
+    class FakeReg:
+        def get(self, _id):
+            if _id == "boomer":
+                def factory(params): return RaisingStrategy(params)
+                return type("R", (), {"factory": staticmethod(factory)})()
+            raise KeyError(_id)
+    monkeypatch.setattr(promotion_mod, "get_registry", lambda: FakeReg())
+    bars = [{"close": 100.0 + i} for i in range(6)]
+    with pytest.raises(RuntimeError):
+        _strategy_return_series("boomer", {}, bars)
