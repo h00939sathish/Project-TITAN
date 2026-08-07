@@ -56,11 +56,15 @@ class ResearchDB:
                 wf_sharpe       REAL,
                 paper_trades    INTEGER,
                 backtest_return REAL,
-                wf_return       REAL,
-                max_dd_pct      REAL,
-                qualified_at    TEXT,
-                notes           TEXT
-            );
+                                wf_return       REAL,
+                                max_dd_pct      REAL,
+                                qualified_at    TEXT,
+                                notes           TEXT,
+                                plateau_stability REAL,
+                                plateau_coverage  REAL,
+                                replication_sharpe REAL,
+                                max_correlation   REAL
+                            );
 
             CREATE TABLE IF NOT EXISTS ensemble_runs (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,6 +100,19 @@ class ResearchDB:
                 session_id      TEXT DEFAULT ''
             );
         """)
+        self._conn.commit()
+        self._migrate_qualifications_metrics()
+
+    def _migrate_qualifications_metrics(self) -> None:
+        """ADR-023 Track 2a: idempotently add plateau/replication/correlation
+        columns to an existing pre-023 qualifications table."""
+        existing = {r[1] for r in self._conn.execute(
+            "PRAGMA table_info(qualifications)")}
+        for col in ("plateau_stability", "plateau_coverage",
+                    "replication_sharpe", "max_correlation"):
+            if col not in existing:
+                self._conn.execute(
+                    f"ALTER TABLE qualifications ADD COLUMN {col} REAL")
         self._conn.commit()
 
     def log_run(
@@ -169,16 +186,22 @@ class ResearchDB:
         backtest_return: float | None = None,
         wf_return: float | None = None,
         max_dd_pct: float | None = None,
+        plateau_stability: float | None = None,
+        plateau_coverage: float | None = None,
+        replication_sharpe: float | None = None,
+        max_correlation: float | None = None,
         notes: str = "",
     ) -> None:
         now = datetime.now(timezone.utc).isoformat() if status == "QUALIFIED" else None
         self._conn.execute(
             """INSERT OR REPLACE INTO qualifications
                (strategy_id, version, status, backtest_sharpe, wf_sharpe, paper_trades,
-                backtest_return, wf_return, max_dd_pct, qualified_at, notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                backtest_return, wf_return, max_dd_pct, qualified_at, notes,
+                plateau_stability, plateau_coverage, replication_sharpe, max_correlation)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (strategy_id, version, status, backtest_sharpe, wf_sharpe, paper_trades,
-             backtest_return, wf_return, max_dd_pct, now, notes),
+             backtest_return, wf_return, max_dd_pct, now, notes,
+             plateau_stability, plateau_coverage, replication_sharpe, max_correlation),
         )
         self._conn.commit()
 

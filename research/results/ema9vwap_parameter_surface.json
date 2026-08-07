@@ -1,0 +1,1837 @@
+{
+  "grid": {
+    "ema_period": [
+      5,
+      7,
+      9,
+      11,
+      13,
+      15,
+      17,
+      19,
+      21
+    ],
+    "trail_mult": [
+      2.0,
+      2.1,
+      2.2,
+      2.3,
+      2.4,
+      2.5,
+      2.6,
+      2.7,
+      2.8,
+      2.9,
+      3.0
+    ]
+  },
+  "cells": [
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.0,
+      "trades": 103,
+      "net_pips": -264.7,
+      "max_dd_pct": 0.5828280972550658,
+      "win_rate": 0.33980582524271846
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.1,
+      "trades": 102,
+      "net_pips": -517.2,
+      "max_dd_pct": 0.5495596815210927,
+      "win_rate": 0.3137254901960784
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.2,
+      "trades": 92,
+      "net_pips": -257.9,
+      "max_dd_pct": 0.4640133896810778,
+      "win_rate": 0.34782608695652173
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.3,
+      "trades": 87,
+      "net_pips": -147.7,
+      "max_dd_pct": 0.5275944245225395,
+      "win_rate": 0.367816091954023
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.4,
+      "trades": 87,
+      "net_pips": -278.7,
+      "max_dd_pct": 0.6175927289233717,
+      "win_rate": 0.367816091954023
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.5,
+      "trades": 83,
+      "net_pips": -190.5,
+      "max_dd_pct": 0.5584553435866481,
+      "win_rate": 0.3855421686746988
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.6,
+      "trades": 75,
+      "net_pips": 52.3,
+      "max_dd_pct": 0.3964814550088406,
+      "win_rate": 0.4
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.7,
+      "trades": 75,
+      "net_pips": -404.8,
+      "max_dd_pct": 0.7433159191480118,
+      "win_rate": 0.37333333333333335
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.8,
+      "trades": 65,
+      "net_pips": 72.0,
+      "max_dd_pct": 0.5479564337048096,
+      "win_rate": 0.4153846153846154
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 2.9,
+      "trades": 63,
+      "net_pips": 200.1,
+      "max_dd_pct": 0.3884900536660535,
+      "win_rate": 0.4126984126984127
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 5,
+      "trail_mult": 3.0,
+      "trades": 65,
+      "net_pips": -345.9,
+      "max_dd_pct": 0.5728003105939562,
+      "win_rate": 0.35384615384615387
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.0,
+      "trades": 91,
+      "net_pips": -438.4,
+      "max_dd_pct": 0.6417437002278278,
+      "win_rate": 0.31868131868131866
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.1,
+      "trades": 89,
+      "net_pips": -579.5,
+      "max_dd_pct": 0.6865330808847709,
+      "win_rate": 0.3146067415730337
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.2,
+      "trades": 82,
+      "net_pips": -350.1,
+      "max_dd_pct": 0.7353681155301923,
+      "win_rate": 0.3048780487804878
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.3,
+      "trades": 78,
+      "net_pips": -244.9,
+      "max_dd_pct": 0.8053048204549594,
+      "win_rate": 0.34615384615384615
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.4,
+      "trades": 79,
+      "net_pips": -547.1,
+      "max_dd_pct": 0.9163343968546314,
+      "win_rate": 0.31645569620253167
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.5,
+      "trades": 76,
+      "net_pips": -416.6,
+      "max_dd_pct": 0.7231169029480516,
+      "win_rate": 0.35526315789473684
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.6,
+      "trades": 67,
+      "net_pips": -548.3,
+      "max_dd_pct": 0.9567635532332959,
+      "win_rate": 0.31343283582089554
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.7,
+      "trades": 67,
+      "net_pips": -701.5,
+      "max_dd_pct": 1.0923275897214817,
+      "win_rate": 0.29850746268656714
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.8,
+      "trades": 61,
+      "net_pips": -447.5,
+      "max_dd_pct": 0.8788604998310644,
+      "win_rate": 0.32786885245901637
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 2.9,
+      "trades": 57,
+      "net_pips": -190.1,
+      "max_dd_pct": 0.6634887286687794,
+      "win_rate": 0.38596491228070173
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 7,
+      "trail_mult": 3.0,
+      "trades": 59,
+      "net_pips": -695.8,
+      "max_dd_pct": 0.8307450632567711,
+      "win_rate": 0.3220338983050847
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.0,
+      "trades": 84,
+      "net_pips": 71.8,
+      "max_dd_pct": 0.5594971417019651,
+      "win_rate": 0.34523809523809523
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.1,
+      "trades": 83,
+      "net_pips": -331.9,
+      "max_dd_pct": 0.5717610119067318,
+      "win_rate": 0.30120481927710846
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.2,
+      "trades": 78,
+      "net_pips": -335.8,
+      "max_dd_pct": 0.5706690321440682,
+      "win_rate": 0.2948717948717949
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.3,
+      "trades": 73,
+      "net_pips": -259.8,
+      "max_dd_pct": 0.59483085842397,
+      "win_rate": 0.3287671232876712
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.4,
+      "trades": 70,
+      "net_pips": -357.4,
+      "max_dd_pct": 0.6609197950671531,
+      "win_rate": 0.32857142857142857
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.5,
+      "trades": 66,
+      "net_pips": -342.1,
+      "max_dd_pct": 0.7056306086501274,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.6,
+      "trades": 58,
+      "net_pips": -159.7,
+      "max_dd_pct": 0.7491082575966892,
+      "win_rate": 0.3620689655172414
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.7,
+      "trades": 58,
+      "net_pips": -215.9,
+      "max_dd_pct": 0.735916686865399,
+      "win_rate": 0.3448275862068966
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.8,
+      "trades": 53,
+      "net_pips": 135.2,
+      "max_dd_pct": 0.5583459401410497,
+      "win_rate": 0.3584905660377358
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 2.9,
+      "trades": 48,
+      "net_pips": 316.1,
+      "max_dd_pct": 0.4657804195635008,
+      "win_rate": 0.3958333333333333
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 9,
+      "trail_mult": 3.0,
+      "trades": 48,
+      "net_pips": 68.2,
+      "max_dd_pct": 0.5268313694791964,
+      "win_rate": 0.3541666666666667
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.0,
+      "trades": 77,
+      "net_pips": 265.6,
+      "max_dd_pct": 0.3341332557329348,
+      "win_rate": 0.37662337662337664
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.1,
+      "trades": 75,
+      "net_pips": 23.8,
+      "max_dd_pct": 0.4094516120500002,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.2,
+      "trades": 73,
+      "net_pips": -155.0,
+      "max_dd_pct": 0.5248369950310673,
+      "win_rate": 0.3287671232876712
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.3,
+      "trades": 70,
+      "net_pips": -135.3,
+      "max_dd_pct": 0.5137211124793439,
+      "win_rate": 0.35714285714285715
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.4,
+      "trades": 67,
+      "net_pips": -209.5,
+      "max_dd_pct": 0.536975972701684,
+      "win_rate": 0.3582089552238806
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.5,
+      "trades": 61,
+      "net_pips": 83.4,
+      "max_dd_pct": 0.5016193219158708,
+      "win_rate": 0.36065573770491804
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.6,
+      "trades": 55,
+      "net_pips": 176.1,
+      "max_dd_pct": 0.5802215970624686,
+      "win_rate": 0.4
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.7,
+      "trades": 54,
+      "net_pips": 183.5,
+      "max_dd_pct": 0.5202794217928433,
+      "win_rate": 0.4074074074074074
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.8,
+      "trades": 49,
+      "net_pips": 370.3,
+      "max_dd_pct": 0.47818024774725104,
+      "win_rate": 0.3877551020408163
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 2.9,
+      "trades": 47,
+      "net_pips": 305.1,
+      "max_dd_pct": 0.5090470146455942,
+      "win_rate": 0.3829787234042553
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 11,
+      "trail_mult": 3.0,
+      "trades": 48,
+      "net_pips": 88.5,
+      "max_dd_pct": 0.5664374850573284,
+      "win_rate": 0.3541666666666667
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.0,
+      "trades": 75,
+      "net_pips": -140.6,
+      "max_dd_pct": 0.6292879073500292,
+      "win_rate": 0.30666666666666664
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.1,
+      "trades": 72,
+      "net_pips": -220.1,
+      "max_dd_pct": 0.6191326313202938,
+      "win_rate": 0.3055555555555556
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.2,
+      "trades": 70,
+      "net_pips": -397.7,
+      "max_dd_pct": 0.69072981879369,
+      "win_rate": 0.3
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.3,
+      "trades": 67,
+      "net_pips": -377.1,
+      "max_dd_pct": 0.7299194898253185,
+      "win_rate": 0.3283582089552239
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.4,
+      "trades": 65,
+      "net_pips": -416.7,
+      "max_dd_pct": 0.690448968121394,
+      "win_rate": 0.3076923076923077
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.5,
+      "trades": 60,
+      "net_pips": -109.5,
+      "max_dd_pct": 0.6188656845146142,
+      "win_rate": 0.31666666666666665
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.6,
+      "trades": 53,
+      "net_pips": 39.9,
+      "max_dd_pct": 0.6932110130805241,
+      "win_rate": 0.33962264150943394
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.7,
+      "trades": 53,
+      "net_pips": 76.4,
+      "max_dd_pct": 0.6315112729580631,
+      "win_rate": 0.3584905660377358
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.8,
+      "trades": 49,
+      "net_pips": 381.8,
+      "max_dd_pct": 0.377594810846626,
+      "win_rate": 0.40816326530612246
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 461.3,
+      "max_dd_pct": 0.3321167463474334,
+      "win_rate": 0.391304347826087
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 3.0,
+      "trades": 47,
+      "net_pips": 276.0,
+      "max_dd_pct": 0.3773042346526251,
+      "win_rate": 0.3829787234042553
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.0,
+      "trades": 67,
+      "net_pips": -23.6,
+      "max_dd_pct": 0.6309809995940182,
+      "win_rate": 0.3283582089552239
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.1,
+      "trades": 64,
+      "net_pips": -59.3,
+      "max_dd_pct": 0.7017538753020676,
+      "win_rate": 0.328125
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.2,
+      "trades": 63,
+      "net_pips": -247.4,
+      "max_dd_pct": 0.8270806450271615,
+      "win_rate": 0.31746031746031744
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.3,
+      "trades": 60,
+      "net_pips": -218.4,
+      "max_dd_pct": 0.7490398335427304,
+      "win_rate": 0.35
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.4,
+      "trades": 59,
+      "net_pips": -302.6,
+      "max_dd_pct": 0.7617935978403848,
+      "win_rate": 0.3389830508474576
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.5,
+      "trades": 56,
+      "net_pips": -64.3,
+      "max_dd_pct": 0.658014543312996,
+      "win_rate": 0.35714285714285715
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.6,
+      "trades": 52,
+      "net_pips": -20.5,
+      "max_dd_pct": 0.8247488551469463,
+      "win_rate": 0.36538461538461536
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.7,
+      "trades": 51,
+      "net_pips": 82.2,
+      "max_dd_pct": 0.7535726047283106,
+      "win_rate": 0.39215686274509803
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.8,
+      "trades": 47,
+      "net_pips": 394.9,
+      "max_dd_pct": 0.3826710354509717,
+      "win_rate": 0.44680851063829785
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 2.9,
+      "trades": 45,
+      "net_pips": 346.5,
+      "max_dd_pct": 0.41280571259442844,
+      "win_rate": 0.4222222222222222
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 15,
+      "trail_mult": 3.0,
+      "trades": 46,
+      "net_pips": 163.6,
+      "max_dd_pct": 0.5636409722596405,
+      "win_rate": 0.391304347826087
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.0,
+      "trades": 64,
+      "net_pips": 198.2,
+      "max_dd_pct": 0.45718982357803295,
+      "win_rate": 0.359375
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.1,
+      "trades": 61,
+      "net_pips": 170.0,
+      "max_dd_pct": 0.491424820434589,
+      "win_rate": 0.36065573770491804
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.2,
+      "trades": 59,
+      "net_pips": 6.9,
+      "max_dd_pct": 0.5908759850663158,
+      "win_rate": 0.3559322033898305
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.3,
+      "trades": 58,
+      "net_pips": -101.9,
+      "max_dd_pct": 0.652543180973733,
+      "win_rate": 0.3620689655172414
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.4,
+      "trades": 57,
+      "net_pips": -461.7,
+      "max_dd_pct": 0.8684078245196909,
+      "win_rate": 0.3157894736842105
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.5,
+      "trades": 55,
+      "net_pips": -170.0,
+      "max_dd_pct": 0.6775731350394453,
+      "win_rate": 0.34545454545454546
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.6,
+      "trades": 52,
+      "net_pips": 68.9,
+      "max_dd_pct": 0.8022934812462612,
+      "win_rate": 0.34615384615384615
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.7,
+      "trades": 52,
+      "net_pips": -184.4,
+      "max_dd_pct": 0.8550091638136158,
+      "win_rate": 0.34615384615384615
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.8,
+      "trades": 46,
+      "net_pips": 322.6,
+      "max_dd_pct": 0.3257260956643732,
+      "win_rate": 0.43478260869565216
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 2.9,
+      "trades": 44,
+      "net_pips": 278.2,
+      "max_dd_pct": 0.3420207964205055,
+      "win_rate": 0.4090909090909091
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 17,
+      "trail_mult": 3.0,
+      "trades": 44,
+      "net_pips": 209.2,
+      "max_dd_pct": 0.37351202350681073,
+      "win_rate": 0.4090909090909091
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.0,
+      "trades": 64,
+      "net_pips": 210.9,
+      "max_dd_pct": 0.44089048268795156,
+      "win_rate": 0.359375
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.1,
+      "trades": 61,
+      "net_pips": 190.2,
+      "max_dd_pct": 0.47301150029721867,
+      "win_rate": 0.36065573770491804
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.2,
+      "trades": 59,
+      "net_pips": 27.1,
+      "max_dd_pct": 0.539991248315641,
+      "win_rate": 0.3559322033898305
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.3,
+      "trades": 57,
+      "net_pips": -56.4,
+      "max_dd_pct": 0.5994614208771317,
+      "win_rate": 0.3684210526315789
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.4,
+      "trades": 56,
+      "net_pips": -444.7,
+      "max_dd_pct": 0.8514065341742504,
+      "win_rate": 0.32142857142857145
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.5,
+      "trades": 54,
+      "net_pips": -120.1,
+      "max_dd_pct": 0.620095933122748,
+      "win_rate": 0.35185185185185186
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.6,
+      "trades": 50,
+      "net_pips": 166.5,
+      "max_dd_pct": 0.7426178605600283,
+      "win_rate": 0.36
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.7,
+      "trades": 50,
+      "net_pips": -82.4,
+      "max_dd_pct": 0.7931346589212367,
+      "win_rate": 0.36
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.8,
+      "trades": 44,
+      "net_pips": 429.1,
+      "max_dd_pct": 0.3224304891531088,
+      "win_rate": 0.45454545454545453
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 2.9,
+      "trades": 42,
+      "net_pips": 389.1,
+      "max_dd_pct": 0.2754729782168157,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 19,
+      "trail_mult": 3.0,
+      "trades": 42,
+      "net_pips": 324.4,
+      "max_dd_pct": 0.30477409673510547,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.0,
+      "trades": 62,
+      "net_pips": 36.3,
+      "max_dd_pct": 0.4451698529295519,
+      "win_rate": 0.3387096774193548
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.1,
+      "trades": 59,
+      "net_pips": 19.1,
+      "max_dd_pct": 0.4769999773015485,
+      "win_rate": 0.3389830508474576
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.2,
+      "trades": 57,
+      "net_pips": -140.5,
+      "max_dd_pct": 0.5828731759557547,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.3,
+      "trades": 56,
+      "net_pips": -245.8,
+      "max_dd_pct": 0.6636875197816282,
+      "win_rate": 0.3392857142857143
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.4,
+      "trades": 55,
+      "net_pips": -524.6,
+      "max_dd_pct": 0.9261187127673823,
+      "win_rate": 0.3090909090909091
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.5,
+      "trades": 53,
+      "net_pips": -208.8,
+      "max_dd_pct": 0.6638596799892068,
+      "win_rate": 0.33962264150943394
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.6,
+      "trades": 48,
+      "net_pips": 251.8,
+      "max_dd_pct": 0.7553389321711982,
+      "win_rate": 0.3958333333333333
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.7,
+      "trades": 47,
+      "net_pips": -74.5,
+      "max_dd_pct": 0.8055689897501227,
+      "win_rate": 0.3617021276595745
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.8,
+      "trades": 42,
+      "net_pips": 278.4,
+      "max_dd_pct": 0.42185934478913806,
+      "win_rate": 0.40476190476190477
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 2.9,
+      "trades": 40,
+      "net_pips": 241.5,
+      "max_dd_pct": 0.4532486403514802,
+      "win_rate": 0.4
+    },
+    {
+      "pair": "EURUSD",
+      "ema_period": 21,
+      "trail_mult": 3.0,
+      "trades": 41,
+      "net_pips": 71.0,
+      "max_dd_pct": 0.48464880555590306,
+      "win_rate": 0.36585365853658536
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.0,
+      "trades": 106,
+      "net_pips": -396.0,
+      "max_dd_pct": 0.9607581021968028,
+      "win_rate": 0.37735849056603776
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.1,
+      "trades": 102,
+      "net_pips": -476.9,
+      "max_dd_pct": 1.0353729069208766,
+      "win_rate": 0.37254901960784315
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.2,
+      "trades": 94,
+      "net_pips": -260.4,
+      "max_dd_pct": 1.0302069570745744,
+      "win_rate": 0.3723404255319149
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.3,
+      "trades": 88,
+      "net_pips": -479.5,
+      "max_dd_pct": 0.98931082524332,
+      "win_rate": 0.3409090909090909
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.4,
+      "trades": 82,
+      "net_pips": -456.2,
+      "max_dd_pct": 1.0513380745108256,
+      "win_rate": 0.36585365853658536
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.5,
+      "trades": 79,
+      "net_pips": -330.6,
+      "max_dd_pct": 0.8575827161602153,
+      "win_rate": 0.379746835443038
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.6,
+      "trades": 69,
+      "net_pips": 456.4,
+      "max_dd_pct": 0.4611991740640858,
+      "win_rate": 0.42028985507246375
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.7,
+      "trades": 68,
+      "net_pips": 228.1,
+      "max_dd_pct": 0.5866140139693176,
+      "win_rate": 0.38235294117647056
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.8,
+      "trades": 65,
+      "net_pips": 306.9,
+      "max_dd_pct": 0.6163566844961432,
+      "win_rate": 0.4307692307692308
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 2.9,
+      "trades": 63,
+      "net_pips": 234.1,
+      "max_dd_pct": 0.577816743151998,
+      "win_rate": 0.3968253968253968
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 5,
+      "trail_mult": 3.0,
+      "trades": 57,
+      "net_pips": 120.4,
+      "max_dd_pct": 0.5057518750824225,
+      "win_rate": 0.3684210526315789
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.0,
+      "trades": 97,
+      "net_pips": -134.1,
+      "max_dd_pct": 0.9231206144358316,
+      "win_rate": 0.3402061855670103
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.1,
+      "trades": 90,
+      "net_pips": 120.2,
+      "max_dd_pct": 0.7015676647243799,
+      "win_rate": 0.35555555555555557
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.2,
+      "trades": 84,
+      "net_pips": 224.1,
+      "max_dd_pct": 0.7253832428904445,
+      "win_rate": 0.35714285714285715
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.3,
+      "trades": 79,
+      "net_pips": 58.6,
+      "max_dd_pct": 0.84359250573108,
+      "win_rate": 0.3670886075949367
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.4,
+      "trades": 74,
+      "net_pips": -23.8,
+      "max_dd_pct": 0.8085029302032691,
+      "win_rate": 0.3783783783783784
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.5,
+      "trades": 71,
+      "net_pips": 66.7,
+      "max_dd_pct": 0.7241922339992365,
+      "win_rate": 0.39436619718309857
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.6,
+      "trades": 61,
+      "net_pips": 1062.3,
+      "max_dd_pct": 0.38929246074072765,
+      "win_rate": 0.47540983606557374
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.7,
+      "trades": 63,
+      "net_pips": 573.4,
+      "max_dd_pct": 0.4504079975647248,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.8,
+      "trades": 61,
+      "net_pips": 391.0,
+      "max_dd_pct": 0.5821304720009057,
+      "win_rate": 0.4426229508196721
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.9,
+      "trades": 59,
+      "net_pips": 3.4,
+      "max_dd_pct": 0.6381125665489059,
+      "win_rate": 0.3898305084745763
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 3.0,
+      "trades": 50,
+      "net_pips": 352.8,
+      "max_dd_pct": 0.6507833955347195,
+      "win_rate": 0.42
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.0,
+      "trades": 79,
+      "net_pips": 336.5,
+      "max_dd_pct": 0.6283289313144773,
+      "win_rate": 0.3670886075949367
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.1,
+      "trades": 74,
+      "net_pips": 678.1,
+      "max_dd_pct": 0.4298548244480515,
+      "win_rate": 0.3783783783783784
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.2,
+      "trades": 71,
+      "net_pips": 557.6,
+      "max_dd_pct": 0.5477041233823166,
+      "win_rate": 0.38028169014084506
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.3,
+      "trades": 65,
+      "net_pips": 316.3,
+      "max_dd_pct": 0.6004082226810137,
+      "win_rate": 0.38461538461538464
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.4,
+      "trades": 65,
+      "net_pips": -10.8,
+      "max_dd_pct": 0.6680955973358091,
+      "win_rate": 0.36923076923076925
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.5,
+      "trades": 62,
+      "net_pips": 26.0,
+      "max_dd_pct": 0.6814930766841207,
+      "win_rate": 0.3870967741935484
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.6,
+      "trades": 56,
+      "net_pips": 583.9,
+      "max_dd_pct": 0.5300940447241919,
+      "win_rate": 0.44642857142857145
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.7,
+      "trades": 57,
+      "net_pips": 128.5,
+      "max_dd_pct": 0.4907945288006945,
+      "win_rate": 0.38596491228070173
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.8,
+      "trades": 54,
+      "net_pips": -53.1,
+      "max_dd_pct": 0.5439861074594777,
+      "win_rate": 0.42592592592592593
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 2.9,
+      "trades": 52,
+      "net_pips": -313.2,
+      "max_dd_pct": 0.637277265798873,
+      "win_rate": 0.36538461538461536
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 9,
+      "trail_mult": 3.0,
+      "trades": 43,
+      "net_pips": 174.0,
+      "max_dd_pct": 0.5088691156861953,
+      "win_rate": 0.4186046511627907
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.0,
+      "trades": 75,
+      "net_pips": 243.9,
+      "max_dd_pct": 0.6353079336161663,
+      "win_rate": 0.4
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.1,
+      "trades": 71,
+      "net_pips": 540.9,
+      "max_dd_pct": 0.6300855275443253,
+      "win_rate": 0.4084507042253521
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.2,
+      "trades": 68,
+      "net_pips": 111.5,
+      "max_dd_pct": 0.7123751452152491,
+      "win_rate": 0.4117647058823529
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.3,
+      "trades": 66,
+      "net_pips": -261.2,
+      "max_dd_pct": 0.8088480500947755,
+      "win_rate": 0.3787878787878788
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.4,
+      "trades": 63,
+      "net_pips": 71.9,
+      "max_dd_pct": 0.7589487686372435,
+      "win_rate": 0.38095238095238093
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.5,
+      "trades": 60,
+      "net_pips": 106.5,
+      "max_dd_pct": 0.6707822634979073,
+      "win_rate": 0.38333333333333336
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.6,
+      "trades": 54,
+      "net_pips": 652.8,
+      "max_dd_pct": 0.5303964397991477,
+      "win_rate": 0.4444444444444444
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.7,
+      "trades": 54,
+      "net_pips": 297.9,
+      "max_dd_pct": 0.5666595347955734,
+      "win_rate": 0.4074074074074074
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.8,
+      "trades": 50,
+      "net_pips": 426.6,
+      "max_dd_pct": 0.493477626640069,
+      "win_rate": 0.44
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 2.9,
+      "trades": 48,
+      "net_pips": 205.8,
+      "max_dd_pct": 0.5252193422046147,
+      "win_rate": 0.3958333333333333
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 11,
+      "trail_mult": 3.0,
+      "trades": 43,
+      "net_pips": 467.1,
+      "max_dd_pct": 0.45520640457062295,
+      "win_rate": 0.4418604651162791
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.0,
+      "trades": 71,
+      "net_pips": 839.6,
+      "max_dd_pct": 0.4067951607536726,
+      "win_rate": 0.43661971830985913
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.1,
+      "trades": 70,
+      "net_pips": 514.0,
+      "max_dd_pct": 0.5616817313583153,
+      "win_rate": 0.4
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.2,
+      "trades": 67,
+      "net_pips": 100.0,
+      "max_dd_pct": 0.606971224213549,
+      "win_rate": 0.3880597014925373
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.3,
+      "trades": 64,
+      "net_pips": -59.5,
+      "max_dd_pct": 0.676478358222603,
+      "win_rate": 0.34375
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.4,
+      "trades": 61,
+      "net_pips": 280.7,
+      "max_dd_pct": 0.6304652652602435,
+      "win_rate": 0.3442622950819672
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.5,
+      "trades": 59,
+      "net_pips": 240.6,
+      "max_dd_pct": 0.6410728818727239,
+      "win_rate": 0.3389830508474576
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.6,
+      "trades": 55,
+      "net_pips": 632.4,
+      "max_dd_pct": 0.49016044935487724,
+      "win_rate": 0.41818181818181815
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.7,
+      "trades": 54,
+      "net_pips": 539.5,
+      "max_dd_pct": 0.36769903275903976,
+      "win_rate": 0.3888888888888889
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.8,
+      "trades": 50,
+      "net_pips": 652.4,
+      "max_dd_pct": 0.3736535102713262,
+      "win_rate": 0.44
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 373.8,
+      "max_dd_pct": 0.456487257892446,
+      "win_rate": 0.391304347826087
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 13,
+      "trail_mult": 3.0,
+      "trades": 44,
+      "net_pips": 301.7,
+      "max_dd_pct": 0.5689890304574613,
+      "win_rate": 0.38636363636363635
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.0,
+      "trades": 70,
+      "net_pips": 627.5,
+      "max_dd_pct": 0.41552503921262907,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.1,
+      "trades": 69,
+      "net_pips": 305.6,
+      "max_dd_pct": 0.6156544761904721,
+      "win_rate": 0.391304347826087
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.2,
+      "trades": 66,
+      "net_pips": -104.8,
+      "max_dd_pct": 0.6189289761251299,
+      "win_rate": 0.3787878787878788
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.3,
+      "trades": 65,
+      "net_pips": -168.9,
+      "max_dd_pct": 0.7195037240081095,
+      "win_rate": 0.35384615384615387
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.4,
+      "trades": 63,
+      "net_pips": -266.5,
+      "max_dd_pct": 0.8211477179675233,
+      "win_rate": 0.3492063492063492
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.5,
+      "trades": 60,
+      "net_pips": -16.8,
+      "max_dd_pct": 0.6364672538892753,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.6,
+      "trades": 57,
+      "net_pips": 220.8,
+      "max_dd_pct": 0.5343608219581913,
+      "win_rate": 0.38596491228070173
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.7,
+      "trades": 54,
+      "net_pips": 719.9,
+      "max_dd_pct": 0.3593261289946499,
+      "win_rate": 0.3888888888888889
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.8,
+      "trades": 49,
+      "net_pips": 680.1,
+      "max_dd_pct": 0.37011113733832784,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 2.9,
+      "trades": 45,
+      "net_pips": 318.7,
+      "max_dd_pct": 0.5894189964656217,
+      "win_rate": 0.37777777777777777
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 15,
+      "trail_mult": 3.0,
+      "trades": 45,
+      "net_pips": -44.9,
+      "max_dd_pct": 0.7504478749139905,
+      "win_rate": 0.35555555555555557
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.0,
+      "trades": 70,
+      "net_pips": 750.5,
+      "max_dd_pct": 0.4149872669940181,
+      "win_rate": 0.42857142857142855
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.1,
+      "trades": 69,
+      "net_pips": 428.8,
+      "max_dd_pct": 0.6148556497707258,
+      "win_rate": 0.391304347826087
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.2,
+      "trades": 65,
+      "net_pips": 209.0,
+      "max_dd_pct": 0.6169524896804713,
+      "win_rate": 0.38461538461538464
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.3,
+      "trades": 65,
+      "net_pips": -30.6,
+      "max_dd_pct": 0.7094368894732086,
+      "win_rate": 0.36923076923076925
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.4,
+      "trades": 62,
+      "net_pips": 64.5,
+      "max_dd_pct": 0.8037096558243159,
+      "win_rate": 0.3709677419354839
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.5,
+      "trades": 59,
+      "net_pips": 317.3,
+      "max_dd_pct": 0.5950071172652783,
+      "win_rate": 0.3728813559322034
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.6,
+      "trades": 57,
+      "net_pips": 499.7,
+      "max_dd_pct": 0.5336442882079181,
+      "win_rate": 0.38596491228070173
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.7,
+      "trades": 55,
+      "net_pips": 827.1,
+      "max_dd_pct": 0.34287182332946964,
+      "win_rate": 0.41818181818181815
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.8,
+      "trades": 51,
+      "net_pips": 577.0,
+      "max_dd_pct": 0.3706997393344973,
+      "win_rate": 0.45098039215686275
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 69.5,
+      "max_dd_pct": 0.5828807433676564,
+      "win_rate": 0.34782608695652173
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 17,
+      "trail_mult": 3.0,
+      "trades": 45,
+      "net_pips": -487.5,
+      "max_dd_pct": 0.6536855397695779,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.0,
+      "trades": 67,
+      "net_pips": 666.1,
+      "max_dd_pct": 0.47778973825895493,
+      "win_rate": 0.40298507462686567
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.1,
+      "trades": 66,
+      "net_pips": 465.6,
+      "max_dd_pct": 0.5706838236220898,
+      "win_rate": 0.3939393939393939
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.2,
+      "trades": 64,
+      "net_pips": 162.1,
+      "max_dd_pct": 0.6092342552669151,
+      "win_rate": 0.375
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.3,
+      "trades": 64,
+      "net_pips": -379.2,
+      "max_dd_pct": 0.7023245294916557,
+      "win_rate": 0.328125
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.4,
+      "trades": 61,
+      "net_pips": 234.8,
+      "max_dd_pct": 0.6004207146200192,
+      "win_rate": 0.3770491803278688
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.5,
+      "trades": 58,
+      "net_pips": 491.0,
+      "max_dd_pct": 0.4095625597005657,
+      "win_rate": 0.39655172413793105
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.6,
+      "trades": 56,
+      "net_pips": 770.0,
+      "max_dd_pct": 0.3034689432945864,
+      "win_rate": 0.4107142857142857
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.7,
+      "trades": 54,
+      "net_pips": 582.0,
+      "max_dd_pct": 0.5065748094763622,
+      "win_rate": 0.3888888888888889
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.8,
+      "trades": 49,
+      "net_pips": 210.2,
+      "max_dd_pct": 0.4175469328182718,
+      "win_rate": 0.3877551020408163
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 89.4,
+      "max_dd_pct": 0.5251719066958964,
+      "win_rate": 0.32608695652173914
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 19,
+      "trail_mult": 3.0,
+      "trades": 45,
+      "net_pips": -478.3,
+      "max_dd_pct": 0.6518670577196303,
+      "win_rate": 0.3111111111111111
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.0,
+      "trades": 66,
+      "net_pips": 452.4,
+      "max_dd_pct": 0.5631786210305245,
+      "win_rate": 0.36363636363636365
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.1,
+      "trades": 65,
+      "net_pips": 254.6,
+      "max_dd_pct": 0.6592938992828923,
+      "win_rate": 0.35384615384615387
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.2,
+      "trades": 63,
+      "net_pips": -184.1,
+      "max_dd_pct": 0.7021038734588413,
+      "win_rate": 0.3333333333333333
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.3,
+      "trades": 61,
+      "net_pips": -286.8,
+      "max_dd_pct": 0.730598390054626,
+      "win_rate": 0.32786885245901637
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.4,
+      "trades": 59,
+      "net_pips": -45.6,
+      "max_dd_pct": 0.625130261903567,
+      "win_rate": 0.3559322033898305
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.5,
+      "trades": 56,
+      "net_pips": 232.2,
+      "max_dd_pct": 0.4173277659569086,
+      "win_rate": 0.375
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.6,
+      "trades": 55,
+      "net_pips": 428.1,
+      "max_dd_pct": 0.4353651059886775,
+      "win_rate": 0.38181818181818183
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.7,
+      "trades": 53,
+      "net_pips": 365.5,
+      "max_dd_pct": 0.5116087773628122,
+      "win_rate": 0.3584905660377358
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.8,
+      "trades": 49,
+      "net_pips": 223.8,
+      "max_dd_pct": 0.4990200079221779,
+      "win_rate": 0.40816326530612246
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 92.6,
+      "max_dd_pct": 0.6171648318745895,
+      "win_rate": 0.3695652173913043
+    },
+    {
+      "pair": "GBPUSD",
+      "ema_period": 21,
+      "trail_mult": 3.0,
+      "trades": 44,
+      "net_pips": 211.4,
+      "max_dd_pct": 0.6723642758787303,
+      "win_rate": 0.4318181818181818
+    }
+  ],
+  "summary": {
+    "cells_total": 198,
+    "EURUSD_positive_cells": 44,
+    "EURUSD_fraction_positive": 0.444,
+    "EURUSD_best": {
+      "pair": "EURUSD",
+      "ema_period": 13,
+      "trail_mult": 2.9,
+      "trades": 46,
+      "net_pips": 461.3,
+      "max_dd_pct": 0.3321167463474334,
+      "win_rate": 0.391304347826087
+    },
+    "GBPUSD_positive_cells": 74,
+    "GBPUSD_fraction_positive": 0.747,
+    "GBPUSD_best": {
+      "pair": "GBPUSD",
+      "ema_period": 7,
+      "trail_mult": 2.6,
+      "trades": 61,
+      "net_pips": 1062.3,
+      "max_dd_pct": 0.38929246074072765,
+      "win_rate": 0.47540983606557374
+    }
+  }
+}
