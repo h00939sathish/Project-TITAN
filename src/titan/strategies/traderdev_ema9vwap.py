@@ -49,9 +49,14 @@ class TraderDevEMA9VWAP:
     _prev_vwap: float | None = None
     _position: int = 0          # +1 long, -1 short, 0 flat
     _trail: float | None = None  # trailing exit price (long: below, short: above)
+    # Exit levels for the intent the bridge builds from THIS bar's signal.
+    # Populated on every BUY/SELL entry: {'stop_price': float|None,
+    # 'take_profit_price': float|None, 'trailing': (activation, trail)|None}
+    current_exits: dict = field(default_factory=dict)
 
     # make it callable like signal_fn(bar)
     def __call__(self, bar: dict) -> str | None:
+        self.current_exits = {}
         if "high" in bar and "low" in bar:
             return self.update_bar(bar)
         return self.update(float(bar["close"]))
@@ -130,10 +135,15 @@ class TraderDevEMA9VWAP:
                 self._position = 1
                 self._trail = close - rng * self.trail_mult
                 signal = "BUY"
+                # expose the initial protective stop to the bridge/intent
+                if self._trail is not None:
+                    self.current_exits["stop_price"] = round(self._trail, 6)
             elif self._prev_ema >= self._prev_vwap and ema < vwap:
                 self._position = -1
                 self._trail = close + rng * self.trail_mult
                 signal = "SELL"
+                if self._trail is not None:
+                    self.current_exits["stop_price"] = round(self._trail, 6)
 
         # ratchet trailing stop in the profit direction
         if self._position != 0 and self._trail is not None:

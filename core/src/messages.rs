@@ -92,6 +92,48 @@ impl EventEnvelope {
     }
 }
 
+/// Trailing-stop configuration in price terms (broker-agnostic).
+///
+/// - activation_distance: how far price must move from the fill (entry) before
+///   the trail arms; 0/none means arm immediately.
+/// - trail_distance: how far the stop lags the current price once armed.
+/// Both are absolute price distances. Validation requires
+/// activation_distance >= trail_distance.
+#[pyclass(get_all)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TrailingConfig {
+    #[serde(deserialize_with = "crate::validation::deserialize_decimal_string")]
+    pub activation_distance: String,
+    #[serde(deserialize_with = "crate::validation::deserialize_decimal_string")]
+    pub trail_distance: String,
+}
+
+#[pymethods]
+impl TrailingConfig {
+    #[new]
+    #[pyo3(signature = (activation_distance, trail_distance))]
+    pub fn new(activation_distance: String, trail_distance: String) -> Self {
+        Self { activation_distance, trail_distance }
+    }
+
+    /// Validation: activation distance must be >= trail distance.
+    /// Returns Ok(()) or a ValueError with a stable machine-readable code.
+    pub fn validate(&self) -> PyResult<()> {
+        let act: f64 = self.activation_distance.parse().map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err("trailing_activation_invalid")
+        })?;
+        let trl: f64 = self.trail_distance.parse().map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err("trailing_distance_invalid")
+        })?;
+        if act < trl {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "trailing_activation_less_than_distance",
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// A typed trade intent emitted by a strategy.
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -116,6 +158,12 @@ pub struct TradeIntent {
     #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub stop_price: Option<String>,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
+    pub take_profit_price: Option<String>,
+    #[pyo3(get)]
+    #[serde(default)]
+    pub trailing: Option<TrailingConfig>,
+    #[pyo3(get)]
     pub order_type: String,
     #[pyo3(get)]
     pub time_in_force: String,
@@ -136,7 +184,7 @@ impl TradeIntent {
     #[pyo3(signature = (
         strategy_id, strategy_package_digest, account_id, instrument_id,
         side, quantity, order_type, time_in_force, risk_profile_version, market_data_timestamp,
-        price=None, stop_price=None, expiry=None
+        price=None, stop_price=None, take_profit_price=None, trailing=None, expiry=None
     ))]
     pub fn new(
         strategy_id: String,
@@ -151,6 +199,8 @@ impl TradeIntent {
         market_data_timestamp: String,
         price: Option<String>,
         stop_price: Option<String>,
+        take_profit_price: Option<String>,
+        trailing: Option<TrailingConfig>,
         expiry: Option<String>,
     ) -> Self {
         Self {
@@ -162,6 +212,8 @@ impl TradeIntent {
             quantity,
             price,
             stop_price,
+            take_profit_price,
+            trailing,
             order_type: order_type.to_uppercase(),
             time_in_force: time_in_force.to_uppercase(),
             risk_profile_version,
@@ -408,5 +460,68 @@ impl RiskStateSnapshot {
 
     fn __repr__(&self) -> String {
         format!("RiskStateSnapshot(id={}, ks={}, ts={}, at={})", self.message_id, self.kill_switch_state, self.trading_state, self.occurred_at)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn intent_with_exits(tp: Option<&str>, trailing: Option<(&str, &str)>) -> TradeIntent {
+        let tr = trailing.map(|(a, d)| TrailingConfig {
+            activation_distance: a.to_string(),
+            trail_distance: d.to_string(),
+        });
+        TradeIntent::new(
+            "strat1".to_string(), "digest1".to_string(), "acc1".to_string(),
+            "EURUSD".to_string(), "BUY".to_string(), "10000".to_string(),
+            "MARKET".to_string(), "DAY".to_string(), "v1".to_string(),
+            "2026-08-07T00:00:00Z".to_string(),
+            Some("1.10".to_string()), Some("1.095".to_string()),
+            tp.map(|s| s.to_string()), tr, None,
+        )
+    }
+
+    #[test]
+    fn trailing_config_accepts_valid_distances() {
+        let tc = TrailingConfig { activation_distance: "0.002".into(), trail_distance: "0.001".into() };
+        assert!(tc.validate().is_ok());
+    }
+
+    #[test]
+    fn trailing_config_rejects_activation_less_than_distance() {
+        let tc = TrailingConfig { activation_distance: "0.001".into(), trail_distance: "0.002".into() };
+        assert!(tc.validate().is_err());
+    }
+
+    #[test]
+    fn trade_intent_carries_take_profit_and_trailing() {
+        let it = intent_with_exits(Some("1.12"), Some(("0.002", "0.001")));
+        assert_eq!(it.take_profit_price.as_deref(), Some("1.12"));
+        let tr = it.trailing.unwrap();
+        assert_eq!(tr.activation_distance, "0.002");
+        assert_eq!(tr.trail_distance, "0.001");
+    }
+
+    #[test]
+    fn trade_intent_serializes_exit_fields() {
+        let it = intent_with_exits(Some("1.12"), Some(("0.002", "0.001")));
+        let json = it.to_json().unwrap();
+        assert!(json.contains("take_profit_price"));
+        assert!(json.contains("trailing"));
+        let back: TradeIntent = TradeIntent::from_json(&json).unwrap();
+        assert_eq!(back.take_profit_price.as_deref(), Some("1.12"));
+        assert!(back.trailing.is_some());
+    }
+
+    #[test]
+    fn trade_intent_backwards_compatible_without_exits() {
+        // Legacy construction (no exit args) still works and round-trips.
+        let it = intent_with_exits(None, None);
+        let json = it.to_json().unwrap();
+        let back: TradeIntent = TradeIntent::from_json(&json).unwrap();
+        assert!(back.take_profit_price.is_none());
+        assert!(back.trailing.is_none());
+        assert!(back.stop_price.is_some());
     }
 }

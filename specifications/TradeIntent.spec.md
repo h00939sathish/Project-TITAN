@@ -25,6 +25,24 @@ Called by: Strategy runtime, Research engine (advisory proposals only).
 - `TradeIntent` messages to the risk gate
 - `TradeIntentExpired` events (when an intent's time-to-live elapses without a decision)
 
+### Exit fields (ADR-021)
+
+A `TradeIntent` may carry optional, broker-agnostic protective exits, all in
+absolute price terms (no strategy-side assumption about broker mechanics):
+
+| Field | Meaning | Validation |
+|---|---|---|
+| `stop_price` | Initial protective stop (loss side) | optional decimal string |
+| `take_profit_price` | Initial profit target | optional decimal string |
+| `trailing` | Trailing controller `(activation_distance, trail_distance)` | `activation >= trail` (strict `ValueError`, code `trailing_activation_less_than_distance`) |
+
+Producer responsibility: the strategy emits signal + exit levels (e.g. ATR ×
+multiple); the bridge attaches them to the intent; the engine/adapter owns
+trailing persistence and broker mapping. `ApprovedOrderIntent` carries
+`stop_price` today; `take_profit_price` / `trailing` require the Rust
+`ApprovedOrderIntent` extension (ADR-021 follow-up) before they survive the
+approval boundary to the IBKR adapter.
+
 ## State machine
 
 ```mermaid

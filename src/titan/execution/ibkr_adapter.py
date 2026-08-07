@@ -259,6 +259,26 @@ class IBKRPaperAdapter(BrokerAdapter):
             if self._account_id:
                 order.account = self._account_id
 
+            # ADR-021: protective stop from the intent. Paper adapter is
+            # guaranteed by construction (paper_mode enforced in __init__), so
+            # mapping the intent's stop_price to an IBKR STP child is safe. The
+            # parent stays the entry order; the STP is attached as a child so a
+            # fill of the parent arms it (bracket semantics). take_profit_price
+            # / trailing require ApprovedOrderIntent to carry them (Rust
+            # extension, documented in ADR-021 spec follow-up) — until then they
+            # are intentionally NOT silently dropped: the entry still places.
+            if intent.stop_price:
+                stop_child = Order()
+                stop_child.action = "SELL" if str(intent.side).upper() == "BUY" else "BUY"
+                stop_child.totalQuantity = int(str(intent.quantity))
+                stop_child.orderType = "STP"
+                stop_child.auxPrice = float(str(intent.stop_price))
+                stop_child.tif = "GTC"
+                stop_child.parentId = oid
+                stop_child.orderId = self._order_id()
+                stop_child.account = self._account_id
+                self._client.placeOrder(stop_child.orderId, contract, stop_child)
+
             # Track the client order for async status polling (tick/ensure_connected)
             self._wrapper._client_by_oid[oid] = str(intent.client_order_id)
             self._wrapper._order_meta[oid] = {
