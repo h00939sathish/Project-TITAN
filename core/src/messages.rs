@@ -330,6 +330,12 @@ pub struct ApprovedOrderIntent {
     #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
     pub stop_price: Option<String>,
     #[pyo3(get)]
+    #[serde(default, deserialize_with = "crate::validation::deserialize_opt_decimal_string")]
+    pub take_profit_price: Option<String>,
+    #[pyo3(get)]
+    #[serde(default)]
+    pub trailing: Option<TrailingConfig>,
+    #[pyo3(get)]
     pub order_type: String,
     #[pyo3(get)]
     pub time_in_force: String,
@@ -346,7 +352,8 @@ impl ApprovedOrderIntent {
     #[pyo3(signature = (
         risk_decision_id, intent_id, client_order_id, instrument_id,
         side, quantity, order_type, time_in_force, risk_profile_version,
-        price=None, stop_price=None, risk_token=None
+        price=None, stop_price=None, take_profit_price=None,
+        trailing=None, risk_token=None
     ))]
     pub fn new(
         risk_decision_id: String,
@@ -360,6 +367,8 @@ impl ApprovedOrderIntent {
         risk_profile_version: String,
         price: Option<String>,
         stop_price: Option<String>,
+        take_profit_price: Option<String>,
+        trailing: Option<TrailingConfig>,
         risk_token: Option<String>,
     ) -> Self {
         Self {
@@ -371,6 +380,8 @@ impl ApprovedOrderIntent {
             quantity,
             price,
             stop_price,
+            take_profit_price,
+            trailing,
             order_type: order_type.to_uppercase(),
             time_in_force: time_in_force.to_uppercase(),
             risk_profile_version,

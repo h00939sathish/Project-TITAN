@@ -671,6 +671,8 @@ class PaperTradingEngine:
             risk_profile_version="1.0",
             price=str(intent.price) if intent.price else None,
             stop_price=str(intent.stop_price) if hasattr(intent, 'stop_price') and intent.stop_price else None,
+            take_profit_price=str(intent.take_profit_price) if hasattr(intent, 'take_profit_price') and intent.take_profit_price else None,
+            trailing=intent.trailing if hasattr(intent, 'trailing') else None,
         )
 
         secret_key = getattr(self.config, 'risk_secret_key', 'TITAN_RISK_SECRET_KEY')

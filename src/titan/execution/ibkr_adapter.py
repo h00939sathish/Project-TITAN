@@ -125,13 +125,28 @@ class IBKRPaperAdapter(BrokerAdapter):
     or Gateway 8874.
     """
 
+    def _trailing_entitled(self) -> bool:
+        """ADR-018 gate: whether the paper account supports trailing orders.
+
+        Defaults to True for paper (IBKR paper supports TRAIL), but returns
+        False if an explicit entitlement map is set and omits it. Callers must
+        refuse loudly (not fall back) when this is False.
+        """
+        ents = getattr(self, "_entitlements", None)
+        if ents is None:
+            return True  # no explicit map -> paper default supports trail
+        return "TRAIL" in ents
+
     @staticmethod
     def _is_paper_account(account_id: str) -> bool:
         if not account_id:
             return False
         acc = account_id.strip().upper()
-        # IBKR Paper account prefixes: DU (Individual Paper), DF (Financial Advisor Paper), PAPER, S (Simulated)
-        return acc.startswith("DU") or acc.startswith("DF") or acc.startswith("PAPER") or acc.startswith("S") or acc.startswith("SIM")
+        # IBKR Paper account prefixes: DU (Individual Paper), DF (Financial
+        # Advisor Paper), PAPER, S (Simulated)
+        return (acc.startswith("DU") or acc.startswith("DF")
+                or acc.startswith("PAPER") or acc.startswith("S")
+                or acc.startswith("SIM"))
 
     def __init__(
         self,
@@ -142,6 +157,7 @@ class IBKRPaperAdapter(BrokerAdapter):
         connect_timeout: float = 15.0,
         fill_timeout: float = 12.0,
         paper_mode: bool = True,
+        entitlements: Optional[set[str]] = None,
     ) -> None:
         if not paper_mode:
             raise ValueError("IBKRPaperAdapter requires paper_mode=True to prevent live routing")
@@ -159,6 +175,7 @@ class IBKRPaperAdapter(BrokerAdapter):
         self._account_id = account_id
         self._connect_timeout = connect_timeout
         self._fill_timeout = fill_timeout
+        self._entitlements = entitlements  # None = paper-default (trail supported)
 
         self._wrapper = _IBKRWrapper()
         self._client = EClient(self._wrapper)
@@ -259,14 +276,10 @@ class IBKRPaperAdapter(BrokerAdapter):
             if self._account_id:
                 order.account = self._account_id
 
-            # ADR-021: protective stop from the intent. Paper adapter is
+            # ADR-021: protective exits from the intent. Paper adapter is
             # guaranteed by construction (paper_mode enforced in __init__), so
-            # mapping the intent's stop_price to an IBKR STP child is safe. The
-            # parent stays the entry order; the STP is attached as a child so a
-            # fill of the parent arms it (bracket semantics). take_profit_price
-            # / trailing require ApprovedOrderIntent to carry them (Rust
-            # extension, documented in ADR-021 spec follow-up) — until then they
-            # are intentionally NOT silently dropped: the entry still places.
+            # mapping intent exits to IBKR child orders is safe. Bracket
+            # semantics: the parent is the entry; children arm on its fill.
             if intent.stop_price:
                 stop_child = Order()
                 stop_child.action = "SELL" if str(intent.side).upper() == "BUY" else "BUY"
@@ -278,6 +291,35 @@ class IBKRPaperAdapter(BrokerAdapter):
                 stop_child.orderId = self._order_id()
                 stop_child.account = self._account_id
                 self._client.placeOrder(stop_child.orderId, contract, stop_child)
+            if getattr(intent, "take_profit_price", None):
+                tp_child = Order()
+                tp_child.action = "SELL" if str(intent.side).upper() == "BUY" else "BUY"
+                tp_child.totalQuantity = int(str(intent.quantity))
+                tp_child.orderType = "LMT"
+                tp_child.lmtPrice = float(str(intent.take_profit_price))
+                tp_child.tif = "GTC"
+                tp_child.parentId = oid
+                tp_child.orderId = self._order_id()
+                tp_child.account = self._account_id
+                self._client.placeOrder(tp_child.orderId, contract, tp_child)
+            if getattr(intent, "trailing", None):
+                # ADR-018 gate: trailing orders are entitlement-sensitive even
+                # on paper. Refuse loudly if the account lacks TRAIL support —
+                # never fall back silently.
+                if not self._trailing_entitled():
+                    return BrokerOrderAcknowledgement(
+                        accepted=False,
+                        rejection_reason="trailing_order_not_entitled (ADR-018)",
+                    )
+                trl_child = Order()
+                trl_child.action = "SELL" if str(intent.side).upper() == "BUY" else "BUY"
+                trl_child.totalQuantity = int(str(intent.quantity))
+                trl_child.orderType = "TRAIL"
+                trl_child.auxPrice = float(getattr(intent.trailing, "trail_distance", "0") or "0")
+                trl_child.parentId = oid
+                trl_child.orderId = self._order_id()
+                trl_child.account = self._account_id
+                self._client.placeOrder(trl_child.orderId, contract, trl_child)
 
             # Track the client order for async status polling (tick/ensure_connected)
             self._wrapper._client_by_oid[oid] = str(intent.client_order_id)
