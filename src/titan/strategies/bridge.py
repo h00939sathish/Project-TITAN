@@ -141,6 +141,15 @@ class StrategyBridge:
         if self._order_type == "LIMIT":
             order_price = order_price + self._limit_offset if signal == "BUY" else order_price - self._limit_offset
 
+        # Exit levels from the strategy (if it exposes them). The strategy is a
+        # pure calculator: it sets current_exits on entry, the bridge attaches
+        # them to the intent so the engine/adapter can carry stop/TP/trailing.
+        exits = getattr(fn, "strat", None)
+        exit_levels = getattr(exits, "current_exits", None) or {}
+        stop_price = exit_levels.get("stop_price")
+        tp_price = exit_levels.get("take_profit_price")
+        trailing_cfg = exit_levels.get("trailing")
+
         intent = TradeIntent(
             strategy_id=self._strategy_id,
             strategy_package_digest=self._package_digest,
@@ -153,6 +162,9 @@ class StrategyBridge:
             risk_profile_version=self._risk_profile_version,
             market_data_timestamp=bar_date or datetime.now(timezone.utc).isoformat(),
             price=str(order_price),
+            stop_price=str(stop_price) if stop_price is not None else None,
+            take_profit_price=str(tp_price) if tp_price is not None else None,
+            trailing=trailing_cfg,
         )
         self._last_manifest = make_manifest(
             strategy_id=self._strategy_id,

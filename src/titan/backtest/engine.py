@@ -107,6 +107,63 @@ class ReplayEngine:
             state_path="",
         )
 
+    def _check_exits(self, bar: dict, ex: dict) -> tuple[str, float] | None:
+        """Evaluate one bar against active exit levels.
+
+        Returns (closing_side, fill_price) when a protective exit is hit, else
+        None. Convention (per ADR-021 plan): gap pierce at bar.open fills at
+        open; intrabar pierce fills at the stop/TP level; stop wins tie-breaks;
+        trailing ratchets monotonically from the entry price.
+        """
+        o = float(bar["open"])
+        h = float(bar["high"])
+        l = float(bar["low"])
+        long_side = ex["side"] == "BUY"
+        stop = float(ex["stop_price"]) if ex.get("stop_price") is not None else None
+        tp = float(ex["take_profit_price"]) if ex.get("take_profit_price") is not None else None
+        trailing = ex.get("trailing")
+
+        # Trailing: ratchet the effective stop from bar extremes.
+        eff_stop = stop
+        if trailing is not None:
+            act = float(getattr(trailing, "activation_distance", "0") or "0")
+            trail = float(getattr(trailing, "trail_distance", "0") or "0")
+            if long_side:
+                if h >= o + act:  # armed this bar
+                    eff_stop = max(eff_stop or 0.0, h - trail)
+            else:
+                if l <= o - act:
+                    eff_stop = min(eff_stop or float("inf"), l + trail) if eff_stop else l + trail
+
+        # Gap checks first (fill at open).
+        if long_side:
+            if stop is not None and o <= float(stop):
+                return "SELL", o
+            if tp is not None and o >= float(tp):
+                return "SELL", o
+        else:
+            if stop is not None and o >= float(stop):
+                return "BUY", o
+            if tp is not None and o <= float(tp):
+                return "BUY", o
+
+        # Intrabar: stop and TP both pierced -> stop wins (conservative).
+        if long_side:
+            stop_hit = eff_stop is not None and l <= float(eff_stop)
+            tp_hit = tp is not None and h >= float(tp)
+            if stop_hit:
+                return "SELL", float(eff_stop)
+            if tp_hit:
+                return "SELL", float(tp)
+        else:
+            stop_hit = eff_stop is not None and h >= float(eff_stop)
+            tp_hit = tp is not None and l <= float(tp)
+            if stop_hit:
+                return "BUY", float(eff_stop)
+            if tp_hit:
+                return "BUY", float(tp)
+        return None
+
     def run(self) -> BacktestResult:
         bars = self._bars
         if not bars:
@@ -133,9 +190,57 @@ class ReplayEngine:
 
         result = BacktestResult()
 
+        # Active exit levels per instrument, set when an accepted intent carries
+        # stops. The engine enforces them as a hard floor for strategies that do
+        # not self-manage exits (a strategy with update_bar self-manages and its
+        # own exit signal flattens first — this only fires when the strategy
+        # returned no exit signal this bar). Gap handling: bar.open pierce fills
+        # at open; intrabar pierce fills at the stop level; stop wins tie-breaks.
+        open_exits: dict[str, dict] = {}
+
         for bar in bars:
             adapter.advance_to(bar)
             engine._check_adapter_health()
+
+            # 1) Protective-exit enforcement BEFORE the strategy's next signal
+            # (only for strategies that cannot self-manage exits — see record).
+            ex = open_exits.get(bar["instrument_id"])
+            if ex is not None:
+                pos = engine.portfolio.get_position(bar["instrument_id"])
+                if pos is None or pos.quantity == 0:
+                    open_exits.pop(bar["instrument_id"], None)
+                    ex = None
+            if ex is not None:
+                forced = self._check_exits(bar, ex)
+                if forced is not None:
+                    side_str, exit_price = forced
+                    fill_price = float(exit_price)
+                    intent = TradeIntent(
+                        strategy_id=getattr(self._strategy, "strategy_id", "replay-exit"),
+                        strategy_package_digest="",
+                        account_id=self._config.account_id,
+                        instrument_id=bar["instrument_id"],
+                        side=side_str,
+                        quantity=str(intent_qty),
+                        order_type="MARKET",
+                        time_in_force="DAY",
+                        risk_profile_version="1.0",
+                        market_data_timestamp=bar["timestamp"] if "T" in str(bar["timestamp"]) else bar["timestamp"] + "T00:00:00Z",
+                        price=str(round(fill_price, 2)),
+                    )
+                    order_result = engine.submit_intent(intent)
+                    if order_result.accepted:
+                        result.trades += 1
+                        result.bars_processed += 1
+                    else:
+                        result.rejected_intents += 1
+                    open_exits.pop(bar["instrument_id"], None)
+                    engine._last_prices[bar["instrument_id"]] = str(fill_price)
+                    try:
+                        engine.portfolio.update_market_price(bar["instrument_id"], str(fill_price))
+                    except Exception:
+                        pass
+                    continue  # exit consumed this bar; do not double-signal
 
             # Prefer the full-OHLC path when the strategy supports it (intrabar
             # stop/trail), so replay and live execution use the same bar shape.
@@ -180,6 +285,23 @@ class ReplayEngine:
                 if order_result.fills:
                     fill_qty = sum(int(f.quantity) for f in order_result.fills)
                     fill_price = order_result.fills[0].price
+                # Record exit levels for ENGINE enforcement — only for strategies
+                # that cannot self-manage exits (no update_bar). Self-managing
+                # strategies (e.g. traderdev-ema9-vwap) ratchet their own trail
+                # in update_bar and must not be double-exited by a stale static.
+                if not hasattr(self._strategy, "update_bar"):
+                    attr_exits = {
+                    "stop_price": getattr(intent, "stop_price", None),
+                    "take_profit_price": getattr(intent, "take_profit_price", None),
+                    "trailing": getattr(intent, "trailing", None),
+                }
+                    if any(v is not None for v in attr_exits.values()):
+                        open_exits[bar["instrument_id"]] = {
+                            "side": side_str.upper(),
+                            "stop_price": attr_exits["stop_price"],
+                            "take_profit_price": attr_exits["take_profit_price"],
+                            "trailing": attr_exits["trailing"],
+                        }
                 pos = engine.portfolio.get_position(bar["instrument_id"])
                 pos_qty = pos.quantity if pos else 0
                 cash = engine.portfolio.get_cash_balance()

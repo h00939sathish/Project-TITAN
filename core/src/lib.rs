@@ -32,6 +32,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Messages
     m.add_class::<messages::EventEnvelope>()?;
     m.add_class::<messages::TradeIntent>()?;
+    m.add_class::<messages::TrailingConfig>()?;
     m.add_class::<messages::RiskDecision>()?;
     m.add_class::<messages::ApprovedOrderIntent>()?;
 

@@ -970,6 +970,8 @@ mod tests {
             price.map(|p| p.to_string()),
             None,
             None,
+            None,
+            None,
         )
     }
 
@@ -1000,6 +1002,8 @@ mod tests {
             "v1".to_string(),
             "2020-01-01T00:00:00Z".to_string(),
             Some("100".to_string()),
+            None,
+            None,
             None,
             None,
         );
