@@ -101,9 +101,14 @@ class ShadowRunner:
                 fn({"close": p})
 
     def on_price(self, instrument: str, price: float,
-                 bar_date: str | None = None) -> list[dict]:
+                 bar_date: str | None = None,
+                 bar: dict | None = None) -> list[dict]:
         """Feed price to all shadow strategies. Returns list of shadow events logged."""
-        bar = {"close": price, "date": bar_date or ""}
+        if bar is not None:
+            bar = dict(bar)
+            bar["date"] = bar_date or bar.get("timestamp", "")
+        else:
+            bar = {"close": price, "date": bar_date or ""}
         events = []
 
         for sid, fn in self._signal_fns.items():

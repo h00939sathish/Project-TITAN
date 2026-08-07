@@ -138,6 +138,10 @@ class ReplayEngine:
             engine._check_adapter_health()
 
             side_str = self._strategy.update(bar["close"])
+            # Prefer the full-OHLC path when the strategy supports it (intrabar
+            # stop/trail), so replay and live execution use the same bar shape.
+            if hasattr(self._strategy, "update_bar"):
+                side_str = self._strategy.update_bar(bar)
             if not side_str:
                 result.bars_processed += 1
                 continue

@@ -133,14 +133,15 @@ class QualifiedStrategyPool:
         self._instrument_positions[instrument] = has_position
 
     def on_price(
-        self, instrument: str, price: float, bar_date: str | None = None
+        self, instrument: str, price: float, bar_date: str | None = None,
+        bar: dict | None = None,
     ) -> TradeIntent | None:
         """Feed price to all bridges, run ensemble, return single intent or None."""
         signals: dict[str, str | None] = {}
         intents: dict[str, TradeIntent] = {}
 
         for sid, bridge in self._bridges.items():
-            intent = bridge.on_price(instrument, price, bar_date)
+            intent = bridge.on_price(instrument, price, bar_date, bar=bar)
             if intent:
                 intents[sid] = intent
                 signals[sid] = intent.side

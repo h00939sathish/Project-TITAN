@@ -75,13 +75,19 @@ class StrategyBridge:
         self._warmed_up.add(instrument)
 
     def on_price(
-        self, instrument: str, price: float, bar_date: str | None = None
+        self, instrument: str, price: float, bar_date: str | None = None,
+        bar: dict | None = None,
     ) -> TradeIntent | None:
         """Feed a new price and return a TradeIntent if a genuine new-bar signal fires.
 
         With a *bar_date* the same bar is never processed twice (prevents
         duplicate intents on restart).  Without one the caller is responsible
         for idempotency (live replay, simulation).
+
+        *bar* is the optional full OHLC dict of the completed bar. When given,
+        it is forwarded to the strategy signal function unchanged so strategies
+        can use intrabar high/low for stop/trail logic; otherwise the signal fn
+        receives ``{"close": price}`` (backwards compatible).
 
         If a RegimeDetector is configured and the current regime is in
         ``suppress_regimes`` the signal is suppressed (None returned).
@@ -93,7 +99,7 @@ class StrategyBridge:
 
         fn = self._signal_fn(instrument)
         self._warmup_bar_count[instrument] = self._warmup_bar_count.get(instrument, 0) + 1
-        signal = fn({"close": price})
+        signal = fn(bar) if bar is not None else fn({"close": price})
         if signal in {"BUY", "SELL"}:
             self._warmup_signals[instrument] = signal
             self._warmup_bar_count[instrument] = 0
