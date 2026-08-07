@@ -235,6 +235,22 @@ def make_vwap_signal_fn(params: dict):
     return signal_fn
 
 
+def make_traderdev_ema9vwap_signal_fn(params: dict):
+    """Factory: returns a signal_fn for the TraderDev EMA9×VWAP trailing candidate."""
+    from titan.strategies.traderdev_ema9vwap import TraderDevEMA9VWAP
+    strat = TraderDevEMA9VWAP(
+        ema_period=int(params.get("ema_period", 9)),
+        vwap_period=int(params.get("vwap_period", 240)),
+        atr_period=int(params.get("atr_period", 14)),
+        trail_mult=float(params.get("trail_mult", 3.0)),
+    )
+
+    def signal_fn(bar):
+        return strat(bar)
+    signal_fn.strat = strat
+    return signal_fn
+
+
 
 def run_backtest_result(bars: list[dict], strategy_params: dict,
                         signal_factory=make_ma_signal_fn,

@@ -1,0 +1,386 @@
+[
+  {
+    "family": "F1_ema9_vwap",
+    "trades": 296,
+    "wins": 101,
+    "win_rate": 0.34121621621621623,
+    "net_pips": -685.7325487298167,
+    "max_dd_pct": 0.9371645113888182,
+    "avg_pips": -2.3166640159791103,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 295
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F2_ema20_60",
+    "trades": 4,
+    "wins": 1,
+    "win_rate": 0.25,
+    "net_pips": -484.89224702635147,
+    "max_dd_pct": 0.9102609012121362,
+    "avg_pips": -121.22306175658787,
+    "exits": {
+      "sl": 3,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F3_st_double",
+    "trades": 170,
+    "wins": 57,
+    "win_rate": 0.3352941176470588,
+    "net_pips": -348.30759353333576,
+    "max_dd_pct": 0.505687770261949,
+    "avg_pips": -2.048868197254916,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 169
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F4_st_vol_trail",
+    "trades": 104,
+    "wins": 27,
+    "win_rate": 0.25961538461538464,
+    "net_pips": -238.7016349486117,
+    "max_dd_pct": 0.40710956487371225,
+    "avg_pips": -2.2952080283520355,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 104
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F5_spectral",
+    "trades": 3,
+    "wins": 1,
+    "win_rate": 0.3333333333333333,
+    "net_pips": -198.22592590907675,
+    "max_dd_pct": 0.6335382497922559,
+    "avg_pips": -66.07530863635891,
+    "exits": {
+      "sl": 2,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F6_adx_vwap",
+    "trades": 201,
+    "wins": 4,
+    "win_rate": 0.01990049751243781,
+    "net_pips": -551.7643687502826,
+    "max_dd_pct": 0.5533752999982311,
+    "avg_pips": -2.745096361941705,
+    "exits": {
+      "sl": 14,
+      "tp": 0,
+      "trail": 186
+    },
+    "pair": "EURUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F1_ema9_vwap",
+    "trades": 84,
+    "wins": 29,
+    "win_rate": 0.34523809523809523,
+    "net_pips": 71.83466654470212,
+    "max_dd_pct": 0.5594971417019651,
+    "avg_pips": 0.8551746017226443,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 84
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F2_ema20_60",
+    "trades": 1,
+    "wins": 1,
+    "win_rate": 1.0,
+    "net_pips": 99.62263752020112,
+    "max_dd_pct": 0.6811928902462927,
+    "avg_pips": 99.62263752020112,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F3_st_double",
+    "trades": 49,
+    "wins": 19,
+    "win_rate": 0.3877551020408163,
+    "net_pips": 60.2064332763346,
+    "max_dd_pct": 0.2163646814542686,
+    "avg_pips": 1.2287027199251959,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 49
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F4_st_vol_trail",
+    "trades": 25,
+    "wins": 7,
+    "win_rate": 0.28,
+    "net_pips": -36.80470332151277,
+    "max_dd_pct": 0.21588280396184156,
+    "avg_pips": -1.4721881328605106,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 25
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F5_spectral",
+    "trades": 3,
+    "wins": 1,
+    "win_rate": 0.3333333333333333,
+    "net_pips": -305.5746135220405,
+    "max_dd_pct": 0.699465581599365,
+    "avg_pips": -101.85820450734684,
+    "exits": {
+      "sl": 2,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F6_adx_vwap",
+    "trades": 61,
+    "wins": 3,
+    "win_rate": 0.04918032786885246,
+    "net_pips": -203.93377380026405,
+    "max_dd_pct": 0.21675344409210823,
+    "avg_pips": -3.3431766196764596,
+    "exits": {
+      "sl": 5,
+      "tp": 0,
+      "trail": 56
+    },
+    "pair": "EURUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F1_ema9_vwap",
+    "trades": 299,
+    "wins": 92,
+    "win_rate": 0.3076923076923077,
+    "net_pips": -1618.4093690138195,
+    "max_dd_pct": 1.9390093578747911,
+    "avg_pips": -5.412740364594714,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 298
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F2_ema20_60",
+    "trades": 3,
+    "wins": 1,
+    "win_rate": 0.3333333333333333,
+    "net_pips": -412.3662646424831,
+    "max_dd_pct": 0.8696795629747962,
+    "avg_pips": -137.45542154749435,
+    "exits": {
+      "sl": 2,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F3_st_double",
+    "trades": 159,
+    "wins": 55,
+    "win_rate": 0.34591194968553457,
+    "net_pips": -337.00893381314086,
+    "max_dd_pct": 0.4083891852422443,
+    "avg_pips": -2.1195530428499425,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 158
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F4_st_vol_trail",
+    "trades": 102,
+    "wins": 21,
+    "win_rate": 0.20588235294117646,
+    "net_pips": -625.8661866604896,
+    "max_dd_pct": 0.6425516348640014,
+    "avg_pips": -6.135943006475388,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 101
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F5_spectral",
+    "trades": 2,
+    "wins": 1,
+    "win_rate": 0.5,
+    "net_pips": -80.97219399209695,
+    "max_dd_pct": 0.8668118557733677,
+    "avg_pips": -40.486096996048474,
+    "exits": {
+      "sl": 1,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F6_adx_vwap",
+    "trades": 188,
+    "wins": 4,
+    "win_rate": 0.02127659574468085,
+    "net_pips": -702.3141712830721,
+    "max_dd_pct": 0.6998217707102701,
+    "avg_pips": -3.7357136770376176,
+    "exits": {
+      "sl": 12,
+      "tp": 0,
+      "trail": 176
+    },
+    "pair": "GBPUSD",
+    "frame": "1h"
+  },
+  {
+    "family": "F1_ema9_vwap",
+    "trades": 79,
+    "wins": 29,
+    "win_rate": 0.3670886075949367,
+    "net_pips": 336.49419917620986,
+    "max_dd_pct": 0.6283289313144773,
+    "avg_pips": 4.259420242736834,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 78
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F2_ema20_60",
+    "trades": 3,
+    "wins": 1,
+    "win_rate": 0.3333333333333333,
+    "net_pips": -610.252150223987,
+    "max_dd_pct": 0.871697576583564,
+    "avg_pips": -203.41738340799566,
+    "exits": {
+      "sl": 2,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F3_st_double",
+    "trades": 49,
+    "wins": 15,
+    "win_rate": 0.30612244897959184,
+    "net_pips": -702.6880508362367,
+    "max_dd_pct": 0.7473430962047033,
+    "avg_pips": -14.340572466045646,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 49
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F4_st_vol_trail",
+    "trades": 27,
+    "wins": 8,
+    "win_rate": 0.2962962962962963,
+    "net_pips": -137.69718352123658,
+    "max_dd_pct": 0.39927830676443216,
+    "avg_pips": -5.099895685971725,
+    "exits": {
+      "sl": 0,
+      "tp": 0,
+      "trail": 27
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F5_spectral",
+    "trades": 2,
+    "wins": 1,
+    "win_rate": 0.5,
+    "net_pips": -278.48573349972935,
+    "max_dd_pct": 0.8688167006931053,
+    "avg_pips": -139.24286674986467,
+    "exits": {
+      "sl": 1,
+      "tp": 0,
+      "trail": 0
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  },
+  {
+    "family": "F6_adx_vwap",
+    "trades": 58,
+    "wins": 2,
+    "win_rate": 0.034482758620689655,
+    "net_pips": -258.1983804892434,
+    "max_dd_pct": 0.2552317979109623,
+    "avg_pips": -4.451696215331783,
+    "exits": {
+      "sl": 3,
+      "tp": 0,
+      "trail": 55
+    },
+    "pair": "GBPUSD",
+    "frame": "4h"
+  }
+]

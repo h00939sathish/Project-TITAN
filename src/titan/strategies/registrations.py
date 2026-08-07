@@ -97,7 +97,7 @@ from titan.research.harness import (make_ma_signal_fn, make_momentum_signal_fn,
                                     make_mr_signal_fn, make_vol_regime_signal_fn,
                                     make_dual_ma_signal_fn, make_rsi_signal_fn,
                                     make_bollinger_signal_fn, make_orb_signal_fn,
-                                    make_vwap_signal_fn)
+                                    make_vwap_signal_fn, make_traderdev_ema9vwap_signal_fn)
 
 _reg.register(StrategyRegistration(
     strategy_id="bollinger",
@@ -133,5 +133,25 @@ _reg.register(StrategyRegistration(
         ParameterDef("std_dev", "float", 2.0, "Standard deviation band multiplier"),
     ),
     factory=make_vwap_signal_fn,
+    qualified_variants=frozenset(),
+))
+
+# EXP-00025 candidate: ported from trader.dev 'EMA 9 + VWAP with ATR Trailing'
+# family (the only family net-positive on FX majors @4h in the research run).
+# Deliberately no qualified_variants: candidate that must clear the promotion
+# gate before it is ever selected for a live environment.
+_reg.register(StrategyRegistration(
+    strategy_id="traderdev-ema9-vwap",
+    version="1.0.0",
+    description="TraderDev EMA9×VWAP crossover with trailing exit — candidate "
+                "strategy ported from the trader.dev MCP server (EXP-00025). "
+                "Not promoted; paper/replay only until it clears the promotion gate.",
+    parameter_schema=(
+        ParameterDef("ema_period", "int", 9, "Fast EMA period"),
+        ParameterDef("vwap_period", "int", 240, "VWAP proxy window"),
+        ParameterDef("atr_period", "int", 14, "Trailing stop window"),
+        ParameterDef("trail_mult", "float", 3.0, "Trailing stop = trail_mult × range"),
+    ),
+    factory=make_traderdev_ema9vwap_signal_fn,
     qualified_variants=frozenset(),
 ))
