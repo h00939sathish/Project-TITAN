@@ -12,6 +12,12 @@ from titan.strategies.timeframes import Timeframe
 
 @pytest.fixture(autouse=True)
 def _add_test_timeframe_qualifications():
+    """Give the strategies tests a qualified ma-crossover, then RESTORE the
+    registry afterward. The registry is a process-global singleton: mutating it
+    without restoration leaks baked variants into every later test session
+    (observed: ADR-022 enforcement in tests/research/ failed only when the
+    strategies suite ran first). Restore guarantees the baked variants never
+    escape this fixture's test."""
     reg = get_registry()
     existing = reg._strategies["ma-crossover"]
     test_variants = set(existing.qualified_variants) | {
@@ -31,6 +37,9 @@ def _add_test_timeframe_qualifications():
         factory=existing.factory,
         qualified_variants=frozenset(test_variants),
     )
+    yield
+    # Restore the pristine registration (ADR-022: gate-only qualification).
+    reg._strategies["ma-crossover"] = existing
 
 
 @pytest.fixture

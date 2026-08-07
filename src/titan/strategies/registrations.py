@@ -20,10 +20,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("slow", "int", 20, "Slow moving average period"),
     ),
     factory=make_ma_signal_fn,
-    qualified_variants=frozenset({
-        (Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
-        (Timeframe.FIVE_MINUTES, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
-    }),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
@@ -37,7 +36,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("exit_z", "float", -0.5, "Z-score threshold to exit (SELL signal)"),
     ),
     factory=make_mr_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"window": 20, "entry_z": -2.0, "exit_z": -0.5}, sort_keys=True))}),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
@@ -51,7 +52,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("vol_multiple", "float", 1.0, "Vol threshold = median_vol * vol_multiple"),
     ),
     factory=make_vol_regime_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"vol_window": 20, "median_window": 60, "vol_multiple": 1.0}, sort_keys=True))}),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
@@ -62,7 +65,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("lookback", "int", 20, "Return calculation window"),
     ),
     factory=make_momentum_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"lookback": 20}, sort_keys=True))}),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
@@ -74,10 +79,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("slow", "int", 20, "Slow moving average period"),
     ),
     factory=make_dual_ma_signal_fn,
-    qualified_variants=frozenset({
-        (Timeframe.ONE_DAY, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
-        (Timeframe.FIVE_MINUTES, json.dumps({"fast": 5, "slow": 20}, sort_keys=True)),
-    }),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
@@ -90,7 +94,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("overbought", "float", 70.0, "RSI sell threshold"),
     ),
     factory=make_rsi_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"window": 14, "oversold": 30.0, "overbought": 70.0}, sort_keys=True))}),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 from titan.research.harness import (make_ma_signal_fn, make_momentum_signal_fn,
@@ -108,7 +114,9 @@ _reg.register(StrategyRegistration(
         ParameterDef("std_dev_multiplier", "float", 2.0, "Standard deviation multiplier for the band width"),
     ),
     factory=make_bollinger_signal_fn,
-    qualified_variants=frozenset({(Timeframe.ONE_DAY, json.dumps({"window": 20, "std_dev_multiplier": 2.0}, sort_keys=True))}),
+    # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
+    # only by the promotion gate writing status=QUALIFIED to the research DB.
+    qualified_variants=frozenset(),
 ))
 
 _reg.register(StrategyRegistration(
