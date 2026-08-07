@@ -35,8 +35,11 @@ from nautilus_trader.trading.strategy import Strategy
 
 from titan._core import ContractType, Instrument, InstrumentId as TitanInstrumentId, Money, RiskConfig, TradeIntent
 from titan.execution.engine import PaperConfig, PaperTradingEngine
+from titan.research.db import ResearchDB, DEFAULT_DB_PATH
+from titan.research.shadow import ShadowRunner
 from titan.runtime.events import MarketEvent, StrategyDefinition, TriggerSpec
 from titan.runtime.evaluator import RuntimeEvaluator
+from titan.strategies.bar_aggregator import BarAggregator
 from titan.strategies.multitimeframe_runtime import MultiTimeframeRuntime
 from titan.strategies.registry import get_registry
 from titan.strategies.timeframes import Timeframe
@@ -91,6 +94,18 @@ STRATEGY_PARAMS = {
     "mean-reversion": {"window": 20, "entry_z": -2.0, "exit_z": -0.5},
     "volatility-regime": {"vol_window": 20, "median_window": 60, "vol_multiple": 1.0},
     "dual-ma": {"fast": 5, "slow": 20},
+}
+
+# 4h-shadow candidates: strategies whose native edge is 4h, fed by aggregating
+# the session's existing 1h bars (ADR-024 Track 1). Kept OUT of STRATEGY_IDS
+# so the runtime never evaluates them at 5m-1h (whips). Each candidate gets a
+# ShadowRunner entry; fills are simulated and logged to shadow_events.
+SHADOW_4H_CANDIDATES = {
+    "traderdev-ema9-vwap": {
+        "params": {"ema_period": 3, "vwap_period": 20,
+                   "atr_period": 5, "trail_mult": 2.0},
+        "instruments": ["EURUSD", "GBPUSD"],
+    },
 }
 
 
@@ -187,10 +202,26 @@ class DataIngestStrategy(Strategy):
         self._counts = {"qualified": 0, "blocked": 0, "submitted": 0, "filled": 0}
         self._last_bar_time: dict[str, float] = {}
         self._stale_warn_secs = 300
+        # ADR-024 Track 1: 4h shadow — aggregator + shadow runner
+        self._shadow_runner: ShadowRunner | None = None
+        self._aggregators: dict[str, BarAggregator] = {}
 
     def set_titan(self, evaluator: RuntimeEvaluator, engine: PaperTradingEngine) -> None:
         self._evaluator = evaluator
         self._engine = engine
+        if SHADOW_4H_CANDIDATES:
+            db_path = os.getenv("TITAN_RESEARCH_DB", str(DEFAULT_DB_PATH))
+            self._shadow_runner = ShadowRunner(
+                db_path=db_path,
+                session_id=f"ibkr-{os.getpid()}",
+            )
+            for sid, cfg in SHADOW_4H_CANDIDATES.items():
+                self._shadow_runner.add_strategy(sid, cfg["params"])
+                for inst in cfg["instruments"]:
+                    self._aggregators[f"{sid}|{inst}"] = BarAggregator(None)
+            log.info(f"[shadow-4h] candidates: {list(SHADOW_4H_CANDIDATES)} -> shadow_events")
+        else:
+            log.info("[shadow-4h] no 4h shadow candidates configured")
 
     def on_start(self) -> None:
         for inst_id, cfg in INSTRUMENT_CONFIG.items():
@@ -245,6 +276,8 @@ class DataIngestStrategy(Strategy):
 
         result = self._evaluator.on_market_event(event)
 
+        self._feed_4h_shadow(inst_id, titan_tf, ts, event.payload)
+
         for proposal in result.proposals:
             self._counts["qualified"] += 1
             intent = TradeIntent(
@@ -273,6 +306,41 @@ class DataIngestStrategy(Strategy):
                 self.log.info(
                     f"[order] {proposal.strategy_id} | {proposal.timeframe} "
                     f"| {proposal.side} rejected: {order_result.rejection_reason}"
+                )
+
+    def _feed_4h_shadow(self, inst_id: str, titan_tf: Timeframe,
+                        ts: datetime, payload: dict) -> None:
+        """ADR-024 Track 1: aggregate 1h bars into 4h and feed shadow runner.
+
+        Only 1h bars feed the aggregator. When a complete 4h bucket closes,
+        forward the synthesized 4h bar to ShadowRunner.on_price, which
+        simulates fills and logs them to shadow_events. The qualified runtime
+        and all non-1h timeframes are completely unaffected.
+        """
+        if self._shadow_runner is None or titan_tf != Timeframe.ONE_HOUR:
+            return
+        for sid, cfg in SHADOW_4H_CANDIDATES.items():
+            if inst_id not in cfg["instruments"]:
+                continue
+            agg = self._aggregators.get(f"{sid}|{inst_id}")
+            if agg is None:
+                continue
+            ts_dt = ts if isinstance(ts, datetime) else None
+            completed = agg.on_1h_bar(
+                inst_id,
+                ts_dt,
+                payload.get("open", payload.get("close", 0.0)),
+                payload.get("high", payload.get("close", 0.0)),
+                payload.get("low", payload.get("close", 0.0)),
+                payload.get("close", 0.0),
+                payload.get("volume", 0),
+            )
+            for bar4h in completed:
+                self._shadow_runner.on_price(
+                    inst_id,
+                    bar4h["close"],
+                    bar_date=bar4h["timestamp"],
+                    bar=bar4h,
                 )
 
     @staticmethod
