@@ -329,7 +329,11 @@ def _build_titan_runtime():
         adapter,
     )
 
-    multirt = MultiTimeframeRuntime()
+    # ADR-022 transition: these strategies were previously qualified by baked-in
+    # registry variants; qualification is now gate-only. Route them through the
+    # watchlist so they keep producing shadow/paper proposals (and live through
+    # the promotion gate) rather than being gated silent by the runtime.
+    multirt = MultiTimeframeRuntime(watchlist_ids=set(STRATEGY_IDS))
     evaluator = RuntimeEvaluator()
 
     for sid in STRATEGY_IDS:
