@@ -1,0 +1,5 @@
+{
+  "experiment": "EXP-000026",
+  "decision": "HALT_NOT_COINTEGRATED",
+  "coint_p": 0.5405545630409184
+}

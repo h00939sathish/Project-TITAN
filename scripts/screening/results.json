@@ -1,0 +1,325 @@
+{
+  "kill_pips_per_year": 200.0,
+  "min_pairs": 2,
+  "rows": [
+    {
+      "concept": "sma_cross",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 90.6,
+          "pips_per_year": 90.6,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 10.5,
+          "pips_per_year": 10.5,
+          "max_dd_pct": 0.81,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "bb_reversion",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 116.4,
+          "pips_per_year": 116.4,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -131.4,
+          "pips_per_year": -131.4,
+          "max_dd_pct": 0.82,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "rsi_extremes",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 16.0,
+          "pips_per_year": 16.0,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -182.5,
+          "pips_per_year": -182.5,
+          "max_dd_pct": 0.82,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "macd_histogram",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 100.0,
+          "pips_per_year": 100.0,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -295.5,
+          "pips_per_year": -295.5,
+          "max_dd_pct": 0.82,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "donchian_breakout",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -85.2,
+          "pips_per_year": -85.2,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 113.7,
+          "pips_per_year": 113.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "atr_expansion",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 43.0,
+          "pips_per_year": 43.0,
+          "max_dd_pct": 0.4,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 0,
+          "net_pips": 0.0,
+          "pips_per_year": 0.0,
+          "max_dd_pct": 0.0,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "vwap_pullback",
+      "survives": false,
+      "pairs": [
+        "GBPUSD"
+      ],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 24.4,
+          "pips_per_year": 24.4,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 313.7,
+          "pips_per_year": 313.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "keltner_squeeze",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -137.7,
+          "pips_per_year": -137.7,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 97.7,
+          "pips_per_year": 97.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "stoch_cross",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 126.7,
+          "pips_per_year": 126.7,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -132.9,
+          "pips_per_year": -132.9,
+          "max_dd_pct": 0.82,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "ichimoku_bounce",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -170.5,
+          "pips_per_year": -170.5,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 97.7,
+          "pips_per_year": 97.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "psar_reversal",
+      "survives": false,
+      "pairs": [
+        "GBPUSD"
+      ],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -35.3,
+          "pips_per_year": -35.3,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 213.8,
+          "pips_per_year": 213.8,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "price_channel",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -85.2,
+          "pips_per_year": -85.2,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 113.7,
+          "pips_per_year": 113.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "williams_r",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": 49.5,
+          "pips_per_year": 49.5,
+          "max_dd_pct": 0.54,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -182.5,
+          "pips_per_year": -182.5,
+          "max_dd_pct": 0.82,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "roc_momentum",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -127.4,
+          "pips_per_year": -127.4,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": -235.6,
+          "pips_per_year": -235.6,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        }
+      }
+    },
+    {
+      "concept": "inside_bar",
+      "survives": false,
+      "pairs": [],
+      "per_pair": {
+        "EURUSD": {
+          "trades": 1,
+          "net_pips": -75.2,
+          "pips_per_year": -75.2,
+          "max_dd_pct": 0.68,
+          "bars": 1610
+        },
+        "GBPUSD": {
+          "trades": 1,
+          "net_pips": 175.7,
+          "pips_per_year": 175.7,
+          "max_dd_pct": 0.67,
+          "bars": 1610
+        }
+      }
+    }
+  ]
+}
