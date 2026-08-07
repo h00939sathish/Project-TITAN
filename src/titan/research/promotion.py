@@ -291,6 +291,14 @@ class PromotionGate:
             if len(runs) >= 2:
                 sc_p = self._scorecard_from_run(runs[0], strategy_id)
                 sc_r = self._scorecard_from_run(runs[1], strategy_id)
+                # F1 (CodeRabbit #15): do NOT pass the same series as both
+                # primary and replication — a series cannot corroborate itself.
+                # The gate has one derivable series; passing it twice would
+                # fabricate a ~1.0 self-correlation. Pass it as primary only;
+                # replication_returns=None means the engine evaluates the two
+                # runs' scorecards (dual-run evidence) without a fake return
+                # correlation. Identical run IDs are still rejected by the
+                # engine's shared-provenance guard.
                 series = _strategy_return_series(
                     strategy_id, _best_params(self._db, strategy_id), self._bars)
                 report = self._replication_engine.evaluate_replication(
@@ -298,7 +306,7 @@ class PromotionGate:
                     primary_scorecard=sc_p,
                     replication_scorecard=sc_r,
                     primary_returns=series,
-                    replication_returns=series,
+                    replication_returns=None,
                     primary_exp_id=str(runs[0].get("id", "EXP-PRIMARY")),
                     replication_exp_id=str(runs[1].get("id", "EXP-REPLICATION")),
                 )
