@@ -1,0 +1,12 @@
+{
+  "experiment": "EXP-00017-RETEST",
+  "protocol": "debated plan Step 1 (gating); pre-registered criterion: Spearman IC >= 0.10 in BOTH 2-fold OOS windows, same sign, none < 0.05",
+  "construction": "reproduces EXP-00017 FX-002 exactly (realized vol 20 bars -> forward 1h |return|) on Dukascopy 1m->1h",
+  "pairs": {
+    "EURUSD": {"oos1_ic": 0.121, "oos2_ic": 0.053, "oos1_n": 1245, "oos2_n": 1244, "bars": 6220},
+    "GBPUSD": {"oos1_ic": 0.098, "oos2_ic": 0.038, "oos1_n": 1245, "oos2_n": 1244, "bars": 6220}
+  },
+  "verdicts": {"EURUSD": "FAIL", "GBPUSD": "FAIL"},
+  "honest_note": "The ONLY promoted effect (vol-clustering) does not clear the pre-registered OOS bar on this dataset. The original EXP-17 'temporal' thirds (IC 0.22-0.33) were same-window sub-periods, NOT out-of-sample - so the effect was never OOS-validated before promotion. This 2-fold test is the first true OOS evidence and it fails/weak. Per the debated plan FAIL branch: close the 'test on this dataset' branch, do not mine it further; the only +EV lever is new regime-diverse data under the pre-frozen WF-v2 protocol.",
+  "date": "2026-08-07"
+}
