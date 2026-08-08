@@ -47,7 +47,7 @@ Classify work before doing it: **research** creates evidence; **proposal** has n
 A subsystem or cross-cutting change may be implemented only when all six conditions are met:
 
 1. **Specification exists** — the subsystem has an accepted `.spec.md` defining boundary, interface, state machines, errors, metrics, and configuration (see `specifications/`).
-2. **ADR accepted** — a consequential decision record is ratified per `ADR.md` and `EVIDENCE_SYNTHESIS.md`.
+2. **ADR accepted** — a consequential decision record is ratified per `docs/reference/ADR.md` and `docs/reference/EVIDENCE_SYNTHESIS.md`.
 3. **Tests written** — unit, contract, and integration tests exist for every state transition, error condition, and failure mode in the specification.
 4. **Verification defined** — the acceptance criteria are measurable, testable, and recorded in the task definition.
 5. **Rollback defined** — the procedure for reverting the change without data loss or inconsistent state is documented.
@@ -65,4 +65,4 @@ Operate the Research, Architecture, Implementation, and Evolution loops defined 
 
 ## Forbidden actions
 
-Do not commit secrets; broaden a model’s authority; add a dependency without an owner and reason; merge disabled tests; introduce a second owner for positions/orders; ship a risk control that is not wired into the order path; auto-reset a kill switch; or promote live trading without the gates in `IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.
+Do not commit secrets; broaden a model’s authority; add a dependency without an owner and reason; merge disabled tests; introduce a second owner for positions/orders; ship a risk control that is not wired into the order path; auto-reset a kill switch; or promote live trading without the gates in `docs/reference/IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.

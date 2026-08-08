@@ -91,11 +91,29 @@ UNDERENGINEERING.md
 .env
 .env.*
 .env.local
+*.auth.json
+*.secret.json
+
+# Local-only research data (large, regenerable; not for git)
+research/dukascopy_1m_ba/
+research/dukascopy_1m_ba_prior/
+research_data/dukascopy_prior_window/
+research/tws_daily/
+research/tws_history/
+research/cot/
+research/neg_results/configs/
+
+# Python tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Diff / debug artifacts
 diff.txt
 diff_utf8.txt
+P0_gate_diff.txt
 cargo_test_output.txt
+certification_*.log
 # local runtime artifacts (added before push)
 .titan_state*
 *.pyd.bak
