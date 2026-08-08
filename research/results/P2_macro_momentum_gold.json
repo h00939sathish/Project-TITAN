@@ -1,0 +1,16 @@
+{
+  "experiment": "P2_macro_momentum_gold",
+  "decision": "P2 FAIL",
+  "oos": {
+    "ann_ret": 0.0094,
+    "sharpe": 0.178,
+    "profit_factor": 1.073,
+    "max_dd": 0.0841
+  },
+  "kill": {
+    "ann>4%": false,
+    "Sharpe>0.45": false,
+    "PF>1.2": false,
+    "DD<20%": true
+  }
+}
