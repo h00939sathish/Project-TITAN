@@ -1,8 +1,8 @@
 # TITAN Canonical Research Questions
 
-> **Status:** Active — Generation 2 (Alpha Discovery Program)  
+> **Status:** Active — post terminal alpha-search pivot  
 > **Owner:** Chief Research Architect & Quant Research Team  
-> **Last Updated:** 2026-07-30  
+> **Last Updated:** 2026-08-18  
 
 ---
 
@@ -12,6 +12,11 @@ This document registers the core **Canonical Research Questions (RQs)** governin
 ---
 
 ## Registered Canonical Research Questions
+
+> **Boundary note:** The liquid-OHLCV directional search class is closed by
+> evidence (`research/ALPHA_SEARCH_TERMINAL_REPORT.md`). Registered questions
+> below are for new hypothesis classes or execution-quality research, not for
+> re-running rejected directional baselines.
 
 ### `RQ-001`: Opening Auction Imbalance Dynamics
 * **Question:** How does institutional opening auction imbalance affect first-hour returns and directional intraday drift across equity indices (`SPY`, `QQQ`, `IWM`)?
@@ -50,3 +55,19 @@ This document registers the core **Canonical Research Questions (RQs)** governin
 * **Category:** Regime Dependence
 * **Economic Mechanism:** Mean-reverting noise dominates trend signals in low-volatility / range-bound regimes.
 * **Target Instruments:** `EURUSD`, `GBPUSD`, `SPY`, `QQQ`
+
+---
+
+### `RQ-006`: Cross-Asset Relative-Value Dislocations
+* **Question:** Which persistent cross-asset dislocations (spot/futures basis, rates/FX carry stress, sector-vs-index spread divergence) remain tradable after financing, borrow, spread, and slippage costs?
+* **Category:** Cross-Asset Relative Value
+* **Economic Mechanism:** Slow-moving balance-sheet constraints, funding segmentation, and rebalance frictions create temporary mispricings.
+* **Target Instruments:** Approved multi-asset pairs/baskets with explicit hedge construction.
+
+---
+
+### `RQ-007`: Event-Driven Fundamental Response
+* **Question:** Do pre-defined macro/fundamental events generate measurable, repeatable post-event return distributions that survive realistic execution latency and adverse selection?
+* **Category:** Event/Fundamental
+* **Economic Mechanism:** Information release timing, institutional positioning constraints, and delayed inventory adjustment.
+* **Target Instruments:** Event-linked futures, FX, and liquid ETFs with explicit event calendars.
