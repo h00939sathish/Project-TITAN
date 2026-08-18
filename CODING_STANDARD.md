@@ -1,11 +1,11 @@
 # Coding Standard
 
 > **Owner:** Core Platform Architecture
-> **Status:** Active — v1.0
-> **Last Review:** 2026-07-12
+> **Status:** Active — v1.1
+> **Last Review:** 2026-08-18
 > **Decision Authority:** Architecture Council
-> **Depends On:** [SYSTEM_CONTRACTS.md](SYSTEM_CONTRACTS.md), [SECURITY.md](SECURITY.md)
-> **Supersedes:** None
+> **Depends On:** [specifications/Execution.spec.md](specifications/Execution.spec.md), [specifications/Risk.spec.md](specifications/Risk.spec.md), [AGENTS.md](AGENTS.md)
+> **Supersedes:** v1.0
 > **Review Frequency:** Quarterly; per language/platform change
 
 ## Philosophy
@@ -18,7 +18,7 @@ Organize by domain boundary: `core/` (messages and state), `risk/`, `execution/`
 
 ## Contracts and state
 
-Messages carry schema version, event/command id, correlation id, causation id, timestamp, source, and validated payload. Represent money, quantity, price, instrument, side, time-in-force, and order status with domain types—not unvalidated strings or floats. Make state transitions explicit and reject illegal transitions. No global singleton owns mutable trading state.
+Messages carry schema version, event/command id, correlation id, causation id, timestamp, source, and validated payload. Represent money, quantity, price, instrument, side, time-in-force, and order status with domain types—not unvalidated strings or floats. Make state transitions explicit and reject illegal transitions. No global singleton owns mutable trading state. All research backtest engines must accept typed, immutable cost models (`FxCostModel`, `CryptoCostModel`, `FactorCostModel`) enforcing explicit attribution across commissions, spread, slippage impact, and short borrow fees.
 
 ## Errors and logging
 
@@ -37,5 +37,7 @@ Profile real workloads before optimization; isolate allocations and blocking I/O
 * LLM calls in order, risk, balance, or reconciliation paths.
 * A safety mechanism that is declared but not invoked by the production path.
 * Auto-reset or default-enable behavior for a kill switch.
+* Backtest engines with hidden zero-cost defaults or bar-close fill assumptions without explicit spread and slippage models.
 * Regex parsing of untrusted model output where a schema can be enforced.
 * Mutable global state, hidden broker SDK calls, raw exception swallowing, or hard-coded environment credentials.
+

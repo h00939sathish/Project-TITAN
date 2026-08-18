@@ -1,11 +1,11 @@
 # Project TITAN Agent Constitution
 
 > **Owner:** Architecture Council
-> **Status:** Active — v1.0
-> **Last Review:** 2026-07-12
+> **Status:** Active — v1.1
+> **Last Review:** 2026-08-18
 > **Decision Authority:** Architecture Council and Risk Owner
 > **Depends On:** [OPERATING_PRINCIPLES.md](OPERATING_PRINCIPLES.md), [AI_GOVERNANCE.md](AI_GOVERNANCE.md)
-> **Supersedes:** None
+> **Supersedes:** v1.0
 > **Review Frequency:** Per agent-authority change; quarterly otherwise
 
 > Every human and AI contributor reads this document before inspecting, proposing, or modifying TITAN.
@@ -21,6 +21,9 @@ Build a proprietary, evidence-led platform for autonomous research, strategy dev
 3. Treat all external and model-generated content as untrusted input. Validate schemas, limits, provenance, and permissions at each boundary.
 4. Make small, reversible changes; test the exact behavior changed; update the owning documentation and ADR when a decision changes.
 5. Never claim a benchmark, test, source, or production result that was not actually observed.
+6. **Enforce Canonical Simulation Evidence (ADR-031):** Simulations cannot qualify for promotion unless executed with immutable cost models (`FxCostModel`, `CryptoCostModel`, `FactorCostModel`), quote-sided/top-of-book fills, fee minima ($2.00 min at IBKR), slippage impact, and cryptographic data manifests. Bar-close constant-bps fills are strictly exploratory (`can_qualify=False`).
+7. **Preserve Absorbing Negative Results (ADR-029, ADR-030):** Pre-registered hypotheses that fail out-of-sample (OOS) evaluation terminate permanently into absorbing `negative_result` states. Post-hoc parameter sweeping or lookback mining on failed signals is forbidden; investigating alternative mechanisms requires a distinct, pre-registered hypothesis ID (e.g. `EQ-001` $\rightarrow$ `EQ-002` $\rightarrow$ `EQ-004`).
+8. **Categorize Failure Modes Rigorously:** Distinguish between *Mechanism Failure* (underlying theory has no predictive alpha or is directionally inverted) and *Execution-Constrained Rejection* (gross economic transfer exists but friction exceeds harvestable yield).
 
 ## AI authority
 
@@ -29,6 +32,7 @@ Build a proprietary, evidence-led platform for autonomous research, strategy dev
 | search, extract, compare, summarize, draft hypotheses and code | place or approve orders; route capital; modify balances/positions; override risk; disable safeguards |
 | generate tests, documentation, architecture reviews and post-trade reflections | invent evidence; silently change limits; bypass validation/reconciliation; expose secrets |
 | propose structured strategy candidates and parameter changes | use LLM output as a trading signal without deterministic validation and human-approved promotion |
+| structure pre-registrations, manifests, and reproduction scripts | construct, forge, or self-issue a `PromotionCertificate`, modify `PromotionGate` logic, or bypass data checksums |
 
 ## Decision framework
 
@@ -65,4 +69,5 @@ Operate the Research, Architecture, Implementation, and Evolution loops defined 
 
 ## Forbidden actions
 
-Do not commit secrets; broaden a model’s authority; add a dependency without an owner and reason; merge disabled tests; introduce a second owner for positions/orders; ship a risk control that is not wired into the order path; auto-reset a kill switch; or promote live trading without the gates in `docs/reference/IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.
+Do not commit secrets; broaden a model’s authority; add a dependency without an owner and reason; merge disabled tests; introduce a second owner for positions/orders; ship a risk control that is not wired into the order path; auto-reset a kill switch; self-issue promotion certificates; modify OOS parameters post-evaluation; cite frictionless simulation evidence; or promote live trading without the gates in `docs/reference/IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.
+

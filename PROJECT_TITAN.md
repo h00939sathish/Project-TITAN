@@ -1,11 +1,11 @@
 # Project TITAN: Vision and Operating Model
 
 > **Owner:** Product and Architecture Leadership
-> **Status:** Active — v1.0
-> **Last Review:** 2026-07-12
+> **Status:** Active — v1.1
+> **Last Review:** 2026-08-18
 > **Decision Authority:** Architecture Council
-> **Depends On:** [OPERATING_PRINCIPLES.md](OPERATING_PRINCIPLES.md), [ROADMAP.md](ROADMAP.md)
-> **Supersedes:** None
+> **Depends On:** [OPERATING_PRINCIPLES.md](OPERATING_PRINCIPLES.md), [AGENTS.md](AGENTS.md)
+> **Supersedes:** v1.0
 > **Review Frequency:** Annual; per material strategy change
 
 ## Identity
@@ -18,10 +18,10 @@ The comparative R&D found no repository that should be adopted wholesale. Nautil
 
 ## Objectives
 
-1. Autonomous, evidence-cited market and repository research.
-2. Structured hypothesis and strategy-candidate generation.
-3. Deterministic backtest, walk-forward, Monte Carlo, replay, and paper-trading validation.
-4. Human-approved, risk-gated live deployment with reconciliation.
+1. Autonomous, evidence-cited market and cross-sectional factor research across US Equities and ETFs.
+2. Structured hypothesis and strategy-candidate generation with explicit, absorbing negative result recording.
+3. Deterministic backtest, walk-forward, Monte Carlo, replay, and paper-trading validation with canonical transaction cost models.
+4. Human-approved, risk-gated live deployment with reconciliation and cryptographic promotion certificates.
 5. Continuous improvement based on production facts, never autonomous capital-policy changes.
 
 ## System boundaries
@@ -37,11 +37,11 @@ The comparative R&D found no repository that should be adopted wholesale. Nautil
 
 ## Architecture philosophy
 
-TITAN is a modular event-driven core with explicit state and durable facts. It may begin as a well-bounded deployable rather than premature microservices; process boundaries are introduced only when isolation, latency, scale, or ownership evidence justifies them. The event log supports audit and recovery but does not justify speculative CQRS projections. See `ARCHITECTURE.md` and `ADR.md`.
+TITAN is a modular event-driven core with explicit state and durable facts. It begins as a well-bounded deployable rather than premature microservices; process boundaries are introduced only when isolation, latency, scale, or ownership evidence justifies them. The event log supports audit and recovery but does not justify speculative CQRS projections. See `ARCHITECTURE.md` and `docs/adr/`.
 
 ## Long-term vision and phases
 
-**Foundation:** deterministic core, data contracts, test harness, observability, simulation, and paper trading. **Controlled operation:** limited instruments/brokers, reconciliation and human live approval. **Scale:** multi-asset and multi-broker only after capacity and failure evidence. **Learning:** advisory knowledge and reflection improve research under governance. Roadmap gates are defined in `ROADMAP.md`; the original staged analysis is `../IMPLEMENTATION_ROADMAP.md`.
+**Foundation:** deterministic core, data contracts, test harness, observability, simulation, and paper trading. **Controlled operation:** limited instruments/brokers, reconciliation and human live approval. **Scale:** multi-asset and multi-broker only after capacity and failure evidence. **Learning:** advisory knowledge and reflection improve research under governance. The original staged analysis is in `../IMPLEMENTATION_ROADMAP.md`.
 
 ## Engineering culture
 
@@ -50,3 +50,4 @@ Disagree with evidence, make uncertainty visible, and prefer deletion to acciden
 ## Definition of success
 
 TITAN is successful when a senior engineer can trace every live action from source event through deterministic risk decision and broker acknowledgement; reproduce its validation; detect and reconcile divergence; halt safely; and understand why each subsystem exists without reading original repositories.
+

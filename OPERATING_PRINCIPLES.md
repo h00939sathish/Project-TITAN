@@ -1,11 +1,11 @@
 # Project TITAN Operating Principles
 
 > **Owner:** Architecture Council
-> **Status:** Active — v1.0
-> **Last Review:** 2026-07-12
+> **Status:** Active — v1.1
+> **Last Review:** 2026-08-18
 > **Decision Authority:** Architecture Council and Risk Owner
 > **Depends On:** R&D evidence base
-> **Supersedes:** None
+> **Supersedes:** v1.0
 > **Review Frequency:** Annual; on a material governance change
 
 ## Purpose
@@ -24,6 +24,7 @@ TITAN is an institutional autonomous quantitative research and trading operating
 8. **Architecture follows evidence.** Adopt patterns, not repositories: typed eventing and reconciliation from NautilusTrader; validation and research techniques from Jesse; advisory reflection from LLM_trader; broker connectors from Fincept; selected risk concepts from new trade. See `../BEST_OF_BREED_MATRIX.md`.
 9. **Institutional thinking over hobby-project convenience.** Reconciliation, idempotency, staged release, rollback, least privilege, and auditability are first-class requirements.
 10. **Simplicity is a safety control.** No distributed service, CQRS projection, agent, model, or dependency is introduced without a documented operational advantage and owner.
+11. **No frictionless backtests or data snooping.** Simulations must enforce immutable venue cost models (commissions, bid-ask spread crossing, slippage impact, and short borrow accrual) on point-in-time data manifests. Hypothetical results omitting real market friction are strictly non-qualifying.
 
 ## The four continuous loops
 
@@ -40,4 +41,5 @@ Before approval, answer: Why now? Why this design? Which alternatives were rejec
 
 ## Authority order
 
-`AGENTS.md` is the operating constitution. `RISK_POLICY.md` overrides convenience and delivery pressure. `ARCHITECTURE.md`, active ADRs, and approved configuration define the technical contract. Evidence reports are architectural inputs and must be revised only through the research and ADR process.
+`AGENTS.md` is the operating constitution. `RISK_POLICY.md` overrides convenience and delivery pressure. `ARCHITECTURE.md`, active ADRs in `docs/adr/`, and approved configuration define the technical contract. Evidence reports are architectural inputs and must be revised only through the research and ADR process.
+
