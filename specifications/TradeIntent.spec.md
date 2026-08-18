@@ -19,6 +19,7 @@ Called by: Strategy runtime, Research engine (advisory proposals only).
 ## Inputs
 
 - Strategy package digest, parameter snapshot, and market/feature state
+- `ExecutionCertificateRef(certificate_id, content_digest)` (mandatory for live/paper execution)
 
 ## Outputs
 
@@ -32,6 +33,7 @@ absolute price terms (no strategy-side assumption about broker mechanics):
 
 | Field | Meaning | Validation |
 |---|---|---|
+| `certificate_ref` | cryptographic execution authority | must match valid loaded promotion certificate |
 | `stop_price` | Initial protective stop (loss side) | optional decimal string |
 | `take_profit_price` | Initial profit target | optional decimal string |
 | `trailing` | Trailing controller `(activation_distance, trail_distance)` | `activation >= trail` (strict `ValueError`, code `trailing_activation_less_than_distance`) |
@@ -70,6 +72,7 @@ stateDiagram-v2
 |---|---|---|
 | Missing required field | Data-quality | Reject at ingress |
 | Invalid strategy digest | Security | Reject; alert |
+| Invalid/Missing Certificate | Security | Reject; alert (engine layer) |
 | Stale market data reference | Operational | Reject; strategy must retry with fresh data |
 | Expired intent | Operational | No-op; caller must submit new intent |
 | Duplicate intent idempotency key | Operational | No-op (if same payload) or error (if different) |

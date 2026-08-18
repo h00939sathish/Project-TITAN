@@ -31,6 +31,7 @@ def test_engine_rejects_unregistered_xauusd():
         side="BUY", quantity="1", order_type="MARKET",
         time_in_force="DAY", risk_profile_version="1.0",
         market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    certificate_ref="test-cert",
     )
     result = engine.submit_intent(intent)
     assert not result.accepted
@@ -65,6 +66,7 @@ def test_xauusd_round_trip_with_simulated_adapter():
         side="BUY", quantity="1", order_type="MARKET",
         time_in_force="DAY", risk_profile_version="1.0",
         market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    certificate_ref="test-cert",
     )
     result = engine.submit_intent(intent)
     assert result.accepted, f"Buy rejected: {result.rejection_reason}"
@@ -77,6 +79,7 @@ def test_xauusd_round_trip_with_simulated_adapter():
         side="SELL", quantity="1", order_type="MARKET",
         time_in_force="DAY", risk_profile_version="1.0",
         market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    certificate_ref="test-cert",
     )
     result2 = engine.submit_intent(intent2)
     assert result2.accepted, f"Sell rejected: {result2.rejection_reason}"

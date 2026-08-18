@@ -124,3 +124,31 @@ class TestStrategyDrivenReplay:
         pos = portfolio.get_position("AAPL")
         cash = int(portfolio.get_cash_balance().amount)
         assert cash > 0
+
+
+def test_identical_inputs_produce_identical_cost_attribution_and_digest():
+    from titan.backtest.fx_costs import FxCostModel
+    from titan.research.harness import run_backtest_result, make_ma_signal_fn
+
+    cost_model = FxCostModel.ibkr_spot_fx_tier_one(fill_mode="QUOTE_NEXT_EVENT")
+    bars = [
+        {
+            "timestamp": f"2026-01-01T{i:04d}",
+            "open": 1.1000 + i * 0.0005,
+            "high": 1.1010 + i * 0.0005,
+            "low": 1.0990 + i * 0.0005,
+            "close": 1.1000 + i * 0.0005,
+            "ask": 1.1001 + i * 0.0005,
+            "bid": 1.0999 + i * 0.0005,
+        }
+        for i in range(50)
+    ]
+    params = {"fast": 3, "slow": 10}
+
+    first = run_backtest_result(bars, params, make_ma_signal_fn, cost_model=cost_model)
+    second = run_backtest_result(bars, params, make_ma_signal_fn, cost_model=cost_model)
+
+    assert first.evidence_artifact is not None
+    assert first.evidence_artifact == second.evidence_artifact
+    assert first.cost_model_digest == second.cost_model_digest
+

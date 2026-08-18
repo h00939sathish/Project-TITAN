@@ -28,9 +28,13 @@ from dukascopy_bi5 import aggregate_1m, day_paths, load_ticks  # noqa: E402
 SYMBOLS = ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"]
 OUT_DIR = Path(__file__).resolve().parents[1] / "research" / "dukascopy_1m_ba"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-MAX_TIME_S = 15
+MAX_TIME_S = 10
 HOURS_PER_DAY = 24
-CONN_BUDGET = 12  # >=half dead hours => treat day as unreachable (feed down), not closed
+CONN_BUDGET = 8  # >=1/3 dead hours => treat day as unreachable (feed down), not closed
+# WINDOWS: when this script is spawned detached (no console), every console
+# child (curl.exe) would otherwise pop a NEW visible console window per call.
+# CREATE_NO_WINDOW suppresses that; harmless no-op elsewhere.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def fetch_hour(url: str, tmp_path: str):
@@ -44,6 +48,7 @@ def fetch_hour(url: str, tmp_path: str):
             rc = subprocess.run(
                 ["curl", "-s", "-o", tmp_path, "--max-time", str(MAX_TIME_S), "-A", UA, url],
                 capture_output=True, timeout=MAX_TIME_S + 5,
+                creationflags=NO_WINDOW,
             ).returncode
             if rc != 0:
                 raise RuntimeError(f"curl rc={rc}")
@@ -58,42 +63,106 @@ def fetch_hour(url: str, tmp_path: str):
     return ("conn", None)  # unreachable
 
 
-def download_symbol_missing(symbol: str, start: date, days: int) -> tuple[list[dict], list[str]]:
-    """Pull `days` days from `start`; returns (bars, unreachable_iso_dates)."""
+def feed_healthy(probe_url: str) -> bool:
+    """True if the datafeed answers a mid-session hour with real bytes."""
+    tmp = Path(os.environ.get("TEMP", ".")) / f"dk_probe_{os.getpid()}.bi5"
+    try:
+        rc = subprocess.run(["curl", "-s", "-o", str(tmp), "--max-time", "12",
+                             "-A", UA, probe_url],
+                            capture_output=True, timeout=18,
+                            creationflags=NO_WINDOW).returncode
+        if rc != 0:
+            return False
+        return os.path.getsize(tmp) > 40
+    except Exception:
+        return False
+
+
+def _pull_one_day(symbol: str, day: date, tmp_dir: Path):
+    """Fetch one day's hours (early-bail once CONN_BUDGET dead hours hit).
+    Returns (bars, conn_fail)."""
+    urls = day_paths(symbol, day, range(HOURS_PER_DAY))
+
+    day_bars: list[dict] = []
+    conn_fail = 0
+    pending = list(enumerate(urls))
+    # per-day tmp subdir so parallel days never collide on the same .bi5 name
+    day_tmp = tmp_dir / day.isoformat().replace("-", "")
+    day_tmp.mkdir(parents=True, exist_ok=True)
+
+    def grab(url_idx):
+        h, url = url_idx
+        kind, ticks = fetch_hour(url, str(day_tmp / f"{h:02d}.bi5"))
+        return h, kind, ticks
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futs = [pool.submit(grab, u) for u in pending]
+        from concurrent.futures import as_completed
+        for fut in as_completed(futs):
+            if conn_fail >= CONN_BUDGET:
+                # early bail: day is unreachable, cancel remaining hours
+                for f in futs:
+                    f.cancel()
+                break
+            h, kind, ticks = fut.result()
+            if kind == "conn":
+                conn_fail += 1
+            elif ticks:
+                for m, bar in enumerate(aggregate_1m_ticks(ticks)):
+                    ts = f"{day.isoformat()}T{h:02d}:{m:02d}:00Z"
+                    day_bars.append({"timestamp": ts, **bar})
+    return day_bars, conn_fail
+
+
+def download_symbol_missing(symbol: str, start: date, days: int,
+                            parallel_days: int = 2,
+                            only_days: set | None = None,
+                            checkpoint=None) -> tuple[list[dict], list[str]]:
+    """Pull `days` days from `start`; returns (bars, unreachable_iso_dates).
+
+    parallel_days > 1 pulls multiple days concurrently (each day still uses
+    its own 4-worker hour pool) — overlaps dead-day timeouts across days.
+
+    only_days: optional set of ISO dates ('YYYY-MM-DD') to restrict the fetch
+    to. When given, days not in the set are skipped entirely (used by the
+    prior-window launcher so already-fetched days are never re-pulled).
+    """
     bars_all: list[dict] = []
     unreachable: list[str] = []
     tmp_dir = Path(os.environ.get("TEMP", ".")) / f"dk_{os.getpid()}_{symbol}"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    day = start
-    for d in range(days):
-        urls = day_paths(symbol, day, range(HOURS_PER_DAY))
+    days_list = [start + timedelta(days=i) for i in range(days)]
+    if only_days is not None:
+        days_list = [d for d in days_list if d.isoformat() in only_days]
 
-        def grab(url_idx):
-            h, url = url_idx
-            kind, ticks = fetch_hour(url, str(tmp_dir / f"{h:02d}.bi5"))
-            return h, kind, ticks
-
-        day_bars: list[dict] = []
-        conn_fail = 0
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            for h, kind, ticks in pool.map(grab, list(enumerate(urls))):
-                if kind == "conn":
-                    conn_fail += 1
-                    continue
-                if not ticks:
-                    continue
-                for m, bar in enumerate(aggregate_1m_ticks(ticks)):
-                    ts = f"{day.isoformat()}T{h:02d}:{m:02d}:00Z"
-                    day_bars.append({"timestamp": ts, **bar})
+    def one(day):
+        bars, conn_fail = _pull_one_day(symbol, day, tmp_dir)
         if conn_fail >= CONN_BUDGET:
-            unreachable.append(day.isoformat())
             print(f"  {symbol} {day}: UNREACHABLE ({conn_fail}/{HOURS_PER_DAY}h feed down) - skipped, will retry", flush=True)
-        elif day_bars:
-            bars_all.extend(day_bars)
-            print(f"  {symbol} {day}: {len(day_bars)} 1m bars", flush=True)
+            return day.isoformat(), [], True
+        if bars:
+            print(f"  {symbol} {day}: {len(bars)} 1m bars", flush=True)
         else:
             print(f"  {symbol} {day}: closed/no ticks", flush=True)
-        day += timedelta(days=1)
+        return day.isoformat(), bars, False
+
+    if parallel_days > 1:
+        with ThreadPoolExecutor(max_workers=parallel_days) as pool:
+            for iso, bars, bad in pool.map(one, days_list):
+                if bad:
+                    unreachable.append(iso)
+                else:
+                    bars_all.extend(bars)
+    else:
+        days_done = 0
+        for iso, bars, bad in map(one, days_list):
+            days_done += 1
+            if bad:
+                unreachable.append(iso)
+            else:
+                bars_all.extend(bars)
+            if checkpoint is not None and days_done % 10 == 0:
+                checkpoint(bars_all)
     return bars_all, unreachable
 
 
@@ -125,7 +194,18 @@ def main():
                 existing = []
         bars, unreachable = download_symbol_missing(sym, start, args.days)
         merged = existing + bars
+        # idempotent merge: sort by timestamp, drop exact-duplicate timestamps
         merged.sort(key=lambda b: b["timestamp"])
+        n0 = len(merged)
+        deduped = []
+        last = None
+        for b in merged:
+            if b["timestamp"] != last:
+                deduped.append(b)
+                last = b["timestamp"]
+        merged = deduped
+        if len(merged) != n0:
+            print(f"  {sym}: dedup removed {n0 - len(merged)} duplicate bars", flush=True)
         out.write_text(json.dumps(merged, indent=1), encoding="utf-8")
         n = len(merged)
         span = (merged[0]["timestamp"][:10] + " -> " + merged[-1]["timestamp"][:10]) if n else "EMPTY"

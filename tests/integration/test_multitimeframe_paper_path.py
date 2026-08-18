@@ -108,6 +108,7 @@ class TestMultiTimeframePaperPath:
             "SPY", "BUY", "10", "MARKET", "DAY", "1.0",
             datetime.now(timezone.utc).isoformat(),
             price="450.00",
+        certificate_ref="test-cert",
         )
         result = self.engine.submit_intent(intent)
         assert result.accepted
@@ -119,6 +120,7 @@ class TestMultiTimeframePaperPath:
             "test-mtf", "", "test-mtf-1",
             "UNKNOWN", "BUY", "1", "MARKET", "DAY", "1.0",
             datetime.now(timezone.utc).isoformat(),
+        certificate_ref="test-cert",
         )
         result = self.engine.submit_intent(intent)
         assert not result.accepted
@@ -184,6 +186,7 @@ def denied_intent():
         "test", "", "test-1",
         "UNKNOWN", "BUY", "1", "MARKET", "DAY", "1.0",
         datetime.now(timezone.utc).isoformat(),
+    certificate_ref="test-cert",
     )
 
 
@@ -194,4 +197,5 @@ def approved_intent():
         "SPY", "BUY", "10", "MARKET", "DAY", "1.0",
         datetime.now(timezone.utc).isoformat(),
         price="450.00",
+    certificate_ref="test-cert",
     )

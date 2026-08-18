@@ -1,0 +1,92 @@
+{
+  "window": "2021-08-01T00:00:00+00:00..2025-07-31T23:59:00+00:00",
+  "contract": {
+    "min_contiguous_months": 24,
+    "max_missing_tick_rate": 0.05
+  },
+  "pairs": {
+    "eurusd": {
+      "pair": "eurusd",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba_prior\\EURUSD.json",
+      "exists": true,
+      "bytes": 158043949,
+      "status": "FAILS_CONTRACT",
+      "details": {
+        "total_bars": 647352,
+        "unique_bars": 647352,
+        "duplicate_timestamps": 0,
+        "first_ts": "2021-08-04T00:00:00+00:00",
+        "last_ts": "2025-07-20T23:59:00+00:00",
+        "in_window_bars": 647352,
+        "contiguous_months": 19,
+        "months_present": 38,
+        "expected_bars_mon_weekdays": 1503360,
+        "missing_tick_rate": 0.5694,
+        "qualifies": false
+      }
+    },
+    "gbpusd": {
+      "pair": "gbpusd",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba_prior\\GBPUSD.json",
+      "exists": true,
+      "bytes": 1513117,
+      "status": "FAILS_CONTRACT",
+      "details": {
+        "total_bars": 6203,
+        "unique_bars": 6203,
+        "duplicate_timestamps": 0,
+        "first_ts": "2021-08-11T00:00:00+00:00",
+        "last_ts": "2021-10-05T23:59:00+00:00",
+        "in_window_bars": 6203,
+        "contiguous_months": 3,
+        "months_present": 3,
+        "expected_bars_mon_weekdays": 1503360,
+        "missing_tick_rate": 0.9959,
+        "qualifies": false
+      }
+    },
+    "usdjpy": {
+      "pair": "usdjpy",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba\\USDJPY.json",
+      "exists": false,
+      "bytes": 0,
+      "status": "MISSING",
+      "details": {}
+    },
+    "usdchf": {
+      "pair": "usdchf",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba\\USDCHF.json",
+      "exists": false,
+      "bytes": 0,
+      "status": "MISSING",
+      "details": {}
+    },
+    "usdcad": {
+      "pair": "usdcad",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba\\USDCAD.json",
+      "exists": false,
+      "bytes": 0,
+      "status": "MISSING",
+      "details": {}
+    },
+    "audusd": {
+      "pair": "audusd",
+      "file": "D:\\projects\\Project TITAN\\research\\dukascopy_1m_ba\\AUDUSD.json",
+      "exists": true,
+      "bytes": 6172945,
+      "status": "OUT_OF_WINDOW",
+      "details": {
+        "total_bars": 25310,
+        "unique_bars": 25310,
+        "duplicate_timestamps": 0,
+        "first_ts": "2026-06-01T01:00:00+00:00",
+        "last_ts": "2026-06-29T23:56:00+00:00",
+        "in_window_bars": 0
+      }
+    }
+  },
+  "qualifying_pairs": [],
+  "n_qualifying": 0,
+  "verdict": "DATA-UNAVAILABLE",
+  "verdict_note": "fewer than 4 qualifying pairs: no promotion analysis; per R6 shelved/labelled"
+}

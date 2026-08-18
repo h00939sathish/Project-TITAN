@@ -17,18 +17,17 @@ def _calc_qty(capital, price, pct):
     return max(1, int(capital * (pct / 100) / price))
 
 def run(label, bars, capital_pct):
-    price = bars[0]["close"]
-    qty = _calc_qty(INITIAL_CAPITAL, price, capital_pct)
     bh = buy_and_hold_result(bars)
     print(f"\n  {label} ({bars[0]['timestamp'][:10]} to {bars[-1]['timestamp'][:10]}, {len(bars)} bars)")
     print(f"    BH: {bh.total_return_pct:+.2f}%  Sharpe={bh.sharpe_ratio:.2f}  DD={bh.max_drawdown_pct:.1f}%")
     for sid, params in STRATEGIES.items():
         reg = _reg.get(sid)
         fn = reg.factory(params)
-        runner = StrategyRunner(fn, buy_qty=qty)
+        runner = StrategyRunner(fn, notional_allocation_pct=capital_pct)
         eq, trades = runner.run(bars)
         r = round((eq[-1] - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100, 2)
         print(f"    {sid:25s}  return={r:+.2f}%  trades={len(trades)}")
+
 
 def main():
     parser = argparse.ArgumentParser()

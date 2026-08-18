@@ -115,6 +115,7 @@ class TestStaleFailClosed:
         intent = TradeIntent(
             "test-strat", "test-pkg", "test-1", "SPY", "BUY", "1", "MARKET", "DAY", "1.0",
             old_ts, price="500.0",
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert not result.accepted, "stale-bar intent must fail closed at the freshness gate"

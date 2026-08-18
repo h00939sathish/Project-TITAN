@@ -74,7 +74,7 @@ def test_multi_session_paper_execution_and_certification():
 
     # Session 1: Submit TradeIntent
     now_iso = datetime.now(timezone.utc).isoformat()
-    intent_1 = TradeIntent("strat-1", "pkg-1", "cert-1", "SPY", "BUY", "10", "MARKET", "DAY", "1.0", now_iso, price="450.00")
+    intent_1 = TradeIntent("strat-1", "pkg-1", "cert-1", "SPY", "BUY", "10", "MARKET", "DAY", "1.0", now_iso, price="450.00", certificate_ref="test-cert")
     res_1 = engine.submit_intent(intent_1)
     assert res_1.accepted is True
     assert len(res_1.fills) > 0
@@ -85,7 +85,7 @@ def test_multi_session_paper_execution_and_certification():
     assert pos.quantity == 10
 
     # Session 2: Submit second TradeIntent
-    intent_2 = TradeIntent("strat-1", "pkg-1", "cert-1", "SPY", "SELL", "5", "MARKET", "DAY", "1.0", now_iso, price="455.00")
+    intent_2 = TradeIntent("strat-1", "pkg-1", "cert-1", "SPY", "SELL", "5", "MARKET", "DAY", "1.0", now_iso, price="455.00", certificate_ref="test-cert")
     res_2 = engine.submit_intent(intent_2)
     assert res_2.accepted is True
     assert len(res_2.fills) > 0

@@ -9,6 +9,14 @@ description = "Project TITAN — autonomous quantitative research and trading OS
 requires-python = ">=3.12"
 dependencies = [
     "ibapi>=9.81",
+    "nautilus_trader",
+    "pandas",
+    "numpy",
+    "scipy",
+    "pydantic",
+    "python-dotenv",
+    "fastapi",
+    "uvicorn"
 ]
 
 [tool.maturin]
@@ -34,6 +42,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 markers = [
     "live: tests that require live Alpaca paper API credentials",
     "benchmark: performance/throughput benchmarks not run in CI",

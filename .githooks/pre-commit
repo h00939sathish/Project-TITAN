@@ -1,0 +1,43 @@
+#!/bin/sh
+# Pre-commit ADR-presence gate (F5). Enforces "Mandatory ADR Gate".
+#
+# Rule: if this commit changes PRODUCTION code under core/src/ or src/titan/
+# (excluding tests and __pycache__), an ADR governing the change must exist —
+# either staged in THIS commit, or already committed on the current branch.
+# Otherwise the commit FAILS.
+#
+# Docs-only / test-only / research-data commits are always allowed.
+# Escape hatch: `git commit --no-verify`.
+set -e
+
+PROD=$(git diff --cached --name-only --diff-filter=ACMRT | \
+  grep -E '^(src/titan|core/src)/' | grep -v '/__pycache__/' || true)
+
+if [ -z "$PROD" ]; then
+  # No production code changed — nothing to gate (docs-only, test-only, or empty).
+  exit 0
+fi
+
+STAGED_ADR=$(git diff --cached --name-only --diff-filter=ACMR | \
+  grep -iE '(^|/)ADR-[0-9]|^docs/adr/' || true)
+
+COMMITTED_ADR=""
+if [ -z "$STAGED_ADR" ]; then
+  # An ADR already committed on this branch governs the change; no need to
+  # re-stage it on every follow-up commit of the same PR.
+  COMMITTED_ADR=$(git log --format=%H --name-only --diff-filter=A -20 HEAD 2>/dev/null | \
+    grep -iE '(^|/)ADR-[0-9]|^docs/adr/' | head -1 || true)
+fi
+
+if [ -z "$STAGED_ADR" ] && [ -z "$COMMITTED_ADR" ]; then
+  echo "ERROR: production code changed without an ADR (staged or committed)."
+  echo "  Changed production files:"
+  echo "$PROD" | sed 's/^/    /'
+  echo ""
+  echo "  Project TITAN requires an Architectural Decision Record for code changes."
+  echo "  Stage the ADR (e.g. docs/adr/ADR-NNN-slug.md) or use"
+  echo "  'git commit --no-verify' to override deliberately."
+  exit 1
+fi
+
+exit 0

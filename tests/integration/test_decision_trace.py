@@ -101,6 +101,7 @@ class TestHarness:
                     "1.0",
                     datetime.now(timezone.utc).isoformat(),
                     price=str(proposal.price) if proposal.price else None,
+                certificate_ref="test-cert",
                 )
                 self.engine.submit_intent(intent, correlation_id=event.correlation_id)
         return result

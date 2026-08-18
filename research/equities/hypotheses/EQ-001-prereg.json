@@ -1,0 +1,43 @@
+{
+  "hypothesis_id": "EQ-001",
+  "factor_name": "momentum_12_1m",
+  "universe": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLF",
+    "XLK",
+    "XLE",
+    "XLV",
+    "XLI",
+    "XLU",
+    "XLP",
+    "XLY",
+    "XLB",
+    "TLT"
+  ],
+  "parameters": {
+    "lookback_days": 252,
+    "skip_days": 21,
+    "top_k": 3,
+    "bottom_k": 3,
+    "rebalance_freq_days": 21
+  },
+  "cost_label": "ibkr_standard_etf_2026-08-16",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "pass_criteria": {
+    "min_oos_net_sharpe": 1.0,
+    "min_ic_positive_frac": 0.7,
+    "min_mean_rank_ic": 0.05,
+    "max_monthly_turnover": 0.60,
+    "max_drawdown": 0.15,
+    "replication_required": true
+  }
+}

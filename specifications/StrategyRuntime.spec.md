@@ -14,7 +14,7 @@ Define the deterministic boundary between event producers (strategies, advisory 
 
 Owns: event dispatch, trigger matching, per-(producer, instrument, timeframe) state isolation, warmup, signal function lifecycle, and construction of typed `TradeProposal` objects.
 
-Delegates to: `ProposalValidator` for proposal validation, `PaperTradingEngine.submit_intent()` for all broker interaction, portfolio reconciliation for starting position state.
+Delegates to: `ProposalValidator` for proposal validation, `PaperTradingEngine.submit_intent()` for all non-shadow broker interaction, portfolio reconciliation for starting position state. Shadow proposals must bypass intent submission entirely and be routed exclusively to the shadow ledger.
 
 Called by: the session runner on each `MarketEvent`.
 
@@ -31,7 +31,8 @@ Called by: the session runner on each `MarketEvent`.
 - At most one `TradeProposal` per (producer_id, instrument_id, timeframe, close_timestamp).
 - Proposals contain `producer_kind`, `package/model/prompt digest`, `sources`, `expiration`, `requested action`, and `rationale digest`.
 - No direct broker call, portfolio mutation, risk override, or secret access.
-- `TradeProposal` must pass `ProposalValidator` before becoming `TradeIntent`.
+- `TradeProposal` must pass `ProposalValidator` and possess an `ExecutionCertificateRef` before becoming `TradeIntent`.
+- Shadow proposals (`producer_kind="SHADOW"`) are routed exclusively to the shadow ledger/simulator and must never become a `TradeIntent`.
 
 ## Supported timeframes
 
@@ -72,6 +73,7 @@ Indicator state, warmup direction, position state, and deduplication state are k
 | SELL while flat | Emit no proposal | No unauthorized short is opened |
 | ProposalValidator rejects | Do not retry from runtime | Engine records the typed rejection |
 | Advisory producer submits TradeIntent | Reject; advisory may only propose | Deterministic validation must construct intent |
+| Shadow proposal reaches engine | Reject and alert | Must never call submit_intent() for shadow |
 
 ## Monitoring and rollback
 

@@ -1,0 +1,30 @@
+{
+  "hypothesis_id": "EQ-004",
+  "factor_name": "reversal_12_1m",
+  "universe_label": "us_top50_sp500_2020_01_02_pit",
+  "parameters": {
+    "lookback_days": 252,
+    "skip_days": 21,
+    "top_k": 10,
+    "bottom_k": 10,
+    "gross_exposure": 2.0,
+    "rebalance_freq_days": 21,
+    "dollar_neutral": true
+  },
+  "cost_label": "ibkr_pro_us_equities_standard_with_impact",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "pass_criteria": {
+    "oos_net_sharpe_positive": true,
+    "mean_rank_ic_positive": true,
+    "decile_monotonicity_verified": true,
+    "max_drawdown_limit_pct": 25.0,
+    "replication_required": true
+  }
+}

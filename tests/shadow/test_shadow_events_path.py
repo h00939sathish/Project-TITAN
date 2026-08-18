@@ -31,12 +31,19 @@ class TestShadowPath:
 
         # Warm the runner with a flat series so the strategy is ready, then a
         # rise triggers BUY. The runner's add_strategy uses the registry.
+        # Warmup MUST carry volume-bearing bars (the production 1h feed path),
+        # not close-only ticks: the strategy's VWAP is volume-weighted, and a
+        # close-only warmup leaves volumes at 0 so the first real 4h bar's
+        # volume makes VWAP jump to that bar's close — which fires SELL instead
+        # of the deterministic BUY this test asserts (observed 2026-08-10).
         runner = ShadowRunner(db_path=str(tmp))
         runner.add_strategy("traderdev-ema9-vwap",
                             {"ema_period": 3, "vwap_period": 20,
                              "atr_period": 5, "trail_mult": 2.0})
+        warm_bar = {"close": 1.0000, "high": 1.0000, "low": 1.0000,
+                    "open": 1.0000, "volume": 100, "timestamp": _h(0).isoformat()}
         for _ in range(40):
-            runner.on_price("EURUSD", 1.0000, bar_date=_h(0).isoformat())
+            runner.on_price("EURUSD", 1.0000, bar_date=_h(0).isoformat(), bar=warm_bar)
 
         # Feed one 4h bucket (4 x 1h) through the aggregator -> runner.
         agg = BarAggregator(None)

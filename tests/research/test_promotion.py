@@ -107,3 +107,35 @@ def test_strategy_return_series_propagates_signal_exceptions(monkeypatch):
     bars = [{"close": 100.0 + i} for i in range(6)]
     with pytest.raises(RuntimeError):
         _strategy_return_series("boomer", {}, bars)
+
+
+def test_promotion_rejects_a_lower_fidelity_bar_only_artifact(temp_db):
+    gate = PromotionGate(db_path=temp_db, bars=[])
+    lower_fidelity_artifact = {
+        "strategy_id": "test-strategy",
+        "data_manifest_digest": "sha256-data",
+        "parameter_digest": "sha256-param",
+        "sizing_digest": "sha256-sizing",
+        "cost_model_digest": "sha256-cost",
+        "fill_model": "BAR_NEXT_OPEN",
+        "fidelity": "lower",
+    }
+    result = gate.evaluate_from_artifact(lower_fidelity_artifact)
+    assert result["passed"] is False
+    assert any("noncanonical_simulation_evidence" in r for r in result["reasons"])
+
+
+def test_promotion_rejects_missing_or_mismatched_digest_artifact(temp_db):
+    gate = PromotionGate(db_path=temp_db, bars=[])
+    artifact_missing_cost_digest = {
+        "strategy_id": "test-strategy",
+        "data_manifest_digest": "sha256-data",
+        "parameter_digest": "sha256-param",
+        "sizing_digest": "sha256-sizing",
+        "fill_model": "QUOTE_NEXT_EVENT",
+        "fidelity": "quote",
+    }
+    result = gate.evaluate_from_artifact(artifact_missing_cost_digest)
+    assert result["passed"] is False
+    assert any("noncanonical_simulation_evidence" in r for r in result["reasons"])
+

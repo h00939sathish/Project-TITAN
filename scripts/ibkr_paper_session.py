@@ -279,6 +279,35 @@ class DataIngestStrategy(Strategy):
         self._feed_4h_shadow(inst_id, titan_tf, ts, event.payload)
 
         for proposal in result.proposals:
+            if proposal.producer_kind == "shadow":
+                self._counts["shadow"] += 1
+                self.log.info(
+                    f"[shadow] {proposal.strategy_id} | {proposal.timeframe} "
+                    f"| {proposal.side} {proposal.quantity} @ {proposal.price}"
+                )
+                
+                # Write to ResearchDB shadow ledger
+                db_path = os.getenv("TITAN_RESEARCH_DB", str(DEFAULT_DB_PATH))
+                db = ResearchDB(db_path)
+                try:
+                    db.log_shadow_event(
+                        strategy_id=proposal.strategy_id,
+                        event_type="PROPOSAL",
+                        event_data={
+                            "instrument_id": str(proposal.instrument_id),
+                            "side": proposal.side,
+                            "quantity": proposal.quantity,
+                            "price": proposal.price,
+                            "timeframe": proposal.timeframe
+                        },
+                        timestamp=datetime.now(timezone.utc).isoformat()
+                    )
+                except Exception as e:
+                    self.log.error(f"Failed to log shadow proposal to ResearchDB: {e}")
+                finally:
+                    db.close()
+                continue
+
             self._counts["qualified"] += 1
             intent = TradeIntent(
                 strategy_id=proposal.strategy_id,
@@ -292,6 +321,7 @@ class DataIngestStrategy(Strategy):
                 risk_profile_version="1.0",
                 market_data_timestamp=datetime.now(timezone.utc).isoformat(),
                 price=str(proposal.price) if proposal.price else None,
+                certificate_ref=self._load_certificate(proposal.strategy_id),
             )
             order_result = self._engine.submit_intent(intent, correlation_id=event.correlation_id)
             if order_result.accepted:

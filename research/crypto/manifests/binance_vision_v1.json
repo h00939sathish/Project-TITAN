@@ -1,0 +1,85 @@
+{
+  "venue": "Binance",
+  "venue_id": "binance-vision",
+  "source_url": "https://data.binance.vision/",
+  "licence": "Public historical market-data dumps published by Binance Vision. Research use of the published files; not an API key product. Terms should be re-verified at https://www.binance.com/en/terms before redistribution.",
+  "licence_url": "https://data.binance.vision/",
+  "licence_notes": "2026-08-14: live terms page was bot-walled from this environment. Uncertainty recorded. Using only public historical files. No private endpoints, no credentials, no order capability.",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "products": [
+    {
+      "symbol": "BTCUSDT",
+      "kind": "SPOT",
+      "quote": "USDT",
+      "tick": "0.01",
+      "lot": "0.000001",
+      "min_notional": "5"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "kind": "SPOT",
+      "quote": "USDT",
+      "tick": "0.01",
+      "lot": "0.000001",
+      "min_notional": "5"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "kind": "PERPETUAL",
+      "quote": "USDT",
+      "margin": "USDT-M",
+      "funding_cadence_hours": 8,
+      "tick": "0.10",
+      "lot": "0.001",
+      "min_notional": "5"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "kind": "PERPETUAL",
+      "quote": "USDT",
+      "margin": "USDT-M",
+      "funding_cadence_hours": 8,
+      "tick": "0.01",
+      "lot": "0.001",
+      "min_notional": "5"
+    }
+  ],
+  "timezone": "UTC",
+  "timestamp_semantics": "open-time milliseconds converted to UTC ISO-8601; funding timestamps are period-end as published by Vision fundingRate files",
+  "coverage_from": "2024-08-14T00:00:00+00:00",
+  "coverage_to": "2026-08-14T00:00:00+00:00",
+  "is_partition": {
+    "from": "2024-08-14T00:00:00+00:00",
+    "to": "2026-02-13T23:59:59+00:00"
+  },
+  "oos_partition": {
+    "from": "2026-02-14T00:00:00+00:00",
+    "to": "2026-08-14T00:00:00+00:00"
+  },
+  "fee_schedule": {
+    "as_of": "2026-08-14",
+    "spot_maker": "0.001",
+    "spot_taker": "0.001",
+    "perp_maker": "0.0002",
+    "perp_taker": "0.0005",
+    "note": "Frozen VIP0 snapshot, not a live lookup."
+  },
+  "funding_convention": {
+    "cadence_hours": 8,
+    "sign": "positive_rate_longs_pay_shorts",
+    "payment_on": "perpetual_position_at_funding_timestamp"
+  },
+  "precision": {
+    "qty": 6,
+    "price": 2,
+    "funding": 8
+  },
+  "retrieval_ts_utc": "2026-08-14T08:35:00+00:00",
+  "schema_version": "1.0",
+  "parent_digest": "",
+  "checksums": {},
+  "gap_log": []
+}

@@ -1,0 +1,32 @@
+{
+  "hypothesis_id": "CRYPTO-003",
+  "universe": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "signal": "order_flow_imbalance_taker_volume_delta",
+  "parameters": {
+    "ofi_threshold": "0.40",
+    "rolling_window_trades": 100,
+    "decay_delay_ms": 250,
+    "hold_trades": 50
+  },
+  "cost_label": "binance_usdt_vip0_2026-08-14",
+  "is_partition": {
+    "from": "2024-08-14T00:00:00+00:00",
+    "to": "2026-02-13T23:59:59+00:00"
+  },
+  "oos_partition": {
+    "from": "2026-02-14T00:00:00+00:00",
+    "to": "2026-08-14T00:00:00+00:00"
+  },
+  "participation_cap": "0.05",
+  "pass_criteria": {
+    "oos_net_sharpe_positive": true,
+    "ic_positive_frac": 0.7,
+    "max_concentration": 0.7,
+    "adverse_capacity_net_positive": true,
+    "replication_required": true,
+    "concentration_note": "Charter 35% is infeasible on a 2-name BTC/ETH universe; frozen 70% until universe expands. Documented deviation, not a silent relax of OOS."
+  }
+}

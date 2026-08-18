@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/contracts/crypto-market-event-v1.schema.json",
+  "title": "CryptoMarketEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "venue",
+    "symbol",
+    "contract_kind",
+    "occurred_at",
+    "event_type",
+    "source_manifest_digest",
+    "ingestion_ts"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "venue": {"type": "string", "minLength": 1},
+    "symbol": {"type": "string", "minLength": 1},
+    "contract_kind": {"type": "string", "enum": ["SPOT", "PERPETUAL"]},
+    "occurred_at": {"type": "string", "minLength": 1},
+    "sequence": {"type": ["integer", "null"]},
+    "event_type": {
+      "type": "string",
+      "enum": ["TRADE", "QUOTE", "L2_SNAPSHOT", "L2_DELTA", "FUNDING", "OPEN_INTEREST", "MARK", "LIQUIDATION"]
+    },
+    "price": {"type": ["string", "null"]},
+    "qty": {"type": ["string", "null"]},
+    "side": {"type": ["string", "null"], "enum": ["BUY", "SELL", null]},
+    "funding_rate": {"type": ["string", "null"]},
+    "open_interest": {"type": ["string", "null"]},
+    "bid": {"type": ["string", "null"]},
+    "ask": {"type": ["string", "null"]},
+    "bid_qty": {"type": ["string", "null"]},
+    "ask_qty": {"type": ["string", "null"]},
+    "l2_levels": {"type": ["array", "null"]},
+    "source_manifest_digest": {"type": "string", "minLength": 16},
+    "ingestion_ts": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"event_type": {"const": "FUNDING"}}},
+      "then": {"required": ["funding_rate"]}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "OPEN_INTEREST"}}},
+      "then": {"required": ["open_interest"]}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "TRADE"}}},
+      "then": {"required": ["price", "qty", "sequence"]}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "QUOTE"}}},
+      "then": {"required": ["bid", "ask"]}
+    }
+  ]
+}

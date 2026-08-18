@@ -2,9 +2,17 @@
 import sys
 from pathlib import Path
 
+# Import the screening script WITHOUT leaving its sys.path mutation behind:
+# screen.py inserts <repo>/research at sys.path[0] at import time, which
+# shadows the repo-root `dashboard` package (research/dashboard.py is a plain
+# module, not a package) for every test collected AFTER this module — observed
+# as "'dashboard' is not a package" in test_dashboard.py during full-suite runs.
+_SYS_PATH_SNAPSHOT = list(sys.path)
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "screening"))
 
 import screen as sc
+
+sys.path[:] = _SYS_PATH_SNAPSHOT
 
 
 def _make_bars(opens, high, low, close):

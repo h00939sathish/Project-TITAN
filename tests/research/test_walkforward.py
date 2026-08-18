@@ -105,3 +105,19 @@ class TestWalkForwardOptimizer:
         assert isinstance(res.wfe, float)
         assert len(res.stitched_oos_equity) > 0
         assert isinstance(res.passed_gate, bool)
+
+
+def test_walk_forward_propagates_one_exact_cost_model_to_every_window():
+    from titan.research.harness import walk_forward
+    from titan.backtest.fx_costs import FxCostModel
+
+    cost_model = FxCostModel.ibkr_spot_fx_tier_one(fill_mode="BAR_NEXT_OPEN")
+    bars = [
+        {"timestamp": f"2026-01-01T{i:04d}", "open": 100.0, "close": 100.0 + (i % 5)}
+        for i in range(400)
+    ]
+    results = walk_forward(bars, {}, cost_model=cost_model)
+    assert len(results) > 0
+    assert {r.cost_model_digest for r in results} == {cost_model.digest()}
+
+

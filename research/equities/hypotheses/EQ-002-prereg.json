@@ -1,0 +1,38 @@
+{
+  "hypothesis_id": "EQ-002",
+  "factor_name": "reversal_12_1m",
+  "universe": [
+
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLF",
+    "XLK",
+    "AAPL",
+    "MSFT"
+  ],
+  "signal": "cross_sectional_reversal_12_1m_inverse_momentum",
+  "parameters": {
+    "lookback_days": 252,
+    "skip_days": 21,
+    "top_k": 2,
+    "bottom_k": 2,
+    "rebalance_freq_days": 21,
+    "dollar_neutral": true
+  },
+  "cost_label": "ibkr_pro_us_equities_standard",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "pass_criteria": {
+    "oos_net_sharpe_positive": true,
+    "mean_rank_ic_positive": true,
+    "quantile_monotonicity_verified": true,
+    "max_drawdown_limit_pct": 25.0
+  }
+}

@@ -4,6 +4,7 @@ from datetime import datetime
 from titan.runtime.events import MarketEvent, TradeProposal, StrategyDefinition
 from titan.strategies.registry import get_registry
 from titan.strategies.timeframes import Timeframe
+from titan.strategies.sizing import Sizer
 
 log = logging.getLogger("titan.runtime")
 
@@ -11,8 +12,8 @@ log = logging.getLogger("titan.runtime")
 class MultiTimeframeRuntime:
     DEFAULT_EQUITY = 100_000
 
-    def __init__(self, definitions: list[StrategyDefinition] | None = None, risk_pct: float = 10.0,
-                 watchlist_ids: set[str] | None = None):
+    def __init__(self, definitions: list[StrategyDefinition] | None = None, notional_allocation_pct: float = 10.0,
+                 watchlist_ids: set[str] | None = None, equity: float = 100_000.0):
         self._reg = get_registry()
         self._definitions: list[StrategyDefinition] = []
         self._signal_fns: dict[tuple[str, str, Timeframe], object] = {}
@@ -21,7 +22,8 @@ class MultiTimeframeRuntime:
         self._last_sides: dict[tuple[str, str, Timeframe], str | None] = {}
         self._last_timestamps: dict[tuple[str, str, Timeframe], datetime | None] = {}
         self._staleness_threshold_seconds: float = 86400
-        self._risk_pct = risk_pct
+        self._notional_allocation_pct = notional_allocation_pct
+        self._equity = equity
         self._watchlist_ids: set[str] = watchlist_ids or set()
 
         if definitions:
@@ -92,14 +94,25 @@ class MultiTimeframeRuntime:
             if self._last_sides.get(key) == signal:
                 continue
 
-            shares = max(1, int(self.DEFAULT_EQUITY * self._risk_pct / 100.0 / close))
+            sz_res = Sizer.size(
+                equity=self._equity,
+                notional_allocation_pct=self._notional_allocation_pct,
+                price=close,
+                conversion_rate=1.0,
+                conversion_timestamp=None,
+                step_size=1,
+                minimum_quantity=1
+            )
+            if not sz_res.is_tradable:
+                continue
+
             proposal = TradeProposal(
                 proposal_id=f"prop-{event.message_id}-{d.strategy_id}",
                 strategy_id=d.strategy_id,
                 producer_kind=producer_kind,
                 instrument_id=event.instrument_id,
                 side=signal,
-                quantity=float(shares),
+                quantity=float(sz_res.quantity),
                 price=close,
                 timeframe=tf,
                 close_timestamp=close_ts,

@@ -293,6 +293,7 @@ class TestFailClosed:
                     quantity="1", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
         assert not result.accepted
@@ -337,6 +338,7 @@ class TestFailClosed:
                     quantity="1", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
         assert not result.accepted
@@ -355,6 +357,7 @@ class TestFailClosed:
             quantity="10", order_type="MARKET", time_in_force="DAY",
             risk_profile_version="1.0",
             market_data_timestamp="2026-07-14T00:00:00Z",
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert not result.accepted
@@ -376,6 +379,7 @@ class TestFailClosed:
                 quantity="10", order_type="MARKET", time_in_force="DAY",
                 risk_profile_version="1.0",
                 market_data_timestamp="2026-07-14T00:00:00Z",
+            certificate_ref="test-cert",
             )
             result = engine.submit_intent(intent)
         assert not result.accepted
@@ -398,6 +402,7 @@ class TestFailClosed:
                 quantity="10", order_type="MARKET", time_in_force="DAY",
                 risk_profile_version="1.0",
                 market_data_timestamp="2026-07-14T00:00:00Z",
+            certificate_ref="test-cert",
             )
             result = engine.submit_intent(intent)
         assert not result.accepted
@@ -659,6 +664,7 @@ class TestOneOrderExecution:
             time_in_force="DAY",
             risk_profile_version="1.0",
             market_data_timestamp=ts,
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert result.accepted, f"Order rejected: {result.rejection_reason}"
@@ -702,6 +708,7 @@ class TestOneOrderExecution:
                     time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp=ts,
+                certificate_ref="test-cert",
                 )
                 sell_result = engine.submit_intent(sell_intent)
                 sell_accepted = sell_result.accepted
@@ -870,6 +877,7 @@ class TestBrokerSubmitFailure:
                         quantity="10", order_type="MARKET", time_in_force="DAY",
                         risk_profile_version="1.0",
                         market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                    certificate_ref="test-cert",
                     )
                     result = engine.submit_intent(intent)
 
@@ -966,6 +974,7 @@ class TestTimestampPreValidation:
                     quantity="10", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp="not-a-timestamp",
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
                 assert not result.accepted
@@ -993,6 +1002,7 @@ class TestTimestampPreValidation:
                     quantity="10", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp="2026-07-14T10:30:00Z",
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
                 # Should pass pre-validation and be accepted by adapter
@@ -1112,6 +1122,7 @@ class TestTimestampUtcOffset:
                     quantity="10", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp="2026-07-15T23:03:44",
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
                 assert not result.accepted
@@ -1136,6 +1147,7 @@ class TestTimestampUtcOffset:
                     quantity="10", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp="2026-07-15T23:03:44Z",
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
                 assert "missing UTC offset" not in result.rejection_reason
@@ -1159,6 +1171,7 @@ class TestTimestampUtcOffset:
                     quantity="10", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp="2026-07-15T23:03:44+00:00",
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
                 assert "missing UTC offset" not in result.rejection_reason
@@ -1196,6 +1209,7 @@ class TestUnfilledOrderRecorded:
                     quantity="1", order_type="MARKET", time_in_force="DAY",
                     risk_profile_version="1.0",
                     market_data_timestamp=datetime.now(timezone.utc).isoformat(),
+                certificate_ref="test-cert",
                 )
                 result = engine.submit_intent(intent)
 

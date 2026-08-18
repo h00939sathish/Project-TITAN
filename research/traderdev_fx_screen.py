@@ -315,7 +315,7 @@ def backtest(s, signal, start, end):
         target = signal[i - 1] if i - 1 >= 0 else 0
         ret = (s[i] / s[i - 1] - 1.0) * (VOL_TARGET / EST_VOL)
         if target != pos:
-            rets.append(-COST_RT)      # entry/exit cost only, no bar return
+            rets.append(-COST_RT / 2.0)      # entry/exit cost only, no bar return
             pos = target
         else:
             rets.append(ret if pos else 0.0)

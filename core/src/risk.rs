@@ -972,6 +972,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
     }
 
@@ -1006,7 +1007,9 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
+
         let verdict = gate.evaluate(&intent, None, None, None, None, None, None);
         assert!(!verdict.accepted);
         assert_eq!(verdict.reason, Some(RiskReasonCode::DataStale));

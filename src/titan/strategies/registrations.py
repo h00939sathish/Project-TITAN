@@ -110,8 +110,8 @@ _reg.register(StrategyRegistration(
     version="1.0.0",
     description="Bollinger Band mean-reversion — BUY when price closes at or below the lower band, SELL when price reverts to the middle band.",
     parameter_schema=(
-        ParameterDef("window", "int", 20, "Rolling window for middle and band computation"),
-        ParameterDef("std_dev_multiplier", "float", 2.0, "Standard deviation multiplier for the band width"),
+        ParameterDef("window", "int", 20, "Moving average window"),
+        ParameterDef("std_dev_multiplier", "float", 2.5, "Standard deviation multiplier for the band width"),
     ),
     factory=make_bollinger_signal_fn,
     # ADR-022: no baked-in qualification (gate-only). QUALIFIED is granted
@@ -155,9 +155,9 @@ _reg.register(StrategyRegistration(
                 "strategy ported from the trader.dev MCP server (EXP-00025). "
                 "Not promoted; paper/replay only until it clears the promotion gate.",
     parameter_schema=(
-        ParameterDef("ema_period", "int", 9, "Fast EMA period"),
-        ParameterDef("vwap_period", "int", 240, "VWAP proxy window"),
-        ParameterDef("atr_period", "int", 14, "Trailing stop window"),
+        ParameterDef("ema_period", "int", 9, "Fast EMA window"),
+        ParameterDef("vwap_period", "int", 120, "VWAP proxy window"),
+        ParameterDef("atr_period", "int", 14, "ATR window for trailing stops"),
         ParameterDef("trail_mult", "float", 3.0, "Trailing stop = trail_mult × range"),
     ),
     factory=make_traderdev_ema9vwap_signal_fn,

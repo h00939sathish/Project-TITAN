@@ -44,8 +44,11 @@ dashboard/
 # Logs
 logs/
 titan-*.log
+*.log
+**/*.log
 *.metrics*.json
 metrics-*.json
+
 
 # Research / generated data
 research_data/
@@ -135,3 +138,12 @@ metrics-*.json
 dist_wheels/
 *.pyd.old
 *.pyd.bak2
+
+# Crypto Vision dumps (regenerable)
+research/crypto/data/
+research/crypto/results/
+
+# Temporary scrapers & local DBs
+.just-scrape/
+*.db
+

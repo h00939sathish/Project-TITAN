@@ -31,6 +31,7 @@ class StrategyBridge:
         lot_sizes: dict[str, int] | None = None,
         order_type: str = "MARKET",
         limit_offset: float = 0.0,
+        certificate_ref: str = "dummy_cert_for_paper_session",
     ):
         self._reg = get_registry().get(strategy_id)
         self._params = dict(strategy_params or {})
@@ -40,6 +41,7 @@ class StrategyBridge:
         self._lot_sizes = lot_sizes or {}
         self._order_type = "LIMIT" if str(order_type).upper() == "LIMIT" else "MARKET"
         self._limit_offset = float(limit_offset)
+        self._certificate_ref = certificate_ref
         self._risk_profile_version = risk_profile_version
         self._has_position: dict[str, bool] = {}
         self._package_digest = self._reg.version
@@ -61,17 +63,23 @@ class StrategyBridge:
             self._signals[instrument] = self._reg.factory(self._params)
         return self._signals[instrument]
 
-    def warmup(self, instrument: str, prices: list[float]) -> None:
-        """Feed historical prices for indicator and regime state; no intents."""
+    def warmup(self, instrument: str, prices: list[float] | list[dict]) -> None:
+        """Feed historical prices or full OHLCV bars for indicator and regime state; no intents."""
         if instrument in self._warmed_up:
             return
         fn = self._signal_fn(instrument)
-        for price in prices:
-            signal = fn({"close": price})
+        for item in prices:
+            if isinstance(item, dict):
+                bar = item
+                close_price = float(bar["close"])
+                signal = fn(bar)
+            else:
+                close_price = float(item)
+                signal = fn({"close": close_price})
             if signal in {"BUY", "SELL"}:
                 self._warmup_signals[instrument] = signal
             if self._regime_detector:
-                self._current_regime = self._regime_detector.update(price)
+                self._current_regime = self._regime_detector.update(close_price)
         self._warmed_up.add(instrument)
 
     def on_price(
@@ -165,6 +173,7 @@ class StrategyBridge:
             stop_price=str(stop_price) if stop_price is not None else None,
             take_profit_price=str(tp_price) if tp_price is not None else None,
             trailing=trailing_cfg,
+            certificate_ref=self._certificate_ref,
         )
         self._last_manifest = make_manifest(
             strategy_id=self._strategy_id,

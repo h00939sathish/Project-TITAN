@@ -139,6 +139,7 @@ def cmd_buy(symbol: str, qty: str):
     intent = TradeIntent(
         "cli", "cli-pkg", engine.config.account_id,
         symbol.upper(), "BUY", qty, "MARKET", "DAY", "1.0",
+    certificate_ref="backtest-cert",
     )
     result = engine.submit_intent(intent)
     if result.accepted:
@@ -160,6 +161,7 @@ def cmd_sell(symbol: str, qty: str):
     intent = TradeIntent(
         "cli", "cli-pkg", engine.config.account_id,
         symbol.upper(), "SELL", qty, "MARKET", "DAY", "1.0",
+    certificate_ref="backtest-cert",
     )
     result = engine.submit_intent(intent)
     if result.accepted:

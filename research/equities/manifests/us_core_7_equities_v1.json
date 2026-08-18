@@ -1,0 +1,43 @@
+{
+  "dataset_name": "us_core_7_equities_v1",
+  "asset_class": "US_EQUITIES_ETF",
+  "source": "yfinance Daily Historical Bars (Point-in-time Split & Dividend Adjusted)",
+  "universe": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLF",
+    "XLK",
+    "AAPL",
+    "MSFT"
+  ],
+  "timezone": "America/New_York",
+  "calendar": "NYSE",
+  "coverage_from": "2020-01-02",
+  "coverage_to": "2024-12-31",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "fee_schedule": {
+    "commission_per_share_usd": 0.005,
+    "spread_bps": 1.0,
+    "slippage_bps": 0.5,
+    "annual_short_borrow_bps": 50.0
+  },
+  "retrieval_ts_utc": "2026-08-17T17:00:00+00:00",
+  "schema_version": "1.0",
+  "checksums": {
+    "SPY": "8b1edb84e10dab167ed3e5eb6dc47ceef5c489073cb9cd1d7408cdc287e4a82e",
+    "QQQ": "bf688ca9e3cbc8bfa890a3b8566449ced672ae0bcbdbcc9a50db51aa65d8b58d",
+    "IWM": "54fc8956222b4e185b5e20e37f7a24b0a841197342b0390bec800efef5a93620",
+    "XLF": "9a5173f5a9b4fa356c08abcaa403ef7f9fe9fcff82a75a2530f41a0797159948",
+    "XLK": "e8c589218c2325886a531edb2a408c1a6c4fc93427ccba270f56bba9df9d4c55",
+    "AAPL": "7b290f55f37b1e4fc5dff963737d4f01a302c47806ba2a63ed06246b959e4fb5",
+    "MSFT": "51311ff33aa59ef454aff7836e5546703a17b613769ccbd4d6e12275ff202b49"
+  }
+}

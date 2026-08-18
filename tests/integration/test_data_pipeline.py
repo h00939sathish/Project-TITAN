@@ -80,6 +80,7 @@ class TestForexDataPipelineRoundTrip:
             side="BUY", quantity="1000", order_type="MARKET",
             time_in_force="DAY", risk_profile_version="1.0",
             market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert result.accepted, f"Order rejected: {result.rejection_reason}"
@@ -144,6 +145,7 @@ class TestGoldDataPipelineRoundTrip:
             side="BUY", quantity="1", order_type="MARKET",
             time_in_force="DAY", risk_profile_version="1.0",
             market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert result.accepted, f"Order rejected: {result.rejection_reason}"
@@ -209,6 +211,7 @@ class TestEquityDataPipelineRoundTrip:
             side="BUY", quantity="10", order_type="MARKET",
             time_in_force="DAY", risk_profile_version="1.0",
             market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        certificate_ref="test-cert",
         )
         result = engine.submit_intent(intent)
         assert result.accepted, f"Order rejected: {result.rejection_reason}"

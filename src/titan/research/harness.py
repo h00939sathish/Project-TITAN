@@ -2,10 +2,11 @@
 
 import re
 import statistics
-from pathlib import Path
+from typing import Any, Callable
 
 from titan.backtest.corporate_actions import common_adjustments
 from titan.backtest.fills import BarConservativeFillModel
+from titan.backtest.fx_costs import FxCostModel
 from titan.backtest.results import BacktestResult
 from titan.data.ingest import read_csv
 from titan.data.manifest import DataManifest
@@ -20,14 +21,16 @@ from titan.research.metrics import (
     compute_turnover,
     daily_return_bootstrap,
     exposure_adjusted_benchmark,
-    identify_regimes,
     regime_results,
 )
+from titan.strategies.bollinger import BollingerBands
+from titan.strategies.dual_ma import DualMovingAverage
 from titan.strategies.mean_reversion import MeanReversion
 from titan.strategies.momentum import TimeSeriesMomentum
 from titan.strategies.moving_average import MovingAverageCrossover
+from titan.strategies.rsi import RelativeStrengthIndex
+from titan.strategies.sizing import Sizer
 from titan.strategies.volatility_regime import VolatilityRegime
-from titan.strategies.dual_ma import DualMovingAverage
 
 INITIAL_CAPITAL = 100_000.0
 
@@ -54,161 +57,172 @@ def split_bars(bars: list[dict], split_date: str) -> tuple[list[dict], list[dict
 
 
 class StrategyRunner:
-    """Runs a buy/sell-signal strategy over bars.
+    """Runs a buy/sell-signal strategy over bars with next-event execution and cost model support.
 
     Takes a function `signal_fn(bar) -> str | None` that returns
     "BUY", "SELL", or None for each bar.
     """
 
-    def __init__(self, signal_fn, buy_qty: int = 10,
-                 slippage_bps: float = 0.5, commission_bps: float = 1.0):
+    def __init__(
+        self,
+        signal_fn,
+        *,
+        notional_allocation_pct: float = 10.0,
+        step_size: int = 1,
+        min_quantity: int = 1,
+        slippage_bps: float = 0.5,
+        commission_bps: float = 1.0,
+        cost_model: FxCostModel | None = None,
+    ):
         self.signal_fn = signal_fn
-        self.buy_qty = buy_qty
+        self.notional_allocation_pct = notional_allocation_pct
+        self.step_size = step_size
+        self.min_quantity = min_quantity
         self.slippage_bps = slippage_bps
         self.commission_bps = commission_bps
+        self.cost_model = cost_model
 
     def run(self, bars: list[dict]) -> tuple[list[float], list[dict]]:
         model = BarConservativeFillModel(
-            slippage_bps=self.slippage_bps, commission_bps=self.commission_bps)
+            slippage_bps=self.slippage_bps, commission_bps=self.commission_bps
+        )
         equity_curve = [INITIAL_CAPITAL]
         trades: list[dict] = []
         cash = INITIAL_CAPITAL
         position = 0.0
         position_cost = 0.0
         in_position = False
+        pending_signal = None
 
         for bar in bars:
-            signal = self.signal_fn(bar)
-
-            if signal == "BUY" and not in_position:
-                fill = model.fill(bar, "buy", self.buy_qty)
-                cost = fill.fill_cost + fill.commission
-                if cost <= cash:
-                    cash -= cost
-                    position = fill.fill_quantity
-                    position_cost = fill.fill_cost
-                    in_position = True
-                    trades.append({
-                        "pnl": 0.0, "commission": fill.commission, "side": "buy",
-                        "price": fill.fill_price, "qty": fill.fill_quantity,
-                        "timestamp": bar.get("timestamp", ""),
-                    })
-            elif signal == "SELL" and in_position:
-                fill = model.fill(bar, "sell", int(position))
-                proceeds = fill.fill_cost - fill.commission
+            # 1. Execute pending signal from previous bar against current bar
+            if pending_signal == "BUY" and not in_position:
+                price = bar.get("ask", bar.get("open", bar.get("close", 0.0)))
+                sz_res = Sizer.size(
+                    equity=cash + (position * float(price) if position else 0.0),
+                    notional_allocation_pct=self.notional_allocation_pct,
+                    price=float(price),
+                    conversion_rate=1.0,  # Assumed base currency for harness
+                    conversion_timestamp=None,
+                    step_size=self.step_size,
+                    minimum_quantity=self.min_quantity,
+                )
+                if sz_res.is_tradable:
+                    fill = model.fill(bar, "buy", sz_res.quantity, cost_model=self.cost_model)
+                    cost = float(fill.fill_cost) + float(fill.commission)
+                    if cost <= cash:
+                        cash -= cost
+                        position = float(fill.fill_quantity)
+                        position_cost = float(fill.fill_cost)
+                        in_position = True
+                        trades.append({
+                            "pnl": 0.0,
+                            "commission": float(fill.commission),
+                            "spread_cost": float(fill.spread_cost),
+                            "slippage_cost": float(fill.slippage_cost),
+                            "side": "buy",
+                            "price": float(fill.fill_price),
+                            "qty": int(fill.fill_quantity),
+                            "timestamp": bar.get("timestamp", ""),
+                            "fidelity": fill.fidelity,
+                        })
+                pending_signal = None
+            elif pending_signal == "SELL" and in_position:
+                fill = model.fill(bar, "sell", int(position), cost_model=self.cost_model)
+                proceeds = float(fill.fill_cost) - float(fill.commission)
                 pnl = proceeds - position_cost
                 cash += proceeds
                 trades[-1]["pnl"] = pnl
                 trades[-1]["exit_timestamp"] = bar.get("timestamp", "")
                 trades.append({
-                    "pnl": pnl, "commission": fill.commission, "side": "sell",
-                    "price": fill.fill_price, "qty": fill.fill_quantity,
+                    "pnl": pnl,
+                    "commission": float(fill.commission),
+                    "spread_cost": float(fill.spread_cost),
+                    "slippage_cost": float(fill.slippage_cost),
+                    "side": "sell",
+                    "price": float(fill.fill_price),
+                    "qty": int(fill.fill_quantity),
                     "timestamp": bar.get("timestamp", ""),
+                    "fidelity": fill.fidelity,
                 })
                 position = 0.0
                 position_cost = 0.0
                 in_position = False
+                pending_signal = None
 
-            mtm = cash + (position * bar["close"]) if in_position else cash
+            # 2. Evaluate signal on current bar for execution on next bar
+            sig = self.signal_fn(bar)
+            if sig in ("BUY", "SELL"):
+                pending_signal = sig
+
+            # 3. Mark to market
+            close_price = float(bar.get("close", bar.get("open", 0.0)))
+            mtm = cash + (position * close_price) if in_position else cash
             equity_curve.append(mtm)
 
         if in_position and bars:
             last_bar = bars[-1]
-            fill = model.fill(last_bar, "sell", int(position))
-            net_proceeds = fill.fill_cost - fill.commission
+            fill = model.fill(last_bar, "sell", int(position), cost_model=self.cost_model)
+            net_proceeds = float(fill.fill_cost) - float(fill.commission)
             equity_curve[-1] = cash + net_proceeds
 
         return equity_curve, trades
 
 
 
-def make_ma_signal_fn(params: dict):
-    """Factory: returns a signal_fn for a MovingAverageCrossover."""
-    strat = MovingAverageCrossover(
-        fast_period=params.get("fast", 5), slow_period=params.get("slow", 20))
 
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
+def make_strategy_signal_fn(
+    strategy_cls: type,
+    field_specs: dict[str, tuple[str, Any]],
+) -> Callable[[dict], Callable[[dict], str | None]]:
+    """Generic signal-fn factory: instantiate strategy_cls from params via field_specs
+    (param key -> (constructor kwarg, default)) and return a bar-updating signal_fn
+    with the strategy attached as .strat."""
+    def factory(params: dict):
+        strat = strategy_cls(**{
+            ctor_kwarg: params.get(param, default)
+            for param, (ctor_kwarg, default) in field_specs.items()
+        })
 
-
-def make_mr_signal_fn(params: dict):
-    """Factory: returns a signal_fn for a MeanReversion."""
-    strat = MeanReversion(
-        window=params.get("window", 20),
-        entry_z=params.get("entry_z", -2.0),
-        exit_z=params.get("exit_z", -0.5),
-    )
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
+        def signal_fn(bar):
+            return strat.update(bar["close"])
+        signal_fn.strat = strat
+        return signal_fn
+    return factory
 
 
-def make_vol_regime_signal_fn(params: dict):
-    """Factory: returns a signal_fn for a VolatilityRegime."""
-    strat = VolatilityRegime(
-        vol_window=params.get("vol_window", 20),
-        median_window=params.get("median_window", 60),
-        vol_multiple=params.get("vol_multiple", 1.0),
-    )
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
-
-
-def make_momentum_signal_fn(params: dict):
-    """Factory: returns a signal_fn for a TimeSeriesMomentum."""
-    strat = TimeSeriesMomentum(lookback=params.get("lookback", 20))
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
-
-
-def make_dual_ma_signal_fn(params: dict):
-    """Factory: returns a signal_fn for a DualMovingAverage."""
-    strat = DualMovingAverage(
-        fast_period=params.get("fast", 5), slow_period=params.get("slow", 20))
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
-
-
-def make_rsi_signal_fn(params: dict):
-    """Factory: returns a signal_fn for RelativeStrengthIndex."""
-    from titan.strategies.rsi import RelativeStrengthIndex
-    strat = RelativeStrengthIndex(
-        window=params.get("window", 14),
-        oversold=params.get("oversold", 30.0),
-        overbought=params.get("overbought", 70.0),
-    )
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
-
-
-def make_bollinger_signal_fn(params: dict):
-    """Factory: returns a signal_fn for BollingerBands."""
-    from titan.strategies.bollinger import BollingerBands
-    strat = BollingerBands(
-        window=params.get("window", 20),
-        std_dev_multiplier=params.get("std_dev_multiplier", 2.0),
-    )
-
-    def signal_fn(bar):
-        return strat.update(bar["close"])
-    signal_fn.strat = strat
-    return signal_fn
+make_ma_signal_fn = make_strategy_signal_fn(
+    MovingAverageCrossover,
+    {"fast": ("fast_period", 5), "slow": ("slow_period", 20)},
+)
+make_mr_signal_fn = make_strategy_signal_fn(
+    MeanReversion,
+    {"window": ("window", 20), "entry_z": ("entry_z", -2.0), "exit_z": ("exit_z", -0.5)},
+)
+make_vol_regime_signal_fn = make_strategy_signal_fn(
+    VolatilityRegime,
+    {
+        "vol_window": ("vol_window", 20),
+        "median_window": ("median_window", 60),
+        "vol_multiple": ("vol_multiple", 1.0),
+    },
+)
+make_momentum_signal_fn = make_strategy_signal_fn(
+    TimeSeriesMomentum,
+    {"lookback": ("lookback", 20)},
+)
+make_dual_ma_signal_fn = make_strategy_signal_fn(
+    DualMovingAverage,
+    {"fast": ("fast_period", 5), "slow": ("slow_period", 20)},
+)
+make_rsi_signal_fn = make_strategy_signal_fn(
+    RelativeStrengthIndex,
+    {"window": ("window", 14), "oversold": ("oversold", 30.0), "overbought": ("overbought", 70.0)},
+)
+make_bollinger_signal_fn = make_strategy_signal_fn(
+    BollingerBands,
+    {"window": ("window", 20), "std_dev_multiplier": ("std_dev_multiplier", 2.5)},
+)
 
 
 def make_orb_signal_fn(params: dict):
@@ -240,7 +254,7 @@ def make_traderdev_ema9vwap_signal_fn(params: dict):
     from titan.strategies.traderdev_ema9vwap import TraderDevEMA9VWAP
     strat = TraderDevEMA9VWAP(
         ema_period=int(params.get("ema_period", 9)),
-        vwap_period=int(params.get("vwap_period", 240)),
+        vwap_period=int(params.get("vwap_period", 120)),
         atr_period=int(params.get("atr_period", 14)),
         trail_mult=float(params.get("trail_mult", 3.0)),
     )
@@ -252,16 +266,54 @@ def make_traderdev_ema9vwap_signal_fn(params: dict):
 
 
 
-def run_backtest_result(bars: list[dict], strategy_params: dict,
-                        signal_factory=make_ma_signal_fn,
-                        slippage_bps: float = 0.5,
-                        commission_bps: float = 1.0) -> BacktestResult:
+def run_backtest_result(
+    bars: list[dict],
+    strategy_params: dict,
+    signal_factory=make_ma_signal_fn,
+    *,
+    notional_allocation_pct: float = 10.0,
+    step_size: int = 1,
+    min_quantity: int = 1,
+    slippage_bps: float = 0.5,
+    commission_bps: float = 1.0,
+    cost_model: FxCostModel | None = None,
+) -> BacktestResult:
     """Run a parameterized strategy + compute BacktestResult."""
-    runner = StrategyRunner(signal_factory(strategy_params), 10,
-                            slippage_bps, commission_bps)
+    runner = StrategyRunner(
+        signal_factory(strategy_params),
+        notional_allocation_pct=notional_allocation_pct,
+        step_size=step_size,
+        min_quantity=min_quantity,
+        slippage_bps=slippage_bps,
+        commission_bps=commission_bps,
+        cost_model=cost_model,
+    )
     eq, trades = runner.run(bars)
     exposure_curve = _exposure_curve(eq, trades, bars)
-    return BacktestResult.compute(eq, trades, exposure_curve)
+    res = BacktestResult.compute(eq, trades, exposure_curve)
+    if cost_model is not None:
+        res.cost_model_digest = cost_model.digest()
+        total_spread = sum(t.get("spread_cost", 0.0) for t in trades)
+        total_slippage = sum(t.get("slippage_cost", 0.0) for t in trades)
+        total_commission = sum(t.get("commission", 0.0) for t in trades)
+        gross_pnl = sum(t.get("pnl", 0.0) for t in trades) + total_commission
+        net_pnl = sum(t.get("pnl", 0.0) for t in trades)
+        fidelity = trades[0]["fidelity"] if trades else ("quote" if cost_model.fill_mode == "QUOTE_NEXT_EVENT" else "lower")
+        res.evidence_artifact = {
+            "cost_model_digest": cost_model.digest(),
+            "fill_model": cost_model.fill_mode,
+            "fidelity": fidelity,
+            "total_trades": len(trades),
+            "total_commission": round(total_commission, 4),
+            "total_spread_cost": round(total_spread, 4),
+            "total_slippage_cost": round(total_slippage, 4),
+            "gross_pnl": round(gross_pnl, 4),
+            "net_pnl": round(net_pnl, 4),
+            "sharpe_ratio": res.sharpe_ratio,
+            "max_drawdown_pct": res.max_drawdown_pct,
+        }
+    return res
+
 
 
 def _exposure_curve(eq: list[float], trades: list[dict],
@@ -298,26 +350,67 @@ def cash_result(bars: list[dict]) -> BacktestResult:
     return BacktestResult.compute(eq, [])
 
 
-def run_parameter_sweep(bars: list[dict],
-                        param_grid: list[dict],
-                        signal_factory=make_ma_signal_fn,
-                        label_fn=str) -> dict:
+def run_parameter_sweep(
+    bars: list[dict],
+    param_grid: list[dict],
+    signal_factory=make_ma_signal_fn,
+    label_fn=str,
+    *,
+    notional_allocation_pct: float = 10.0,
+    step_size: int = 1,
+    min_quantity: int = 1,
+    slippage_bps: float = 0.5,
+    commission_bps: float = 1.0,
+    cost_model: FxCostModel | None = None,
+) -> dict:
     results = {}
     for params in param_grid:
-        r = run_backtest_result(bars, params, signal_factory)
+        r = run_backtest_result(
+            bars,
+            params,
+            signal_factory,
+            notional_allocation_pct=notional_allocation_pct,
+            step_size=step_size,
+            min_quantity=min_quantity,
+            slippage_bps=slippage_bps,
+            commission_bps=commission_bps,
+            cost_model=cost_model,
+        )
         results[label_fn(params)] = r
     return results
 
 
-def walk_forward(bars: list[dict], strategy_params: dict,
-                 signal_factory=make_ma_signal_fn,
-                 train_size: int = 252, step: int = 63) -> list[BacktestResult]:
+def walk_forward(
+    bars: list[dict],
+    strategy_params: dict,
+    signal_factory=make_ma_signal_fn,
+    train_size: int = 252,
+    step: int = 63,
+    *,
+    notional_allocation_pct: float = 10.0,
+    step_size: int = 1,
+    min_quantity: int = 1,
+    slippage_bps: float = 0.5,
+    commission_bps: float = 1.0,
+    cost_model: FxCostModel | None = None,
+) -> list[BacktestResult]:
     results = []
     for start in range(0, len(bars) - train_size - step + 1, step):
         window = bars[start:start + train_size + step]
-        r = run_backtest_result(window, strategy_params, signal_factory)
+        r = run_backtest_result(
+            window,
+            strategy_params,
+            signal_factory,
+            notional_allocation_pct=notional_allocation_pct,
+            step_size=step_size,
+            min_quantity=min_quantity,
+            slippage_bps=slippage_bps,
+            commission_bps=commission_bps,
+            cost_model=cost_model,
+        )
         results.append(r)
     return results
+
 
 
 def evaluate_success_criteria(
@@ -554,7 +647,7 @@ class ValidationHarness:
                 INITIAL_CAPITAL * bar["close"] / initial_close for bar in test_bars
             )
         control_equity, _ = StrategyRunner(
-            self.control_factory(self.control_params), 10
+            self.control_factory(self.control_params), notional_allocation_pct=10.0
         ).run(test_bars)
         report.cagr = {
             "candidate": compute_cagr(eq),

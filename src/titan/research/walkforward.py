@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable, Any
 
+from titan.backtest.fx_costs import FxCostModel
 from titan.backtest.results import BacktestResult
 from titan.research.harness import StrategyRunner, INITIAL_CAPITAL
 
@@ -129,10 +130,18 @@ def _evaluate_metric(result: BacktestResult, metric_name: str) -> float:
 class WalkForwardOptimizer:
     """Executes rolling Walk-Forward Optimization across strategy parameter combinations."""
 
-    def __init__(self, buy_qty: int = 10, slippage_bps: float = 0.5, commission_bps: float = 1.0):
-        self.buy_qty = buy_qty
+    def __init__(
+        self,
+        *,
+        notional_allocation_pct: float = 10.0,
+        slippage_bps: float = 0.5,
+        commission_bps: float = 1.0,
+        cost_model: FxCostModel | None = None,
+    ):
+        self.notional_allocation_pct = notional_allocation_pct
         self.slippage_bps = slippage_bps
         self.commission_bps = commission_bps
+        self.cost_model = cost_model
 
     def optimize_window(
         self,
@@ -158,12 +167,15 @@ class WalkForwardOptimizer:
             signal_fn = strategy_factory(params)
             runner = StrategyRunner(
                 signal_fn,
-                buy_qty=self.buy_qty,
+                notional_allocation_pct=self.notional_allocation_pct,
                 slippage_bps=self.slippage_bps,
                 commission_bps=self.commission_bps,
+                cost_model=self.cost_model,
             )
             eq, trades = runner.run(train_bars)
-            result = BacktestResult(eq, trades)
+            result = BacktestResult.compute(eq, trades)
+            if self.cost_model is not None:
+                result.cost_model_digest = self.cost_model.digest()
             raw_score = _evaluate_metric(result, target_metric)
             score = raw_score - mt_penalty
 
@@ -173,7 +185,6 @@ class WalkForwardOptimizer:
                 best_result = result
 
         return best_params, best_result, best_score
-
 
     def run(
         self,
@@ -200,12 +211,15 @@ class WalkForwardOptimizer:
             signal_fn = strategy_factory(best_params)
             runner = StrategyRunner(
                 signal_fn,
-                buy_qty=self.buy_qty,
+                notional_allocation_pct=self.notional_allocation_pct,
                 slippage_bps=self.slippage_bps,
                 commission_bps=self.commission_bps,
+                cost_model=self.cost_model,
             )
             oos_eq, oos_trades = runner.run(w.test_bars)
-            oos_result = BacktestResult(oos_eq, oos_trades)
+            oos_result = BacktestResult.compute(oos_eq, oos_trades)
+            if self.cost_model is not None:
+                oos_result.cost_model_digest = self.cost_model.digest()
             oos_score = _evaluate_metric(oos_result, config.target_metric)
 
             step_results.append(

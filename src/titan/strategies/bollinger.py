@@ -21,7 +21,7 @@ class BollingerBands:
     """
 
     window: int = 20
-    std_dev_multiplier: float = 2.0
+    std_dev_multiplier: float = 2.5
 
     prices: deque[float] = field(default_factory=deque)
     _in_position: bool = False

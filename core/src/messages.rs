@@ -143,6 +143,9 @@ pub struct TradeIntent {
     #[pyo3(get)]
     pub strategy_package_digest: String,
     #[pyo3(get)]
+    #[serde(default)]
+    pub certificate_ref: Option<String>,
+    #[pyo3(get)]
     pub account_id: String,
     #[pyo3(get)]
     pub instrument_id: String,
@@ -184,7 +187,7 @@ impl TradeIntent {
     #[pyo3(signature = (
         strategy_id, strategy_package_digest, account_id, instrument_id,
         side, quantity, order_type, time_in_force, risk_profile_version, market_data_timestamp,
-        price=None, stop_price=None, take_profit_price=None, trailing=None, expiry=None
+        price=None, stop_price=None, take_profit_price=None, trailing=None, expiry=None, certificate_ref=None
     ))]
     pub fn new(
         strategy_id: String,
@@ -202,6 +205,7 @@ impl TradeIntent {
         take_profit_price: Option<String>,
         trailing: Option<TrailingConfig>,
         expiry: Option<String>,
+        certificate_ref: Option<String>,
     ) -> Self {
         Self {
             strategy_id,
@@ -219,6 +223,7 @@ impl TradeIntent {
             risk_profile_version,
             market_data_timestamp,
             expiry,
+            certificate_ref,
         }
     }
 
@@ -489,8 +494,9 @@ mod tests {
             "MARKET".to_string(), "DAY".to_string(), "v1".to_string(),
             "2026-08-07T00:00:00Z".to_string(),
             Some("1.10".to_string()), Some("1.095".to_string()),
-            tp.map(|s| s.to_string()), tr, None,
+            tp.map(|s| s.to_string()), tr, None, None,
         )
+
     }
 
     #[test]

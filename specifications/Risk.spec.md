@@ -32,7 +32,7 @@ Called by: Strategy runtime (sends TradeIntent), Operator (limit changes, kill-s
 ## Risk pipeline (evaluation order)
 
 ```text
-TradeIntent → schema/integrity → strategy eligibility →
+TradeIntent → schema/integrity → certificate validation (certificate_ref present and signed) → strategy eligibility →
 market-data freshness → order limits (price/qty/notional/rate) →
 position/exposure → portfolio/drawdown → liquidity/impact →
 broker/session health → ApprovedOrderIntent or Rejected
@@ -91,6 +91,8 @@ stateDiagram-v2
 | Limit configuration invalid | Terminal (deploy error) | Fail to start; reject reload |
 | Kill-switch state unreadable | Operational | Start in HALTED; alert |
 | Market data freshness unknown | Operational | Reject intents for affected instruments |
+| Certificate invalid or absent | Security | Reject intent (Unauthorized); alert |
+| Sizing conversion data missing | Operational | Reject intent; await fresh rates |
 
 ## Metrics
 

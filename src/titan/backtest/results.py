@@ -17,11 +17,14 @@ class BacktestResult:
     capacity_proxy: float = 0.0
     calmar_ratio: float = 0.0
     profit_factor: float = 0.0
+    cost_model_digest: str = ""
+    evidence_artifact: dict | None = None
 
     @staticmethod
     def compute(equity_curve: list[float], trades: list[dict],
                 exposure_curve: list[float] | None = None) -> "BacktestResult":
         return _compute_backtest(equity_curve, trades, exposure_curve)
+
 
 
 def _compute_backtest(equity_curve: list[float], trades: list[dict],

@@ -1,0 +1,96 @@
+{
+  "hypothesis_id": "EQ-001",
+  "factor_name": "momentum_12_1m",
+  "manifest_digest": "a99fbd0ab826b388b2e83bf0afc70617a11606c3fe576ed1127d240a6f154afe",
+  "is": {
+    "hypothesis_id": "EQ-001",
+    "partition": "IS",
+    "annualized_net_sharpe": 0.4776,
+    "annualized_net_return": 0.0416,
+    "max_drawdown": 0.1658,
+    "monthly_turnover": 0.1208,
+    "mean_rank_ic": 0.1582,
+    "ic_positive_fraction": 0.76,
+    "costs": {
+      "total_borrow_cost": 0.013925,
+      "total_commissions": 0.000225,
+      "total_spread": 0.00045,
+      "total_slippage": 0.000225,
+      "total_friction": 0.014825
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.192,
+      "short_leg_ann": -0.1457,
+      "gross_spread_ann": 0.0463,
+      "net_spread_ann": 0.0416
+    }
+  },
+  "oos": {
+    "hypothesis_id": "EQ-001",
+    "partition": "OOS",
+    "annualized_net_sharpe": 0.7003,
+    "annualized_net_return": 0.0646,
+    "max_drawdown": 0.083,
+    "monthly_turnover": 0.1679,
+    "mean_rank_ic": -0.0169,
+    "ic_positive_fraction": 0.4583,
+    "costs": {
+      "total_borrow_cost": 0.009692,
+      "total_commissions": 0.000208,
+      "total_spread": 0.000417,
+      "total_slippage": 0.000208,
+      "total_friction": 0.010526
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.2758,
+      "short_leg_ann": -0.2061,
+      "gross_spread_ann": 0.0697,
+      "net_spread_ann": 0.0646
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "EQ-001",
+    "partition": "OOS_ADVERSE",
+    "annualized_net_sharpe": 0.591,
+    "annualized_net_return": 0.0545,
+    "max_drawdown": 0.0887,
+    "monthly_turnover": 0.1679,
+    "mean_rank_ic": -0.0169,
+    "ic_positive_fraction": 0.4583,
+    "costs": {
+      "total_borrow_cost": 0.029077,
+      "total_commissions": 0.000417,
+      "total_spread": 0.00125,
+      "total_slippage": 0.000625,
+      "total_friction": 0.031369
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.2758,
+      "short_leg_ann": -0.2061,
+      "gross_spread_ann": 0.0697,
+      "net_spread_ann": 0.0545
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_sharpe": false,
+      "rank_ic_fraction": false,
+      "rank_ic_magnitude": false,
+      "max_drawdown": true,
+      "turnover_capacity": true,
+      "adverse_net_positive": true,
+      "replication": false
+    },
+    "metrics": {
+      "annualized_net_sharpe": 0.7003023838697694,
+      "annualized_net_return": 0.064564776314398,
+      "mean_rank_ic": -0.016941391941391947,
+      "ic_positive_fraction": 0.4583333333333333,
+      "monthly_turnover": 0.1679462571976967,
+      "max_drawdown": 0.08303612083882615,
+      "adverse_annualized_net_return": 0.054483202418044836
+    }
+  },
+  "generated_at": "2026-08-18T07:05:32.751234+00:00"
+}

@@ -243,17 +243,29 @@ class TestIBKRAdapterEndToEndMock:
     def test_full_lifecycle(self):
         adapter = IBKRPaperAdapter()
 
-        with patch.object(adapter._client, "connect"):
-            with patch.object(adapter._client, "run"):
-                adapter._wrapper.managedAccounts("DU1234567")
-                adapter._wrapper.nextValidId(100)
+        # authenticate() REBUILDS _wrapper and _client for every candidate
+        # client id (ibkr_adapter.py:190-213), so patching adapter._client /
+        # adapter._wrapper beforehand never takes effect — the fresh EClient
+        # and _IBKRWrapper replace them before connect(). Patch EClient at the
+        # module level and have connect() fire the wrapper callbacks that set
+        # accounts_ready / oid_ready on the wrapper instance authenticate()
+        # passes into the EClient constructor.
+        import titan.execution.ibkr_adapter as ibkr_mod
 
-                session = adapter.authenticate()
-                assert session.state == AdapterSessionState.CONNECTED
+        def _fire_callbacks_on_connect(*args, **kwargs):
+            wrapper = ibkr_mod.EClient.call_args.args[0]
+            wrapper.managedAccounts("DU1234567")
+            wrapper.nextValidId(100)
 
-                with patch.object(adapter._client, "isConnected", return_value=True):
-                    health = adapter.heartbeat()
-                    assert health.connected is True
+        with patch.object(ibkr_mod, "EClient") as mock_ec:
+            mock_ec.return_value.connect.side_effect = _fire_callbacks_on_connect
+            mock_ec.return_value.isConnected.return_value = True
+
+            session = adapter.authenticate()
+            assert session.state == AdapterSessionState.CONNECTED
+
+            health = adapter.heartbeat()
+            assert health.connected is True
 
     def test_place_order_with_mock(self):
         adapter = IBKRPaperAdapter()

@@ -63,6 +63,7 @@ def _make_intent(instrument="AAPL", side="BUY", quantity="100", price=None) -> T
         instrument, side, quantity, "MARKET", "DAY", "1.0",
         datetime.now(timezone.utc).isoformat(),
         price=price,
+        certificate_ref="test-cert",
     )
 
 

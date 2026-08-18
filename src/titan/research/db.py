@@ -66,6 +66,14 @@ class ResearchDB:
                                 max_correlation   REAL
                             );
 
+            CREATE TABLE IF NOT EXISTS qualifications_audit (
+                strategy_id TEXT,
+                status TEXT,
+                metrics TEXT,
+                reason TEXT,
+                retired_at TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS ensemble_runs (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at    TEXT NOT NULL,

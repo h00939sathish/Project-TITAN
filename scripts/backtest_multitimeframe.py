@@ -232,6 +232,7 @@ def run_once(bars: list[dict], risk_pct: float, strategy_params: dict[str, dict]
                 risk_profile_version="1.0",
                 market_data_timestamp=datetime.now(timezone.utc).isoformat(),
                 price=str(proposal.price) if proposal.price else None,
+            certificate_ref="backtest-cert",
             )
             order_result = engine.submit_intent(intent, correlation_id=event.correlation_id)
             if order_result.accepted:

@@ -73,25 +73,36 @@ def _strategy_return_series(
     series: list[float] = []
     prev_close = None
     pos = 0.0
+    prev_pos = 0.0
+    
+    # Cost assumptions (e.g. 0.5 bps slippage, 1.0 bps commission = 1.5 bps)
+    cost_bps = 1.5
+    cost_fraction = cost_bps / 10000.0
+    
     for bar in bars:
         close = bar.get("close")
         if close is None:
             series.append(0.0)
             continue
-        # F7: do NOT swallow signal exceptions. A strategy that raises in its
-        # signal must fail the gate, not silently become a flat (0 return)
-        # series that looks artificially clean. Exceptions propagate to the
-        # caller (the gate), which then fails closed.
+        # F7: do NOT swallow signal exceptions.
         sig = signal_fn({"close": close})
         if sig == "BUY":
             pos = 1.0
         elif sig == "SELL":
             pos = 0.0
+            
         if prev_close is None or prev_close == 0:
             series.append(0.0)
         else:
-            series.append(round(pos * (close / prev_close - 1.0), 8))
+            trade_cost = 0.0
+            if pos != prev_pos:
+                trade_cost = cost_fraction * abs(pos - prev_pos)
+            
+            raw_ret = prev_pos * (close / prev_close - 1.0)
+            series.append(round(raw_ret - trade_cost, 8))
+            
         prev_close = close
+        prev_pos = pos
     return series
 
 
@@ -212,7 +223,40 @@ class PromotionGate:
         ))
         return {"strategy_id": strategy_id, "gates": [g.__dict__ for g in gates], "passed": passed}
 
+    def evaluate_from_artifact(self, artifact: dict) -> dict:
+        """Evaluate promotion admission from a canonical persisted evidence artifact (ADR-031)."""
+        reasons: list[str] = []
+        strategy_id = artifact.get("strategy_id", "")
+
+        # 1. Verify required digests
+        data_digest = artifact.get("data_manifest_digest") or artifact.get("data_digest")
+        param_digest = artifact.get("parameter_digest") or artifact.get("param_digest")
+        sizing_digest = artifact.get("sizing_digest")
+        cost_digest = artifact.get("cost_model_digest")
+        fill_model = artifact.get("fill_model")
+        fidelity = artifact.get("fidelity")
+
+        if not all([data_digest, param_digest, sizing_digest, cost_digest, fill_model, fidelity]):
+            reasons.append("noncanonical_simulation_evidence: missing required digest(s) or model metadata")
+
+        # 2. Reject lower-fidelity or bar-only synthetic models
+        if fidelity == "lower" or fill_model == "BAR_NEXT_OPEN":
+            reasons.append("noncanonical_simulation_evidence: lower-fidelity simulation evidence cannot promote")
+
+        # 3. Reject cost-free derived return series
+        if artifact.get("derived_series", False):
+            reasons.append("noncanonical_simulation_evidence: cost-free derived return series is not admissible")
+
+        passed = len(reasons) == 0
+        return {
+            "strategy_id": strategy_id,
+            "passed": passed,
+            "reasons": reasons,
+            "artifact": artifact,
+        }
+
     def _get_qual(self, strategy_id: str) -> dict | None:
+
         quals = self._db.get_qualifications()
         normalized = strategy_id.replace("_", "-")
         return next((q for q in quals if q["strategy_id"] in (strategy_id, normalized)), None)

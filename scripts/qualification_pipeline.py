@@ -33,6 +33,7 @@ from titan.backtest.corporate_actions import common_adjustments
 from titan.research.harness import split_bars, run_backtest_result, walk_forward
 from titan.strategies.registry import get_registry
 
+from titan.backtest.fx_costs import FxCostModel
 from titan.research.optimizers.parameter_surface import ParameterSurface, SurfaceNode
 from titan.research.validators.parameter_stability import OptimizationRiskValidator
 
@@ -179,6 +180,7 @@ def qualify_strategy(
     criteria: dict | None = None,
     slippage_bps: float = 0.5,
     commission_bps: float = 1.0,
+    cost_model: FxCostModel | None = None,
     is_unapproved_source: bool = False,
 ) -> StrategyQualification | None:
     criteria = criteria or QUALIFICATION_CRITERIA
@@ -199,10 +201,16 @@ def qualify_strategy(
     sweep_results = []
     surface = ParameterSurface(strategy_id=strategy_id, timeframe="1d", instrument_id="SPY")
     for params in param_grid:
-        r_is = run_backtest_result(train_bars, params, factory,
-                                   slippage_bps=slippage_bps, commission_bps=commission_bps)
-        r_oos = run_backtest_result(test_bars, params, factory,
-                                    slippage_bps=slippage_bps, commission_bps=commission_bps)
+        r_is = run_backtest_result(
+            train_bars, params, factory,
+            slippage_bps=slippage_bps, commission_bps=commission_bps,
+            cost_model=cost_model,
+        )
+        r_oos = run_backtest_result(
+            test_bars, params, factory,
+            slippage_bps=slippage_bps, commission_bps=commission_bps,
+            cost_model=cost_model,
+        )
         if r_is.total_trades > 0:
             sweep_results.append((r_is, params))
         node = SurfaceNode(
@@ -230,16 +238,24 @@ def qualify_strategy(
     scorecard = validator.validate(strategy_id=strategy_id, timeframe="1d", surfaces_by_instrument={"SPY": surface})
 
     # ── Phase 3: OOS test ──
-    oos_result = run_backtest_result(test_bars, best_params, factory,
-                                     slippage_bps=slippage_bps, commission_bps=commission_bps)
+    oos_result = run_backtest_result(
+        test_bars, best_params, factory,
+        slippage_bps=slippage_bps, commission_bps=commission_bps,
+        cost_model=cost_model,
+    )
 
     # ── Phase 4: Walk-forward ──
     wf_size = min(252, max(30, len(test_bars) // 3))
     wf_step = max(10, wf_size // 4)
-    wf_results = walk_forward(test_bars, best_params, factory,
-                              train_size=wf_size, step=wf_step)
+    wf_results = walk_forward(
+        test_bars, best_params, factory,
+        train_size=wf_size, step=wf_step,
+        slippage_bps=slippage_bps, commission_bps=commission_bps,
+        cost_model=cost_model,
+    )
     wf_sharpes = [r.sharpe_ratio for r in wf_results]
     wf_mean_sharpe = sum(wf_sharpes) / len(wf_sharpes) if wf_sharpes else 0.0
+
 
     # ── Phase 5: Qualification check ──
     reasons = []
@@ -412,6 +428,7 @@ def main() -> None:
 
     slippage_bps = args.slippage_bps if args.slippage_bps is not None else (1.0 if args.asset_class == "forex" else 0.5)
     commission_bps = args.commission_bps if args.commission_bps is not None else (1.0 if args.asset_class == "forex" else 1.0)
+    cost_model = FxCostModel.ibkr_spot_fx_tier_one() if args.asset_class == "forex" else None
 
     print(f"Loading bars from {args.csv} (Asset Class: {args.asset_class}, Slippage: {slippage_bps}bps, Commission: {commission_bps}bps) ...")
     bars = load_bars(args.csv)
@@ -435,8 +452,10 @@ def main() -> None:
         q = qualify_strategy(
             bars, sid, args.train_date, args.test_date, criteria,
             slippage_bps=slippage_bps, commission_bps=commission_bps,
+            cost_model=cost_model,
             is_unapproved_source=args.unapproved_source
         )
+
         if q:
             qualifications.append(q)
             print(f"    IS Sharpe={q.is_sharpe:.2f}  OOS Sharpe={q.oos_sharpe:.2f}  "

@@ -60,6 +60,7 @@ class TestMultiTimeframeRecovery:
             "SPY", "BUY", "50", "MARKET", "DAY", "1.0",
             datetime.now(timezone.utc).isoformat(),
             price="450.00",
+        certificate_ref="test-cert",
         ))
 
         cash_before = engine.portfolio.get_cash_balance().amount
@@ -111,6 +112,7 @@ class TestMultiTimeframeRecovery:
             "QQQ", "BUY", "10", "MARKET", "DAY", "1.0",
             datetime.now(timezone.utc).isoformat(),
             price="500.00",
+        certificate_ref="test-cert",
         ))
         assert result.accepted
 

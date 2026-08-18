@@ -1,10 +1,75 @@
-"""ATR-based position sizing — volatility-adjusted share count."""
+import math
+from typing import Optional
+from dataclasses import dataclass
+
+@dataclass
+class SizingResult:
+    quantity: int
+    is_tradable: bool
+    reason: str = ""
+
+class Sizer:
+    @staticmethod
+    def size(
+        equity: float,
+        notional_allocation_pct: float,
+        price: float,
+        conversion_rate: Optional[float],
+        conversion_timestamp: Optional[str],
+        step_size: int,
+        minimum_quantity: int,
+        now_timestamp: Optional[str] = None,
+        data_freshness_threshold_ms: int = 5000
+    ) -> SizingResult:
+        
+        if conversion_timestamp and now_timestamp:
+            from datetime import datetime
+            try:
+                # Handle potential timezone offsets or Z
+                t_conv = datetime.fromisoformat(conversion_timestamp.replace('Z', '+00:00'))
+                t_now = datetime.fromisoformat(now_timestamp.replace('Z', '+00:00'))
+                delta_ms = (t_now - t_conv).total_seconds() * 1000
+                if delta_ms > data_freshness_threshold_ms:
+                    return SizingResult(0, False, f"Market data is stale (delta {delta_ms}ms > {data_freshness_threshold_ms}ms)")
+            except ValueError:
+                pass # Fallback if invalid timestamps
+        
+        if conversion_rate is None or conversion_rate <= 0:
+            return SizingResult(0, False, "Sizing conversion data missing")
+            
+        if equity <= 0 or notional_allocation_pct <= 0 or price <= 0:
+            return SizingResult(0, False, "Invalid equity, allocation, or price")
+            
+        notional_base = equity * (notional_allocation_pct / 100.0)
+        notional_target = notional_base * conversion_rate
+        
+        raw_shares = notional_target / price
+        
+        # Round down to step_size
+        rounded_shares = math.floor(raw_shares / step_size) * step_size
+        
+        if rounded_shares < minimum_quantity:
+            return SizingResult(0, False, "Allocation cannot fund minimum lot")
+            
+        return SizingResult(int(rounded_shares), True)
+
+
+# ---------------------------------------------------------------------------
+# DEPRECATED (ADR-028 migration in progress): legacy ATR-based sizing kept as
+# compat shims for callers not yet migrated to the canonical Sizer
+# (src/titan/strategies/pipeline.py, scripts/ensemble_lab.py,
+# tests/strategies/test_phases_2_9.py). Migration to Sizer is P1
+# economic-parity work (titan_alpha_loop_FINAL.md §2). Do NOT use in new code.
+# ---------------------------------------------------------------------------
 
 import statistics
 
 
 def atr(closes: list[float], period: int = 14) -> float:
-    """Compute Average Dollar Range (volatility proxy) over close prices."""
+    """Compute Average Dollar Range (volatility proxy) over close prices.
+
+    DEPRECATED: legacy ATR sizing helper; keep until callers migrate to Sizer.
+    """
     if len(closes) < period + 1:
         return 0.0
     returns = [
@@ -24,6 +89,8 @@ def position_size(
     max_shares: int = 1000,
 ) -> int:
     """Compute position size = risk_budget / (atr * stop_multiple * price).
+
+    DEPRECATED: legacy ATR sizing helper; keep until callers migrate to Sizer.
 
     Args:
         equity: Current account equity (cash + position value).

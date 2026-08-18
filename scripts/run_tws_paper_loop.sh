@@ -21,7 +21,7 @@ backoff=$BASE_BACKOFF
 while true; do
   echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) starting paper_session ===" >> paper_session_restarts.log
   start_ts=$(date +%s)
-  python scripts/paper_session.py > paper_session_console.log 2>&1
+  python scripts/paper_session.py --enable-fx > paper_session_console.log 2>&1
   code=$?
   runtime=$(( $(date +%s) - start_ts ))
   echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) paper_session exited code=$code runtime=${runtime}s backoff=${backoff}s ===" >> paper_session_restarts.log

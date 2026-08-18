@@ -124,7 +124,8 @@ class MultiInstrumentHarness:
         control_eq_curves = []
         for spec in self.instruments:
             control_runner = StrategyRunner(
-                self.control_factory(self.control_params), 10)
+                self.control_factory(self.control_params), notional_allocation_pct=10.0
+            )
             eq, _ = control_runner.run(spec.test_bars)
             control_eq_curves.append(eq)
         min_len = min(len(e) for e in control_eq_curves)

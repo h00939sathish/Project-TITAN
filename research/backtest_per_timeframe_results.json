@@ -1,0 +1,808 @@
+{
+  "orb": [
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -1.38,
+      "vs_buy_and_hold_pct": 1.38,
+      "timeframe": "15m",
+      "dataset": "SPY [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -7.18,
+      "vs_buy_and_hold_pct": 7.18,
+      "timeframe": "15m",
+      "dataset": "QQQ [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -0.03,
+      "vs_buy_and_hold_pct": 0.03,
+      "timeframe": "15m",
+      "dataset": "AAPL [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 4.24,
+      "vs_buy_and_hold_pct": -4.24,
+      "timeframe": "15m",
+      "dataset": "MSFT [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 0.21,
+      "vs_buy_and_hold_pct": -0.21,
+      "timeframe": "15m",
+      "dataset": "IWM [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 10.52,
+      "vs_buy_and_hold_pct": -10.52,
+      "timeframe": "15m",
+      "dataset": "XLF [15m from 5m, 1092 bars]"
+    },
+    {
+      "strategy_id": "orb",
+      "params": {
+        "atr_period": 14,
+        "min_volume_ratio": 1.2,
+        "breakout_mult": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -10.83,
+      "vs_buy_and_hold_pct": 10.83,
+      "timeframe": "15m",
+      "dataset": "XLK [15m from 5m, 1092 bars]"
+    }
+  ],
+  "vwap-reversion": [
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -1.4,
+      "vs_buy_and_hold_pct": 1.4,
+      "timeframe": "5m",
+      "dataset": "SPY [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -7.11,
+      "vs_buy_and_hold_pct": 7.11,
+      "timeframe": "5m",
+      "dataset": "QQQ [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -0.19,
+      "vs_buy_and_hold_pct": 0.19,
+      "timeframe": "5m",
+      "dataset": "AAPL [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 3.73,
+      "vs_buy_and_hold_pct": -3.73,
+      "timeframe": "5m",
+      "dataset": "MSFT [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 0.18,
+      "vs_buy_and_hold_pct": -0.18,
+      "timeframe": "5m",
+      "dataset": "IWM [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": 10.74,
+      "vs_buy_and_hold_pct": -10.74,
+      "timeframe": "5m",
+      "dataset": "XLF [5m native, 3276 bars]"
+    },
+    {
+      "strategy_id": "vwap-reversion",
+      "params": {
+        "window": 30,
+        "std_dev": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -10.73,
+      "vs_buy_and_hold_pct": 10.73,
+      "timeframe": "5m",
+      "dataset": "XLK [5m native, 3276 bars]"
+    }
+  ],
+  "traderdev-ema9-vwap": [
+    {
+      "strategy_id": "traderdev-ema9-vwap",
+      "params": {
+        "ema_period": 9,
+        "vwap_period": 240,
+        "atr_period": 14,
+        "trail_mult": 3.0
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.01,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 40.0,
+      "profit_factor": 1.5,
+      "total_trades": 15,
+      "buy_and_hold_return_pct": 0.93,
+      "vs_buy_and_hold_pct": -0.93,
+      "timeframe": "4h",
+      "dataset": "EURUSD [4h from clean 5m, 1610 bars]"
+    },
+    {
+      "strategy_id": "traderdev-ema9-vwap",
+      "params": {
+        "ema_period": 9,
+        "vwap_period": 240,
+        "atr_period": 14,
+        "trail_mult": 3.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.03,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 30.77,
+      "profit_factor": 0.5,
+      "total_trades": 13,
+      "buy_and_hold_return_pct": 2.12,
+      "vs_buy_and_hold_pct": -2.12,
+      "timeframe": "4h",
+      "dataset": "GBPUSD [4h from clean 5m, 1610 bars]"
+    },
+    {
+      "strategy_id": "traderdev-ema9-vwap",
+      "params": {
+        "ema_period": 9,
+        "vwap_period": 240,
+        "atr_period": 14,
+        "trail_mult": 3.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -4.22,
+      "vs_buy_and_hold_pct": 4.22,
+      "timeframe": "4h",
+      "dataset": "AUDUSD [4h from clean 5m, 126 bars]"
+    }
+  ],
+  "mean-reversion": [
+    {
+      "strategy_id": "mean-reversion",
+      "params": {
+        "window": 20,
+        "entry_z": -2.0,
+        "exit_z": -0.5
+      },
+      "total_return_pct": 1.41,
+      "sharpe_ratio": 0.65,
+      "max_drawdown_pct": 0.9,
+      "win_rate_pct": 91.67,
+      "profit_factor": 3.64,
+      "total_trades": 48,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -79.66,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "mean-reversion",
+      "params": {
+        "window": 20,
+        "entry_z": -2.0,
+        "exit_z": -0.5
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.69,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 75.0,
+      "profit_factor": 2.69,
+      "total_trades": 16,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "mean-reversion",
+      "params": {
+        "window": 20,
+        "entry_z": -2.0,
+        "exit_z": -0.5
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 1.96,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 77.78,
+      "profit_factor": 10.38,
+      "total_trades": 18,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "mean-reversion",
+      "params": {
+        "window": 20,
+        "entry_z": -2.0,
+        "exit_z": -0.5
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -3.87,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 1,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "time-series-momentum": [
+    {
+      "strategy_id": "time-series-momentum",
+      "params": {
+        "lookback": 20
+      },
+      "total_return_pct": 1.92,
+      "sharpe_ratio": 0.76,
+      "max_drawdown_pct": 0.63,
+      "win_rate_pct": 42.0,
+      "profit_factor": 2.23,
+      "total_trades": 100,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -79.14,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "time-series-momentum",
+      "params": {
+        "lookback": 20
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.59,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 45.16,
+      "profit_factor": 2.0,
+      "total_trades": 31,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "time-series-momentum",
+      "params": {
+        "lookback": 20
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.2,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 32.26,
+      "profit_factor": 1.21,
+      "total_trades": 31,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "time-series-momentum",
+      "params": {
+        "lookback": 20
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "ma-crossover": [
+    {
+      "strategy_id": "ma-crossover",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": 2.29,
+      "sharpe_ratio": 0.92,
+      "max_drawdown_pct": 0.79,
+      "win_rate_pct": 58.82,
+      "profit_factor": 2.49,
+      "total_trades": 68,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -78.78,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "ma-crossover",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.3,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 42.11,
+      "profit_factor": 0.73,
+      "total_trades": 19,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "ma-crossover",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.76,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 20.0,
+      "profit_factor": 0.26,
+      "total_trades": 20,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "ma-crossover",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "dual-ma": [
+    {
+      "strategy_id": "dual-ma",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": 2.29,
+      "sharpe_ratio": 0.92,
+      "max_drawdown_pct": 0.79,
+      "win_rate_pct": 58.82,
+      "profit_factor": 2.49,
+      "total_trades": 68,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -78.78,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "dual-ma",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.35,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 38.1,
+      "profit_factor": 0.69,
+      "total_trades": 21,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "dual-ma",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.77,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 18.18,
+      "profit_factor": 0.26,
+      "total_trades": 22,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "dual-ma",
+      "params": {
+        "fast": 5,
+        "slow": 20
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "rsi": [
+    {
+      "strategy_id": "rsi",
+      "params": {
+        "window": 14,
+        "oversold": 30.0,
+        "overbought": 70.0
+      },
+      "total_return_pct": 1.08,
+      "sharpe_ratio": 0.39,
+      "max_drawdown_pct": 1.04,
+      "win_rate_pct": 76.92,
+      "profit_factor": 2.21,
+      "total_trades": 26,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -79.99,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "rsi",
+      "params": {
+        "window": 14,
+        "oversold": 30.0,
+        "overbought": 70.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.57,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 85.71,
+      "profit_factor": 999.0,
+      "total_trades": 7,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "rsi",
+      "params": {
+        "window": 14,
+        "oversold": 30.0,
+        "overbought": 70.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.31,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 66.67,
+      "profit_factor": 3.38,
+      "total_trades": 6,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "rsi",
+      "params": {
+        "window": 14,
+        "oversold": 30.0,
+        "overbought": 70.0
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -4.3,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 1,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "bollinger": [
+    {
+      "strategy_id": "bollinger",
+      "params": {
+        "window": 20,
+        "std_dev_multiplier": 2.0
+      },
+      "total_return_pct": 1.37,
+      "sharpe_ratio": 0.55,
+      "max_drawdown_pct": 0.9,
+      "win_rate_pct": 90.91,
+      "profit_factor": 3.01,
+      "total_trades": 44,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -79.69,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "bollinger",
+      "params": {
+        "window": 20,
+        "std_dev_multiplier": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.48,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 57.14,
+      "profit_factor": 2.33,
+      "total_trades": 14,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "bollinger",
+      "params": {
+        "window": 20,
+        "std_dev_multiplier": 2.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.88,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 71.43,
+      "profit_factor": 7.62,
+      "total_trades": 14,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "bollinger",
+      "params": {
+        "window": 20,
+        "std_dev_multiplier": 2.0
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -5.5,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 1,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ],
+  "volatility-regime": [
+    {
+      "strategy_id": "volatility-regime",
+      "params": {
+        "vol_window": 20,
+        "median_window": 60,
+        "vol_multiple": 1.0
+      },
+      "total_return_pct": 0.88,
+      "sharpe_ratio": 0.38,
+      "max_drawdown_pct": 0.63,
+      "win_rate_pct": 58.06,
+      "profit_factor": 1.61,
+      "total_trades": 62,
+      "buy_and_hold_return_pct": 81.06,
+      "vs_buy_and_hold_pct": -80.18,
+      "timeframe": "1d",
+      "dataset": "SPY [Daily 2020-2024, 1257 bars]"
+    },
+    {
+      "strategy_id": "volatility-regime",
+      "params": {
+        "vol_window": 20,
+        "median_window": 60,
+        "vol_multiple": 1.0
+      },
+      "total_return_pct": -0.0,
+      "sharpe_ratio": -0.7,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 33.33,
+      "profit_factor": 0.46,
+      "total_trades": 12,
+      "buy_and_hold_return_pct": -0.53,
+      "vs_buy_and_hold_pct": 0.53,
+      "timeframe": "1d",
+      "dataset": "EURUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "volatility-regime",
+      "params": {
+        "vol_window": 20,
+        "median_window": 60,
+        "vol_multiple": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.62,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 83.33,
+      "profit_factor": 3.16,
+      "total_trades": 12,
+      "buy_and_hold_return_pct": 1.52,
+      "vs_buy_and_hold_pct": -1.52,
+      "timeframe": "1d",
+      "dataset": "GBPUSD [Clean Daily, 313 bars]"
+    },
+    {
+      "strategy_id": "volatility-regime",
+      "params": {
+        "vol_window": 20,
+        "median_window": 60,
+        "vol_multiple": 1.0
+      },
+      "total_return_pct": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown_pct": 0.0,
+      "win_rate_pct": 0.0,
+      "profit_factor": 999.0,
+      "total_trades": 0,
+      "buy_and_hold_return_pct": -3.9,
+      "vs_buy_and_hold_pct": 3.9,
+      "timeframe": "1d",
+      "dataset": "AUDUSD [Clean Daily, 25 bars]"
+    }
+  ]
+}

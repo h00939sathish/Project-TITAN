@@ -18,7 +18,7 @@ Called by: Risk gate (receives ApprovedOrderIntent), Reconciliation (query in-fl
 
 ## Inputs
 
-- `ApprovedOrderIntent` (from Risk gate)
+- `ApprovedOrderIntent` (from Risk gate), containing a valid, signed `ExecutionCertificateRef`
 - Broker adapter responses (acknowledgement, fill, reject, timeout)
 - Reconciliation queries
 - Operator cancel/replace commands
@@ -36,7 +36,9 @@ Execution-specific states for the adapter submission:
 
 ```mermaid
 stateDiagram-v2
-  [*] --> PERSISTING: ApprovedOrderIntent received
+  [*] --> VALIDATING: ApprovedOrderIntent received
+  VALIDATING --> PERSISTING: Certificate verified & signed
+  VALIDATING --> REJECTED: Certificate absent, forged, or expired (Unauthorized)
   PERSISTING --> SENDING: OrderSubmitted event persisted
   SENDING --> WAITING: adapter request sent
   SENDING --> STORE_FAILURE: event store unavailable

@@ -39,11 +39,12 @@ class TraderDevEMA9VWAP:
     """
 
     ema_period: int = 9
-    vwap_period: int = 240
+    vwap_period: int = 120
     atr_period: int = 14
     trail_mult: float = 3.0
 
     closes: deque = field(default_factory=lambda: deque(maxlen=400))
+    volumes: deque = field(default_factory=lambda: deque(maxlen=400))
     ranges: deque = field(default_factory=lambda: deque(maxlen=60))
     _prev_ema: float | None = None
     _prev_vwap: float | None = None
@@ -82,6 +83,7 @@ class TraderDevEMA9VWAP:
         if n >= 1:
             self.ranges.append(abs(close_price - self.closes[-1]))
         self.closes.append(close_price)
+        self.volumes.append(0.0)
         if n < max(self.vwap_period, self.ema_period + 1, self.atr_period):
             return None
         return self._decide(close_price, high=close_price, low=close_price)
@@ -91,18 +93,27 @@ class TraderDevEMA9VWAP:
         close = float(bar["close"])
         high = float(bar.get("high", close))
         low = float(bar.get("low", close))
+        vol = float(bar.get("volume", 0) or bar.get("n", 0))
         n = len(self.closes)
         if n >= 1:
             self.ranges.append(max(high - low, abs(close - self.closes[-1])))
         self.closes.append(close)
+        self.volumes.append(vol)
         if n < max(self.vwap_period, self.ema_period + 1, self.atr_period):
             return None
         return self._decide(close, high=high, low=low)
 
     def _decide(self, close: float, high: float, low: float) -> str | None:
-        closes = list(self.closes)
+        closes = list(self.closes)[-self.vwap_period:]
+        vols = list(self.volumes)[-self.vwap_period:]
         ema = self._ema(closes[-self.ema_period:], self.ema_period)
-        vwap = self._sma(closes[-self.vwap_period:])
+        
+        cum_vol = sum(vols)
+        if cum_vol > 0:
+            vwap = sum(p * v for p, v in zip(closes, vols)) / cum_vol
+        else:
+            vwap = self._sma(closes)
+            
         rng = self._rng()
 
         # intrabar trailing-stop check (real OHLC only) BEFORE new entry

@@ -77,9 +77,7 @@ def _calc_qty(capital: float, price: float, capital_pct: float) -> int:
 
 
 def run_strategy(bars: list[dict], signal_factory, params: dict, capital_pct: float = 25.0) -> dict:
-    price = bars[0]["close"]
-    qty = _calc_qty(INITIAL_CAPITAL, price, capital_pct)
-    runner = StrategyRunner(signal_factory(params), buy_qty=qty)
+    runner = StrategyRunner(signal_factory(params), notional_allocation_pct=capital_pct)
     eq, trades = runner.run(bars)
     end = eq[-1]
     total_return = (end - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100
@@ -87,7 +85,6 @@ def run_strategy(bars: list[dict], signal_factory, params: dict, capital_pct: fl
     bh_ret = bh.total_return_pct
     return {
         "trades": len(trades),
-        "qty": qty,
         "total_return_pct": round(total_return, 2),
         "buy_hold_pct": round(bh_ret, 2),
         "vs_bh": round(total_return - bh_ret, 2),
@@ -95,9 +92,9 @@ def run_strategy(bars: list[dict], signal_factory, params: dict, capital_pct: fl
 
 
 def _run_one(params_and_factory):
-    params, factory_fn, qty = params_and_factory
+    params, factory_fn, capital_pct = params_and_factory
     try:
-        runner = StrategyRunner(factory_fn(params), buy_qty=qty)
+        runner = StrategyRunner(factory_fn(params), notional_allocation_pct=capital_pct)
         eq, trades = runner.run(_bars_global)
         end = eq[-1]
         total_return = round((end - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100, 2)
@@ -107,6 +104,7 @@ def _run_one(params_and_factory):
 
 
 _bars_global = None
+
 
 
 def main():
@@ -186,7 +184,7 @@ def main():
                     results = []
                     for params in grid:
                         try:
-                            runner = StrategyRunner(factory(params), buy_qty=qty)
+                            runner = StrategyRunner(factory(params), notional_allocation_pct=args.capital_pct)
                             eq, trades = runner.run(bars)
                             tr = round((eq[-1] - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100, 2)
                             results.append((params, tr, len(trades)))

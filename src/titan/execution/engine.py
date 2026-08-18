@@ -45,6 +45,7 @@ from titan.risk.session_initialization import (
     SessionInitialization,
     validate as validate_initialization,
 )
+from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate
 
 # Order statuses that mean "still alive at the broker" — a working order must
 # NEVER be rejected/cancelled locally (the broker may fill it any moment).
@@ -143,6 +144,11 @@ class PaperTradingEngine:
         self._intent_counter: int = 0
         self._health_cache: Optional[tuple[float, bool]] = None
         self._health_cache_ttl = 5.0
+        
+        # Load registry for certificate verification
+        pub_key = os.environ.get("TITAN_EXEC_PUBKEY", None)
+        self.certificate_registry = PromotionCertificateRegistry(public_key_hex=pub_key)
+        
         self._seen_init_nonces: set[str] = set()
         # Reconstruct replay protection from durable events: a restart must
         # not allow a previously-used initialization nonce to be replayed
@@ -565,6 +571,23 @@ class PaperTradingEngine:
         }
 
     def submit_intent(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
+        if getattr(intent, "producer_kind", "") == "shadow" or "shadow" in str(getattr(intent, "strategy_id", "")).lower():
+            raise ValueError("Shadow intents are strictly forbidden in the execution engine.")
+            
+        cert_json = getattr(intent, "certificate_ref", None)
+        if not cert_json:
+            raise ValueError("Missing execution certificate (certificate_ref is None). Unauthorized intent.")
+            
+        try:
+            cert_data = json.loads(cert_json)
+            cert = Certificate(**cert_data)
+            self.certificate_registry.verify(cert)
+        except Exception as e:
+            raise ValueError(f"Execution certificate verification failed: {str(e)}")
+            
+        return self._submit_intent_core(intent, correlation_id=correlation_id)
+
+    def _submit_intent_core(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
         instr_str = str(intent.instrument_id)
         self.intents_by_instrument[instr_str] += 1
 

@@ -67,6 +67,7 @@ def test_forex_market_order_through_engine():
         time_in_force="DAY",
         risk_profile_version="1.0",
         market_data_timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    certificate_ref="test-cert",
     )
     result = engine.submit_intent(intent)
     assert result.accepted, f"Order rejected: {result.rejection_reason}"

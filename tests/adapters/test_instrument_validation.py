@@ -26,6 +26,7 @@ def _intent(side="BUY", quantity="1", price="1500.00") -> TradeIntent:
     return TradeIntent(
         "test", "", "test-1", "ES", side, quantity, "LIMIT", "DAY", "1.0",
         datetime.now(timezone.utc).isoformat(), price=price,
+    certificate_ref="test-cert",
     )
 
 

@@ -33,6 +33,7 @@ Every `.spec.md` contains:
 | StrategyRuntime.spec.md | Strategy warmup, signal deduplication, and intent proposal boundary | Phase J |
 | Broker.spec.md | Session lifecycle, auth, reconciliation | Phase C/E |
 | Replay.spec.md | Clock, determinism, fill models | Phase D |
+| CryptoResearch.spec.md | Research-only crypto market-structure discovery: ingestion, venue registry, cost simulator, preregistered screens | pending ADR-029 acceptance |
 
 ## Cross-cutting specs
 

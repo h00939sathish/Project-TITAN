@@ -55,13 +55,16 @@ def make_orb_signal_fn(params: dict) -> Callable[[Sequence[dict]], float]:
             return 0.0
 
         avg_range = statistics.mean(ranges)
-        avg_vol = statistics.mean(volumes) if statistics.mean(volumes) > 0 else 1.0
 
         # Market Context Filters: Range expansion + Volume ratio expansion
         if r < avg_range * 0.8:
             return 0.0  # Low-volatility session filter
-        if c_vol < avg_vol * min_volume_ratio:
-            return 0.0  # Volume expansion filter
+            
+        sum_vol = sum(volumes)
+        if sum_vol > 0:
+            avg_vol = sum_vol / len(volumes)
+            if c_vol < avg_vol * min_volume_ratio:
+                return 0.0  # Volume expansion filter
 
         upper_bound = p_high + (avg_range * (breakout_mult - 1.0))
         lower_bound = p_low - (avg_range * (breakout_mult - 1.0))

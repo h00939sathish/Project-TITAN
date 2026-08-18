@@ -47,6 +47,17 @@ Identical inputs (data partitions, strategy package digest, parameters, seed, fi
 
 Order-book simulation and impact calibration are deferred until Phase F gate.
 
+## Canonical FX Simulation (ADR-031 Amendment)
+
+`FxCostModel`: `version`, `venue`, `account_currency`, `quote_currency`, `commission_bps`, `minimum_commission`, `half_spread_bps`, `slippage_bps`, `fill_mode`, `data_manifest_digest`.
+
+- Canonical runs require `Decimal` values and a SHA-256 digest of the complete model.
+- Commission is assessed on every fill as `max(notional_usd * commission_bps / 10_000, minimum_commission)`.
+- `BAR_NEXT_OPEN` fills the order generated at bar *t* on bar *t+1* open plus adverse synthetic spread/slippage. It carries lower fidelity and cannot qualify or promote a candidate.
+- `QUOTE_NEXT_EVENT` fills buy at ask and sell at bid using next-event quote data.
+- Missing required price, quote, or USD conversion rejects the run fail-closed.
+- Promotion gate rejects artifacts with missing digests, mismatched digests, or lower-fidelity fill models.
+
 ## Corporate actions
 
 Each action is an explicit event applied at its effective time:
