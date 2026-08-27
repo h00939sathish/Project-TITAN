@@ -20,6 +20,8 @@ from titan._core import (
     InstrumentId,
     KillSwitchState,
     Money,
+    OrderState,
+    OrderStateMachine,
     ReconciliationConfig,
     RiskConfig,
     TradeIntent,
@@ -47,7 +49,9 @@ from titan.operations.logging import StructuredLogger
 def _has_creds() -> bool:
     env_path = Path(__file__).resolve().parent.parent.parent / ".env"
     load_dotenv(env_path)
-    return bool(os.getenv("APCA_API_KEY_ID") and os.getenv("APCA_API_SECRET_KEY"))
+    key = os.getenv("APCA_API_KEY_ID")
+    secret = os.getenv("APCA_API_SECRET_KEY")
+    return bool(key and secret and not key.startswith("YOUR_") and key != "YOUR_ALPACA_KEY_ID")
 
 
 def _creds() -> tuple[str, str]:
@@ -610,6 +614,8 @@ class TestOneOrderExecution:
 
     def test_one_market_order_certification(self):
         """Submit 1 share SPY MARKET DAY, observe ack, cancel if open, reconcile."""
+        if not _has_creds():
+            pytest.skip("Alpaca API credentials not configured in .env")
         from datetime import datetime, timezone, timedelta
 
         import json
@@ -882,7 +888,10 @@ class TestBrokerSubmitFailure:
                     result = engine.submit_intent(intent)
 
                 assert not result.accepted
-                assert "Broker submit failed" in result.rejection_reason
+                # P0 U1: outcome is UNKNOWN, not a firm rejection — the order
+                # is parked (never resent) and routing is halted.
+                assert "UNKNOWN" in result.rejection_reason
+                assert "not resent" in result.rejection_reason
                 assert engine.risk_gate.kill_switch.blocks_routing()
 
 
@@ -894,52 +903,41 @@ class TestUnfilledOrderGuard:
     """Accepted-but-unfilled orders must not create phantom fills."""
 
     def test_unfilled_order_no_fills(self):
-        """Ack with fill_quantity=None returns accepted=False with no fills."""
+        """The authoritative fill path applies nothing without a real delta."""
         from titan.execution.alpaca_adapter import AlpacaAdapter
-        from titan._core import ApprovedOrderIntent
 
         adapter = AlpacaAdapter(api_key="k", secret_key="s")
         config = PaperConfig(risk_config=_make_risk_config(), state_path=_tmp_state_path())
         engine = PaperTradingEngine(config, adapter)
         initialize_fresh(engine)
 
-        # Directly test _resolve_fills
-        intent = ApprovedOrderIntent(
-            risk_decision_id="rd-1", intent_id="in-1",
-            client_order_id="c1", instrument_id="SPY",
-            side="BUY", quantity="10", order_type="MARKET",
-            time_in_force="DAY", risk_profile_version="1.0",
-            price="500.00", stop_price=None,
-        )
-        broker_id = BrokerOrderId(id="order-1")
+        # Register an acknowledged order with its tracking metadata.
+        coid = "c1"
+        sm = OrderStateMachine()
+        sm.transition(OrderState.Validated)
+        sm.transition(OrderState.Submitted)
+        sm.transition(OrderState.Acknowledged)
+        engine.order_states[coid] = sm
+        engine._order_metadata[coid] = {"instrument_id": "SPY", "side": "BUY",
+                                        "quantity": 10}
+        engine._order_filled_quantity.setdefault(coid, 0)
 
-        # fill_quantity = None
-        ack = BrokerOrderAcknowledgement(
-            accepted=True, broker_order_id=broker_id,
-            fill_quantity=None, fill_price="500.00",
-            rejection_reason="",
-        )
-        fills = engine._resolve_fills(intent, broker_id, ack)
-        assert len(fills) == 0
+        # fill_quantity = None -> no fill applied
+        assert engine._absorb_broker_fill(coid, sm, None, "500.00") is None
+        # fill_quantity = "0" -> no fill applied
+        assert engine._absorb_broker_fill(coid, sm, "0", None) is None
+        assert engine.portfolio.get_position("SPY") is None
 
-        # fill_quantity = "0"
-        ack_zero = BrokerOrderAcknowledgement(
-            accepted=True, broker_order_id=broker_id,
-            fill_quantity="0", fill_price=None,
-            rejection_reason="",
-        )
-        fills2 = engine._resolve_fills(intent, broker_id, ack_zero)
-        assert len(fills2) == 0
+        # fill_quantity = "5" — exactly the delta is applied once
+        fill = engine._absorb_broker_fill(coid, sm, "5", "501.00")
+        assert fill is not None and fill.quantity == "5"
+        pos = engine.portfolio.get_position("SPY")
+        assert pos is not None and pos.quantity == 5
+        assert str(sm.current) == str(OrderState.PartiallyFilled)
 
-        # fill_quantity = "5" — should produce a fill
-        ack_filled = BrokerOrderAcknowledgement(
-            accepted=True, broker_order_id=broker_id,
-            fill_quantity="5", fill_price="501.00",
-            rejection_reason="",
-        )
-        fills3 = engine._resolve_fills(intent, broker_id, ack_filled)
-        assert len(fills3) == 1
-        assert fills3[0].quantity == "5"
+        # Re-reporting cumulative 5 applies nothing further.
+        assert engine._absorb_broker_fill(coid, sm, "5", "501.00") is None
+        assert engine.portfolio.get_position("SPY").quantity == 5
 
 
 # ---------------------------------------------------------------------------
@@ -1215,4 +1213,8 @@ class TestUnfilledOrderRecorded:
 
                 assert len(engine.order_states) > 0
                 states = list(engine.order_states.values())
-                assert any(str(sm.current) in ("Filled", "Rejected") for sm in states)
+                # P0 U4/C4: an accepted-but-unfilled order is NOT declared
+                # dead — it stays Acknowledged (tracked) for the poller to
+                # settle against broker truth.
+                assert any(str(sm.current) == "Acknowledged" for sm in states)
+                assert not any(sm.current.is_terminal() for sm in states)

@@ -45,20 +45,34 @@ def test_engine_rejects_intent_without_certificate():
 
 
 def test_certificate_validation_failures():
-    from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate
-    registry = PromotionCertificateRegistry()
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate, create_signed_certificate
+    
+    priv = ed25519.Ed25519PrivateKey.generate()
+    pub_hex = priv.public_key().public_bytes_raw().hex()
+    registry = PromotionCertificateRegistry(public_key_hex=pub_hex)
+    
+    # 0. Authentic valid certificate
+    cert_valid = create_signed_certificate(priv, "test", "2099-01-01T00:00:00Z")
+    assert registry.verify(cert_valid) is True
     
     # 1. Missing certificate
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="(?i)missing"):
         registry.verify(None)
     
-    # 2. Forged signature
-    cert = Certificate(strategy_id="test", expires_at="2099-01-01T00:00:00Z", signature="bad")
+    # 2. Forged signature (invalid signature bytes)
+    cert_forged = Certificate(strategy_id="test", expires_at="2099-01-01T00:00:00Z", signature="00" * 64)
     with pytest.raises(Exception, match="(?i)forged|signature"):
-        registry.verify(cert)
+        registry.verify(cert_forged)
+
+    # 2b. Forged signature (signed with mismatched private key)
+    priv_mismatch = ed25519.Ed25519PrivateKey.generate()
+    cert_wrong_key = create_signed_certificate(priv_mismatch, "test", "2099-01-01T00:00:00Z")
+    with pytest.raises(Exception, match="(?i)forged|signature"):
+        registry.verify(cert_wrong_key)
         
     # 3. Expired
-    cert_expired = Certificate(strategy_id="test", expires_at="2000-01-01T00:00:00Z", signature="valid")
+    cert_expired = create_signed_certificate(priv, "test", "2000-01-01T00:00:00Z")
     with pytest.raises(Exception, match="(?i)expired"):
         registry.verify(cert_expired)
 

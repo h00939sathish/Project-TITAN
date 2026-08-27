@@ -106,6 +106,13 @@ impl StateMachineCore {
             (OrderState::PartiallyFilled, OrderState::CancelPending) => true,
             (OrderState::CancelPending, OrderState::Cancelled) => true,
 
+            // External cancellation reported by the broker with a partial fill
+            // already applied (or none). Cancellation is an order-state outcome,
+            // NOT proof that zero shares filled — the engine must absorb any
+            // fill delta BEFORE transitioning here.
+            (OrderState::Acknowledged, OrderState::Cancelled) => true,
+            (OrderState::PartiallyFilled, OrderState::Cancelled) => true,
+
             // Expiry
             (OrderState::Acknowledged, OrderState::Expired) => true,
             (OrderState::PartiallyFilled, OrderState::Expired) => true,

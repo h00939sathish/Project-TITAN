@@ -1,0 +1,43 @@
+{
+  "hypothesis_id": "EQ-005",
+  "factor_name": "regime_gated_long_side_reversal_5d",
+  "universe_label": "us_core_7_equities_v1",
+  "economic_rationale": "Recent cross-sectional losers exhibit positive subsequent returns when market conditions favor mean reversion (elevated cross-sectional dispersion), while the effect weakens or disappears during persistent momentum regimes. Isolates the long-side alpha observed in EQ-004 without shorting runaway momentum leaders.",
+  "parameters": {
+    "lookback_days": 5,
+    "long_k": 2,
+    "portfolio_mode": "long_only_or_cash",
+    "gross_exposure_when_active": 1.0,
+    "rebalance_freq_days": 5,
+    "execution_lag_days": 1,
+    "primary_regime_variable": "cross_sectional_dispersion_21d",
+    "regime_threshold_source": "in_sample_median",
+    "regime_lag_days": 1,
+    "secondary_diagnostic": "spy_realized_vol_21d"
+  },
+  "cost_schedules": [
+    "baseline_alpaca_us_equity",
+    "baseline_ibkr_pro_tiered",
+    "stressed_adverse"
+  ],
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "control_baseline": "exposure_matched_regime_conditioned_random_selection",
+  "documented_caveats": [
+    "Commission rate in L1 simulator is evaluated on dollar turnover against assumed share price baseline ($100), rather than exact per-share counts.",
+    "EQ-004 dollar-neutral model was not strictly beta-neutral; EQ-005 eliminates the short leg entirely to isolate long laggard excess return vs cash and random controls."
+  ],
+  "pass_criteria": {
+    "oos_net_sharpe_min": 0.50,
+    "excess_return_over_random_control": true,
+    "regime_gating_improves_sharpe_vs_unconditioned_long": true,
+    "max_drawdown_limit_pct": 20.0,
+    "survives_stress_cost": true
+  }
+}

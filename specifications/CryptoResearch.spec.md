@@ -33,6 +33,7 @@ Delegates: nothing to broker or execution subsystems. Consumes only read-only lo
 - `CryptoMarketEvent` stream (normalized; no raw exchange payload reaches the simulator).
 - Coverage, gap, sequence-validity, and point-in-time universe reports.
 - Net PnL attribution evidence bundles and terminal status: `candidate` or `negative_result`.
+- **Negative-result completeness rule:** A `negative_result` verdict is incomplete unless the evidence bundle contains a structured `failure_mode` (one of `execution_constrained` or `mechanism_failure` per AGENTS.md Rule 8), `failure_mode_basis` (plain-language description of what the evidence shows), and `failure_mode_confidence` (`high` or `medium`). An optional `disambiguation` field must be present when `failure_mode_confidence` is `medium`, recording the remaining ambiguity that prevents a `high` classification.
 - Frozen snapshots at each program gate.
 
 ## Canonical contracts

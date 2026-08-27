@@ -1,0 +1,66 @@
+{
+  "hypothesis_id": "FX-002",
+  "name": "asian_compression_london_expansion",
+  "mechanism_ref": "M-006",
+  "asset_class": "SPOT_FX",
+  "instruments": ["EURUSD", "GBPUSD"],
+  "economic_rationale": "Reduced overnight liquidity and constrained price discovery during the Asian session create structural conditions for directional realized volatility expansion when institutional European interbank liquidity enters the market at the London open.",
+  "session_definitions": {
+    "asian_window": "00:00 to 06:59 UTC",
+    "london_breakout_window": "07:00 to 10:00 UTC",
+    "session_exit_time": "15:00 UTC"
+  },
+  "quantitative_definitions": {
+    "asian_high": "max(High_Ask) between 00:00 and 06:59 UTC",
+    "asian_low": "min(Low_Bid) between 00:00 and 06:59 UTC",
+    "asian_range": "asian_high - asian_low",
+    "historical_baseline": "20-day rolling median of asian_range (evaluated through yesterday t-1)",
+    "compression_trigger": "asian_range < 0.75 * historical_baseline_20d"
+  },
+  "execution_rules": {
+    "trade_notional_base_units": 100000,
+    "long_entry_trigger": "First bar t in 07:00..10:00 UTC where Ask_t > asian_high",
+    "short_entry_trigger": "First bar t in 07:00..10:00 UTC where Bid_t < asian_low",
+    "simultaneous_breakout_rule": "If High_Ask > asian_high AND Low_Bid < asian_low in the exact same 1-minute bar -> mark AMBIGUOUS / NO_TRADE",
+    "stop_loss_long": "asian_low",
+    "stop_loss_short": "asian_high",
+    "profit_target": "2.0 * asian_range above/below entry",
+    "stop_target_collision_rule": "If High touches target AND Low touches stop in the exact same bar -> assume STOP_LOSS hit first (pessimistic fill convention)",
+    "time_exit": "15:00 UTC market close if neither stop nor target hit",
+    "no_breakout_handling": "If no breakout occurs by 10:00 UTC, session is marked NO_TRADE (0.0 realized PnL)"
+  },
+  "cost_model": {
+    "venue": "IDEALPRO",
+    "commission_bps": 0.20,
+    "minimum_commission_usd_per_order": 2.00,
+    "fee_formula": "fee_per_side = max(2.00, notional * 0.000020)",
+    "minimum_round_trip_commission_usd": 4.00,
+    "spread_model": "QUOTE_SIDED_TOP_OF_BOOK",
+    "slippage_bps": 0.10,
+    "fill_mode": "QUOTE_NEXT_EVENT"
+  },
+  "partitions": {
+    "is_partition": {
+      "from": "2021-08-02",
+      "to": "2024-07-31"
+    },
+    "oos_partition": {
+      "from": "2024-08-01",
+      "to": "2026-07-31"
+    }
+  },
+  "control_baselines": {
+    "unconditioned_asian_breakout": "Breakout rule applied to ALL sessions regardless of compression trigger",
+    "timestamp_matched_random_direction": "On compressed days with valid breakout, enter at the exact same breakout timestamp with randomly assigned 50/50 Long/Short direction, using identical stop, target, and 15:00 UTC exit rules (N=500 Monte Carlo)"
+  },
+  "decision_gates": {
+    "gate_1_volatility_expansion": "London realized range on compressed days is statistically higher than non-compressed days (Welch's t-test p < 0.05)",
+    "gate_2_compression_value_add": "Compressed breakout Sharpe exceeds Unconditioned breakout Sharpe by at least +0.30",
+    "gate_3_random_baseline_superiority": "Compressed breakout expectancy exceeds Timestamp-Matched Random Direction baseline with p < 0.05",
+    "gate_4_net_economic_expectancy": {
+      "oos_net_sharpe_min": 0.80,
+      "oos_net_expectancy_min_pips": 2.0,
+      "max_drawdown_limit_pct": 15.0
+    }
+  }
+}

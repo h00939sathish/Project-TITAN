@@ -1,0 +1,355 @@
+{
+  "hypothesis_id": "EQ-005",
+  "factor_name": "regime_gated_long_side_reversal_5d",
+  "universe": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLF",
+    "XLK",
+    "AAPL",
+    "MSFT"
+  ],
+  "manifest_digest": "fe08445336597900a837677fdfe04ee962163a518db91ed7090b67f48b19d1c0",
+  "is_median_dispersion_threshold": 0.007147245005429863,
+  "outcome_classification": "Case D \u2014 Regime Gating Ineffective / Redundant (Absorbing Negative Result)",
+  "results_by_venue": {
+    "alpaca": {
+      "is": {
+        "hypothesis_id": "EQ-005",
+        "partition": "IS",
+        "annualized_net_sharpe": 0.7219,
+        "annualized_net_return": 0.5818,
+        "annualized_gross_return": 0.582,
+        "max_drawdown": 0.7571,
+        "monthly_turnover": 0.0972,
+        "active_days_pct": 0.9458,
+        "costs": {
+          "total_commissions": 0.0,
+          "total_spread": 0.00035,
+          "total_slippage": 0.000175,
+          "total_regulatory_fees": 1.4e-05,
+          "total_friction": 0.000539
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.0,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 1.0,
+          "slippage_bps": 0.5,
+          "annual_short_borrow_bps": 50.0,
+          "name": "baseline_alpaca_us_equity",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 0.0,
+          "regulatory_fees_bps": 0.04,
+          "assumption_status": "research_assumption",
+          "provenance": "Alpaca self-directed US pricing schedule (uncalibrated research assumption)",
+          "source_document": "Alpaca Commission and Fee Schedule 2026",
+          "source_url": "https://alpaca.markets/disclosures",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "f7fdb68e6e79dd8e3524ed7c9490cdf3364ae4d53a3ff68364782ba5b916d90a"
+        }
+      },
+      "oos": {
+        "hypothesis_id": "EQ-005",
+        "partition": "OOS",
+        "annualized_net_sharpe": 1.6295,
+        "annualized_net_return": 0.7174,
+        "annualized_gross_return": 0.7177,
+        "max_drawdown": 0.3386,
+        "monthly_turnover": 0.1467,
+        "active_days_pct": 0.8882,
+        "costs": {
+          "total_commissions": 0.0,
+          "total_spread": 0.00035,
+          "total_slippage": 0.000175,
+          "total_regulatory_fees": 1.4e-05,
+          "total_friction": 0.000539
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.0,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 1.0,
+          "slippage_bps": 0.5,
+          "annual_short_borrow_bps": 50.0,
+          "name": "baseline_alpaca_us_equity",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 0.0,
+          "regulatory_fees_bps": 0.04,
+          "assumption_status": "research_assumption",
+          "provenance": "Alpaca self-directed US pricing schedule (uncalibrated research assumption)",
+          "source_document": "Alpaca Commission and Fee Schedule 2026",
+          "source_url": "https://alpaca.markets/disclosures",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "f7fdb68e6e79dd8e3524ed7c9490cdf3364ae4d53a3ff68364782ba5b916d90a"
+        }
+      }
+    },
+    "ibkr": {
+      "is": {
+        "hypothesis_id": "EQ-005",
+        "partition": "IS",
+        "annualized_net_sharpe": 0.7219,
+        "annualized_net_return": 0.5818,
+        "annualized_gross_return": 0.582,
+        "max_drawdown": 0.7571,
+        "monthly_turnover": 0.0972,
+        "active_days_pct": 0.9458,
+        "costs": {
+          "total_commissions": 0.000122,
+          "total_spread": 0.00028,
+          "total_slippage": 0.000105,
+          "total_regulatory_fees": 1.4e-05,
+          "total_friction": 0.000521
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.0035,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 0.8,
+          "slippage_bps": 0.3,
+          "annual_short_borrow_bps": 50.0,
+          "name": "baseline_ibkr_pro_tiered",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 0.35,
+          "regulatory_fees_bps": 0.04,
+          "assumption_status": "research_assumption",
+          "provenance": "IBKR Pro US tiered equity schedule (uncalibrated research assumption)",
+          "source_document": "IBKR Pro Commission Rates (US Stocks/ETFs)",
+          "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "9987af280379e3e7a0eb68cbeaa967929ba90934e75e801a0f2ddd0686b8dc18"
+        }
+      },
+      "oos": {
+        "hypothesis_id": "EQ-005",
+        "partition": "OOS",
+        "annualized_net_sharpe": 1.6295,
+        "annualized_net_return": 0.7174,
+        "annualized_gross_return": 0.7177,
+        "max_drawdown": 0.3386,
+        "monthly_turnover": 0.1467,
+        "active_days_pct": 0.8882,
+        "costs": {
+          "total_commissions": 0.000123,
+          "total_spread": 0.00028,
+          "total_slippage": 0.000105,
+          "total_regulatory_fees": 1.4e-05,
+          "total_friction": 0.000522
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.0035,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 0.8,
+          "slippage_bps": 0.3,
+          "annual_short_borrow_bps": 50.0,
+          "name": "baseline_ibkr_pro_tiered",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 0.35,
+          "regulatory_fees_bps": 0.04,
+          "assumption_status": "research_assumption",
+          "provenance": "IBKR Pro US tiered equity schedule (uncalibrated research assumption)",
+          "source_document": "IBKR Pro Commission Rates (US Stocks/ETFs)",
+          "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "9987af280379e3e7a0eb68cbeaa967929ba90934e75e801a0f2ddd0686b8dc18"
+        }
+      }
+    },
+    "stress": {
+      "is": {
+        "hypothesis_id": "EQ-005",
+        "partition": "IS",
+        "annualized_net_sharpe": 0.7213,
+        "annualized_net_return": 0.5814,
+        "annualized_gross_return": 0.582,
+        "max_drawdown": 0.7571,
+        "monthly_turnover": 0.0972,
+        "active_days_pct": 0.9458,
+        "costs": {
+          "total_commissions": 0.00035,
+          "total_spread": 0.00105,
+          "total_slippage": 0.000525,
+          "total_regulatory_fees": 2.8e-05,
+          "total_friction": 0.001953
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.01,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 3.0,
+          "slippage_bps": 1.5,
+          "annual_short_borrow_bps": 150.0,
+          "name": "stressed_adverse_us_equity",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 2.0,
+          "regulatory_fees_bps": 0.08,
+          "assumption_status": "research_assumption",
+          "provenance": "Adverse stress test assumption",
+          "source_document": "TITAN Adversarial Simulation Suite",
+          "source_url": "",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
+        }
+      },
+      "oos": {
+        "hypothesis_id": "EQ-005",
+        "partition": "OOS",
+        "annualized_net_sharpe": 1.6279,
+        "annualized_net_return": 0.7167,
+        "annualized_gross_return": 0.7177,
+        "max_drawdown": 0.3386,
+        "monthly_turnover": 0.1467,
+        "active_days_pct": 0.8882,
+        "costs": {
+          "total_commissions": 0.00035,
+          "total_spread": 0.00105,
+          "total_slippage": 0.000525,
+          "total_regulatory_fees": 2.8e-05,
+          "total_friction": 0.001953
+        },
+        "cost_schedule": {
+          "commission_per_share_usd": 0.01,
+          "assumed_avg_share_price": 100.0,
+          "spread_bps": 3.0,
+          "slippage_bps": 1.5,
+          "annual_short_borrow_bps": 150.0,
+          "name": "stressed_adverse_us_equity",
+          "layer": "layer1_discovery",
+          "min_commission_usd": 2.0,
+          "regulatory_fees_bps": 0.08,
+          "assumption_status": "research_assumption",
+          "provenance": "Adverse stress test assumption",
+          "source_document": "TITAN Adversarial Simulation Suite",
+          "source_url": "",
+          "source_hash": "",
+          "effective_date": "2026-08-19",
+          "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
+        }
+      }
+    }
+  },
+  "unconditioned_long_reversal": {
+    "is": {
+      "hypothesis_id": "UNCOND_LONG",
+      "partition": "IS",
+      "annualized_net_sharpe": 0.5411,
+      "annualized_net_return": 0.4921,
+      "annualized_gross_return": 0.4923,
+      "max_drawdown": 0.7571,
+      "monthly_turnover": 0.0694,
+      "active_days_pct": 0.9987,
+      "costs": {
+        "total_commissions": 8.8e-05,
+        "total_spread": 0.0002,
+        "total_slippage": 7.5e-05,
+        "total_regulatory_fees": 1e-05,
+        "total_friction": 0.000373
+      },
+      "cost_schedule": {
+        "commission_per_share_usd": 0.0035,
+        "assumed_avg_share_price": 100.0,
+        "spread_bps": 0.8,
+        "slippage_bps": 0.3,
+        "annual_short_borrow_bps": 50.0,
+        "name": "baseline_ibkr_pro_tiered",
+        "layer": "layer1_discovery",
+        "min_commission_usd": 0.35,
+        "regulatory_fees_bps": 0.04,
+        "assumption_status": "research_assumption",
+        "provenance": "IBKR Pro US tiered equity schedule (uncalibrated research assumption)",
+        "source_document": "IBKR Pro Commission Rates (US Stocks/ETFs)",
+        "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+        "source_hash": "",
+        "effective_date": "2026-08-19",
+        "digest": "9987af280379e3e7a0eb68cbeaa967929ba90934e75e801a0f2ddd0686b8dc18"
+      }
+    },
+    "oos": {
+      "hypothesis_id": "UNCOND_LONG",
+      "partition": "OOS",
+      "annualized_net_sharpe": 1.8283,
+      "annualized_net_return": 0.9335,
+      "annualized_gross_return": 0.9336,
+      "max_drawdown": 0.3518,
+      "monthly_turnover": 0.1048,
+      "active_days_pct": 0.998,
+      "costs": {
+        "total_commissions": 8.8e-05,
+        "total_spread": 0.0002,
+        "total_slippage": 7.5e-05,
+        "total_regulatory_fees": 1e-05,
+        "total_friction": 0.000373
+      },
+      "cost_schedule": {
+        "commission_per_share_usd": 0.0035,
+        "assumed_avg_share_price": 100.0,
+        "spread_bps": 0.8,
+        "slippage_bps": 0.3,
+        "annual_short_borrow_bps": 50.0,
+        "name": "baseline_ibkr_pro_tiered",
+        "layer": "layer1_discovery",
+        "min_commission_usd": 0.35,
+        "regulatory_fees_bps": 0.04,
+        "assumption_status": "research_assumption",
+        "provenance": "IBKR Pro US tiered equity schedule (uncalibrated research assumption)",
+        "source_document": "IBKR Pro Commission Rates (US Stocks/ETFs)",
+        "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+        "source_hash": "",
+        "effective_date": "2026-08-19",
+        "digest": "9987af280379e3e7a0eb68cbeaa967929ba90934e75e801a0f2ddd0686b8dc18"
+      }
+    }
+  },
+  "random_selection_control": {
+    "mean_is_sharpe": 0.774,
+    "mean_oos_sharpe": 1.6038,
+    "mean_is_return": 0.6614,
+    "mean_oos_return": 0.6871,
+    "std_oos_sharpe": 0.0684
+  },
+  "regime_breakdown": {
+    "2020": {
+      "factor_net_return": 1.48,
+      "factor_gross_return": 1.4805,
+      "factor_net_sharpe": 1.8721,
+      "factor_max_dd": 0.3809,
+      "active_days_pct": 0.8379,
+      "spy_benchmark_return": 0.2238
+    },
+    "2021": {
+      "factor_net_return": 1.0603,
+      "factor_gross_return": 1.0607,
+      "factor_net_sharpe": 2.0666,
+      "factor_max_dd": 0.1931,
+      "active_days_pct": 0.996,
+      "spy_benchmark_return": 0.2611
+    },
+    "2022": {
+      "factor_net_return": -0.3785,
+      "factor_gross_return": -0.3781,
+      "factor_net_sharpe": -0.4909,
+      "factor_max_dd": 0.574,
+      "active_days_pct": 0.9163,
+      "spy_benchmark_return": -0.172
+    },
+    "2023": {
+      "factor_net_return": 0.7244,
+      "factor_gross_return": 0.7249,
+      "factor_net_sharpe": 1.9561,
+      "factor_max_dd": 0.3143,
+      "active_days_pct": 0.776,
+      "spy_benchmark_return": 0.243
+    },
+    "2024": {
+      "factor_net_return": 0.5381,
+      "factor_gross_return": 0.5387,
+      "factor_net_sharpe": 1.2073,
+      "factor_max_dd": 0.3386,
+      "active_days_pct": 0.7968,
+      "spy_benchmark_return": 0.2348
+    }
+  }
+}

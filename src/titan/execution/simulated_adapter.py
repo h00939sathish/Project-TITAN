@@ -191,6 +191,10 @@ class SimulatedAdapter(BrokerAdapter):
 
         return state
 
+    def query_order(self, client_order_id: str):
+        """P0 U1: broker truth by idempotency key for uncertain-outcome resolution."""
+        return self._orders.get(client_order_id)
+
     def get_order(self, order_id: str) -> SimOrderState | None:
         return self._orders.get(order_id)
 

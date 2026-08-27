@@ -1,0 +1,89 @@
+{
+  "hypothesis_id": "FX-001",
+  "name": "passive_mae_opening_excursion_reversal",
+  "mechanism_ref": "M-003",
+  "asset_class": "SPOT_FX",
+  "instruments": ["EURUSD", "GBPUSD"],
+  "economic_rationale": "Intraday price structurally travels significantly further against initial opening range direction (MAE) than with it (MFE) due to market maker inventory replenishment. Passive limit liquidity placed at the ex-ante adverse excursion boundary captures this inventory rebalance flow at favorable prices without paying aggressive taker friction.",
+  "session_window": {
+    "timezone": "UTC",
+    "session_name": "London_Opening_Session",
+    "opening_range_start": "07:00",
+    "opening_range_end": "07:30",
+    "entry_order_placement": "07:30",
+    "fill_evaluation_window": "07:31 to 14:59",
+    "session_exit": "15:00"
+  },
+  "mae_mfe_definition": {
+    "reference_price": "Close_07:30_UTC",
+    "evaluation_window": "07:31_to_15:00_UTC",
+    "long_breakout_mae": "max(0, Close_07:30 - min(Bid_t)) for t in 07:31..15:00",
+    "long_breakout_mfe": "max(0, max(Ask_t) - Close_07:30) for t in 07:31..15:00",
+    "short_breakout_mae": "max(0, max(Ask_t) - Close_07:30) for t in 07:31..15:00",
+    "short_breakout_mfe": "max(0, Close_07:30 - min(Bid_t)) for t in 07:31..15:00"
+  },
+  "quantitative_boundary_formula": {
+    "direction_rule": "Initial break direction determined by sign of (Close_07:30 - Open_07:00)",
+    "long_limit_price": "Open_07:00 - 1.0 * (High_07:00_07:30 - Low_07:00_07:30)",
+    "short_limit_price": "Open_07:00 + 1.0 * (High_07:00_07:30 - Low_07:00_07:30)"
+  },
+  "execution_rules": {
+    "order_type": "POST_ONLY_LIMIT",
+    "trade_notional_base_units": 100000,
+    "fill_condition_long": "market_ask <= limit_price",
+    "fill_condition_short": "market_bid >= limit_price",
+    "time_in_force": "SESSION_CLOSE (15:00 UTC)",
+    "unfilled_handling": "CANCEL_AT_15:00 (zero realized PnL, track opportunity cost separately)",
+    "position_exit": "MARKET_CLOSE_AT_15:00_UTC (Bid_15:00 for Longs, Ask_15:00 for Shorts)"
+  },
+  "cost_model": {
+    "venue": "IDEALPRO",
+    "commission_bps": 0.20,
+    "minimum_commission_usd_per_order": 2.00,
+    "fee_formula": "fee_per_side = max(2.00, notional * 0.000020)",
+    "minimum_round_trip_commission_usd": 4.00,
+    "spread_model": "QUOTE_SIDED_TOP_OF_BOOK",
+    "slippage_bps": 0.10,
+    "fill_mode": "QUOTE_NEXT_EVENT"
+  },
+  "partitions": {
+    "is_partition": {
+      "from": "2021-08-02",
+      "to": "2024-07-31"
+    },
+    "oos_partition": {
+      "from": "2024-08-01",
+      "to": "2026-07-31"
+    }
+  },
+  "random_boundary_control": {
+    "method": "Uniform random boundary in [0.5 * OR, 1.5 * OR]",
+    "iterations": 500
+  },
+  "sub_hypotheses_and_gates": {
+    "Q1_descriptive_asymmetry_replicates": {
+      "metric": "MAE > MFE paired Wilcoxon signed-rank p-value",
+      "threshold": "< 0.05 in both IS and OOS",
+      "min_ratio": 1.20
+    },
+    "Q2a_information_integrity": {
+      "requirement": "Zero data after 07:30:00 UTC used in limit calculation (enforced by audit test)"
+    },
+    "Q2b_economic_predictability": {
+      "decision_rule": "Delta Expectancy = (Expectancy_Fixed - Expectancy_Random_Mean) > 0 with paired p < 0.05, and Fixed Expectancy > 90th percentile of N=500 Monte Carlo distribution"
+    },
+    "Q3_passive_fill_accessibility_and_adverse_selection": {
+      "metric": "Fill rate P(Fill) = filled_sessions / total_valid_sessions",
+      "threshold_min": 0.40,
+      "adverse_runaway_limit_pct": "Post-fill MAE > 2.0 * OR in < 25% of filled trades",
+      "telemetry": ["fill_rate", "median_time_to_fill_min", "post_fill_mae_pips", "post_fill_mfe_pips"]
+    },
+    "Q4_net_expectancy_and_cost_survivability": {
+      "metric": "Net expectancy per filled trade after IBKR per-order min fee ($4.00 round-trip min) and quote spreads",
+      "threshold_min_pips": 1.5,
+      "oos_net_sharpe_min": 0.80,
+      "max_drawdown_limit_pct": 15.0,
+      "reporting": ["realized_net_pnl", "opportunity_cost_unfilled_pnl"]
+    }
+  }
+}

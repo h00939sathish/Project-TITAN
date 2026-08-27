@@ -283,7 +283,13 @@ class TestIBKRAdapterEndToEndMock:
 
 
 class TestIBKRAdapterExitBrackets:
-    """ADR-021: exit intents map to STP / LMT-TP / TRAIL child orders."""
+    """P1 D2: bracket exits are DISABLED pending OCA implementation.
+
+    Independent stop/target/trail children can EACH fill after the entry
+    (no OCA group cancels siblings), overselling the position 2-3x. The
+    adapter must hard-reject every intent carrying exit specifications and
+    place NOTHING on the wire — fail closed.
+    """
 
     def _connected_adapter(self, entitlements=None):
         from titan._core import ApprovedOrderIntent as AOI
@@ -311,13 +317,6 @@ class TestIBKRAdapterExitBrackets:
         base.update(kw)
         return AOI(**base)
 
-    def _parent_id(self, orders) -> int | None:
-        """The parent (entry) order id — first non-child order placed."""
-        for o in orders:
-            if getattr(o, "parentId", 0) == 0:
-                return o.orderId
-        return None
-
     def _arm(self, adapter):
         """Pre-fire the fill event + result so place_order's bounded wait returns."""
         oid = adapter._wrapper.next_oid
@@ -325,47 +324,34 @@ class TestIBKRAdapterExitBrackets:
         adapter._wrapper._order_events[oid].set()
         adapter._wrapper._order_results[oid] = ("Filled", 1.10, 10000, 0.0)
 
+    def _assert_rejected_no_wire(self, adapter, intent):
+        result = adapter.place_order(intent)
+        assert result.accepted is False
+        assert "bracket" in (result.rejection_reason or "").lower()
+        assert adapter._client.placeOrder.call_args_list == []
+
     def test_stop_maps_to_stp_child(self):
         adapter = self._connected_adapter()
-        intent = self._intent(stop_price="1.09")
-        self._arm(adapter)
-        result = adapter.place_order(intent)
-        orders = [c.args[2] for c in adapter._client.placeOrder.call_args_list]
-        assert result.accepted is True
-        stp = [o for o in orders if o.orderType == "STP"]
-        assert stp, "an STP child must be placed"
-        assert float(stp[0].auxPrice) == 1.09
-        assert stp[0].parentId == self._parent_id(orders)
+        self._assert_rejected_no_wire(adapter, self._intent(stop_price="1.09"))
 
     def test_take_profit_maps_to_lmt_child(self):
         adapter = self._connected_adapter()
-        intent = self._intent(stop_price="1.09", take_profit_price="1.12")
-        self._arm(adapter)
-        adapter.place_order(intent)
-        orders = [c.args[2] for c in adapter._client.placeOrder.call_args_list]
-        pid = self._parent_id(orders)
-        tp = [o for o in orders if o.orderType == "LMT" and o.parentId == pid]
-        assert tp and float(tp[0].lmtPrice) == 1.12
+        self._assert_rejected_no_wire(
+            adapter, self._intent(stop_price="1.09", take_profit_price="1.12"))
 
     def test_trailing_maps_to_trail_when_entitled(self):
-        adapter = self._connected_adapter(entitlements={"TRAIL"})
         from titan._core import TrailingConfig
-        intent = self._intent(stop_price="1.09", trailing=TrailingConfig("2.0", "1.0"))
-        self._arm(adapter)
-        result = adapter.place_order(intent)
-        orders = [c.args[2] for c in adapter._client.placeOrder.call_args_list]
-        trl = [o for o in orders if o.orderType == "TRAIL"]
-        assert trl, "a TRAIL child must be placed when entitled"
-        assert result.accepted is True
+        adapter = self._connected_adapter(entitlements={"TRAIL"})
+        self._assert_rejected_no_wire(
+            adapter, self._intent(stop_price="1.09",
+                                  trailing=TrailingConfig("2.0", "1.0")))
 
     def test_trailing_rejected_without_entitlement(self):
-        adapter = self._connected_adapter(entitlements=set())  # no TRAIL
         from titan._core import TrailingConfig
-        intent = self._intent(stop_price="1.09", trailing=TrailingConfig("2.0", "1.0"))
-        self._arm(adapter)
-        result = adapter.place_order(intent)
-        assert result.accepted is False
-        assert "trailing_order_not_entitled" in result.rejection_reason
+        adapter = self._connected_adapter(entitlements=set())  # no TRAIL
+        self._assert_rejected_no_wire(
+            adapter, self._intent(stop_price="1.09",
+                                  trailing=TrailingConfig("2.0", "1.0")))
 
     def test_no_children_without_exits(self):
         adapter = self._connected_adapter()

@@ -1,0 +1,90 @@
+{
+  "hypothesis_id": "FX-002",
+  "instrument": "EURUSD",
+  "outcome_classification": "Case C \u2014 Spurious Trading Result (Gate 1 Volatility Expansion Failed)",
+  "gate_1_volatility_expansion": {
+    "IS": {
+      "n_compressed": 98,
+      "n_non_compressed": 419,
+      "mean_compressed_range_pips": 59.08,
+      "mean_non_compressed_range_pips": 66.01,
+      "range_difference_pips": -6.94,
+      "welch_t_stat": -2.098,
+      "welch_p_value_onesided": 0.981208,
+      "gate1_passed": false
+    },
+    "OOS": {
+      "n_compressed": 97,
+      "n_non_compressed": 310,
+      "mean_compressed_range_pips": 47.49,
+      "mean_non_compressed_range_pips": 51.75,
+      "range_difference_pips": -4.26,
+      "welch_t_stat": -1.658,
+      "welch_p_value_onesided": 0.950429,
+      "gate1_passed": false
+    }
+  },
+  "trading_performance": {
+    "IS": {
+      "compressed": {
+        "total_days": 517,
+        "n_trades": 98,
+        "trade_frequency": 0.1896,
+        "win_rate": 0.3776,
+        "mean_pips_trade": 0.66,
+        "total_net_usd": 650.45,
+        "annualized_net_sharpe": 0.19,
+        "max_drawdown_usd": 1936.42
+      },
+      "unconditioned": {
+        "total_days": 517,
+        "n_trades": 476,
+        "trade_frequency": 0.9207,
+        "win_rate": 0.4601,
+        "mean_pips_trade": 0.86,
+        "total_net_usd": 4081.11,
+        "annualized_net_sharpe": 0.4,
+        "max_drawdown_usd": 7212.65
+      },
+      "gate2_compression_value_add": false,
+      "gate4_net_economic_hurdle": false
+    },
+    "OOS": {
+      "compressed": {
+        "total_days": 407,
+        "n_trades": 90,
+        "trade_frequency": 0.2211,
+        "win_rate": 0.4,
+        "mean_pips_trade": -0.54,
+        "total_net_usd": -488.97,
+        "annualized_net_sharpe": -0.19,
+        "max_drawdown_usd": 2076.97
+      },
+      "unconditioned": {
+        "total_days": 407,
+        "n_trades": 349,
+        "trade_frequency": 0.8575,
+        "win_rate": 0.4499,
+        "mean_pips_trade": -1.26,
+        "total_net_usd": -4385.68,
+        "annualized_net_sharpe": -0.69,
+        "max_drawdown_usd": 7824.78
+      },
+      "gate2_compression_value_add": true,
+      "gate4_net_economic_hurdle": false
+    }
+  },
+  "timestamp_matched_random_baseline": {
+    "mean_pips": -0.25,
+    "std_pips": 1.15,
+    "p95_pips": 1.63,
+    "mean_sharpe": -0.29,
+    "std_sharpe": 1.17
+  },
+  "decision_gate_status": {
+    "gate_1_volatility_expansion": false,
+    "gate_2_compression_value_add": true,
+    "gate_3_random_baseline_superiority": false,
+    "gate_4_net_economic_hurdle": false
+  }
+}

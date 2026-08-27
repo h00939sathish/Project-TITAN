@@ -6,6 +6,8 @@ from titan.operations.logging import StructuredLogger, LogSeverity
 def log_risk_decision(logger: StructuredLogger, intent_id: str, accepted: bool,
                       reason: str | None, correlation_id: str = "",
                       instrument_id: str = "") -> None:
+    if logger is None:
+        return
     if accepted:
         logger.info("risk_gate", f"Intent {intent_id} accepted",
                     correlation_id=correlation_id,
@@ -20,6 +22,8 @@ def log_risk_decision(logger: StructuredLogger, intent_id: str, accepted: bool,
 def log_adapter_event(logger: StructuredLogger, event: str, order_id: str,
                       instrument_id: str = "", correlation_id: str = "",
                       payload: dict | None = None) -> None:
+    if logger is None:
+        return
     logger.info("adapter", f"Order {order_id} {event}",
                 correlation_id=correlation_id,
                 payload={"order_id": order_id, "event": event,
@@ -28,6 +32,8 @@ def log_adapter_event(logger: StructuredLogger, event: str, order_id: str,
 
 def log_reconciliation(logger: StructuredLogger, result: dict,
                        correlation_id: str = "") -> None:
+    if logger is None:
+        return
     severity = LogSeverity.WARNING if result.get("has_drift") else LogSeverity.INFO
     logger._log(severity, "reconciliation", "Reconciliation completed",
                 correlation_id=correlation_id, payload=result)

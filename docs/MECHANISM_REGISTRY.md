@@ -84,28 +84,32 @@ $$\text{MEI} = 0.30 \cdot \text{Replication} + 0.25 \cdot \text{StatSupport} + 0
 
 ---
 
-### `M-003` (v1.0): Structural Excursion Asymmetry (MAE > MFE)
-* **Canonical RQ:** `RQ-001` $\longrightarrow$ **Feeds `RQ-003`** (Execution Microstructure) & **`RQ-005`** (Regimes)
-* **Status:** 🟢 **Strong Evidence** (MEI = 0.85, Revalidation = 1.00)
-* **Scientific Lineage:** Unconditional structural refinement from `M-002` in `EXP-00010`.
-* **Observed Phenomenon (Confirmed):** Intraday price travels significantly further against the opening direction (MAE) than it extends with it (MFE) across equities and forex.
+### `M-003` (v2.0): Structural Excursion Asymmetry (MAE > MFE)
+* **Canonical RQ:** `RQ-001` $\longrightarrow$ `RQ-003` (Execution Microstructure) & `RQ-005` (Regimes)
+* **Status:** 🔴 **Retired as Unconditional Mechanism** (MEI = 0.15, Revalidation = 1.00)
+* **Scientific Lineage:** Unconditional structural refinement from `M-002` in `EXP-00010` $\longrightarrow$ Formalized and evaluated in `FX-001`.
+* **Empirical Rejection (FX-001):** When evaluated over 5 contiguous years (966 London opening sessions, 1,505,233 1-minute bars on EURUSD), the unconditional $\text{MAE} > \text{MFE}$ asymmetry **failed to replicate**:
+  * In-Sample (2021–2024, $N=553$): $\text{MAE/MFE} = 0.97\times$, Fraction $\text{MAE} > \text{MFE} = 48.1\%$, Wilcoxon $p = 0.8133$.
+  * Out-of-Sample (2024–2026, $N=411$): $\text{MAE/MFE} = 0.89\times$, Fraction $\text{MAE} > \text{MFE} = 44.5\%$, Wilcoxon $p = 0.9673$.
+  * Passive limit execution at $1.0\times\text{OR}$ suffered a $34.3\%\text{--}36.3\%$ adverse runaway rate ($>2.0\times\text{OR}$) and trailed the Random Boundary control baseline ($+1.32\text{ pips}$ vs $+1.91\text{ pips}$).
+* **Scientific Finding:** Unconditional $\text{MAE} > \text{MFE}$ is disproven as an established market property; earlier observations in `EXP-00010` were exploratory sample artifacts.
 
 #### Competing Candidate Causal Mechanisms Comparison
 
 | Candidate Causal Model | Supporting Evidence | Contradicting Evidence | Confidence Level | Current Status |
 |---|---|---|---|---|
-| **1. Market Maker Inventory Rebalancing** | Moderate (EXP-00010 73.3% morning concentration) | Limited | Medium-High | **Primary Lead** |
-| **2. Liquidity Replenishment & Book Rebuilding** | Moderate (MAE > MFE across SPY & EURUSD) | Unknown | Medium | Active Alternative |
-| **3. Institutional VWAP Completion** | Weak (Needs intraday volume profile analysis) | Unknown | Low | Secondary |
+| **1. Unconditional Market Maker Inventory Rebalancing** | None | Decisive (FX-001 966 sessions, ratio 0.89x–0.97x) | Very Low | **Disproven / Retired** |
+| **2. Session-Conditioned Volatility Expansion** | Moderate (London opening volume surges) | Under Investigation in FX-002 | Medium | **Active Research Lead** |
+| **3. Institutional VWAP Completion** | Weak | Unknown | Low | Secondary |
 | **4. Intraday Risk Transfer & Hedging Friction** | Preliminary | Unknown | Low | Secondary |
 
 #### Mechanism Validation Matrix (`M-003`)
 
-| Preregistered Prediction | SPY | EURUSD | Futures | Bull | Bear | High Vol | Low Vol |
-|---|---|---|---|---|---|---|---|
-| **MAE > MFE Ratio > 1.0** | ✅ (1.45x) | ✅ (5.25x) | □ | □ | □ | □ | □ |
-| **Morning Concentration (> 70%)** | ✅ (73.3%) | ✅ (100%) | □ | □ | □ | □ | □ |
-| **Execution Alpha via Limit Timing** | □ | □ | □ | □ | □ | □ | □ |
+| Preregistered Prediction | SPY (EXP-00010) | EURUSD (EXP-00010) | EURUSD Full 5-Yr (FX-001) | Full OOS Sample (FX-001) |
+|---|---|---|---|---|
+| **MAE > MFE Ratio > 1.20x** | ⚠️ (1.45x, N=30) | ⚠️ (5.25x, N=15) | ❌ **0.97x (N=553, p=0.81)** | ❌ **0.89x (N=411, p=0.97)** |
+| **Fraction MAE > MFE (> 60%)** | ⚠️ (73.3%) | ⚠️ (100.0%) | ❌ **48.1%** | ❌ **44.5%** |
+| **Execution Alpha via Limit Timing** | □ | □ | ❌ **Expectancy Trailed Random Baseline** | ❌ **34.3% Adverse Runaway** |
 
 ---
 

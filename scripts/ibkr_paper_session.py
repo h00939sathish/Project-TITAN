@@ -17,16 +17,6 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import titan.strategies.registrations  # noqa: F401
-from nautilus_trader.adapters.interactive_brokers.common import IB
-from nautilus_trader.adapters.interactive_brokers.config import (
-    IBMarketDataTypeEnum,
-    InteractiveBrokersDataClientConfig,
-    InteractiveBrokersInstrumentProviderConfig,
-    SymbologyMethod,
-)
-from nautilus_trader.adapters.interactive_brokers.factories import (
-    InteractiveBrokersLiveDataClientFactory,
-)
 from nautilus_trader.config import LoggingConfig, StrategyConfig, TradingNodeConfig, LiveDataEngineConfig
 from nautilus_trader.live.node import TradingNode
 from nautilus_trader.model.data import Bar, BarType
@@ -455,6 +445,17 @@ def _build_titan_runtime():
 # ---------- main ----------
 
 def main():
+    from nautilus_trader.adapters.interactive_brokers.common import IB
+    from nautilus_trader.adapters.interactive_brokers.config import (
+        IBMarketDataTypeEnum,
+        InteractiveBrokersDataClientConfig,
+        InteractiveBrokersInstrumentProviderConfig,
+        SymbologyMethod,
+    )
+    from nautilus_trader.adapters.interactive_brokers.factories import (
+        InteractiveBrokersLiveDataClientFactory,
+    )
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",

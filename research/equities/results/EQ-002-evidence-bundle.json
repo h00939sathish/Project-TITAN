@@ -16,6 +16,7 @@
       "total_commissions": 0.000125,
       "total_spread": 0.00025,
       "total_slippage": 0.000125,
+      "total_regulatory_fees": 0.0,
       "total_friction": 0.016661
     },
     "quantile_returns": {
@@ -23,6 +24,24 @@
       "short_leg_ann": -0.3412,
       "gross_spread_ann": -0.2523,
       "net_spread_ann": -0.2576
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.0,
+      "assumption_status": "research_assumption",
+      "provenance": "Standard US equity research baseline (uncalibrated assumption)",
+      "source_document": "TITAN Architecture Equity Research Standard v1.1",
+      "source_url": "",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "25e463e8bfab684acd04c39427b1a6dc2087747589a7c61a1a6060e8144a7d5f"
     }
   },
   "oos": {
@@ -39,6 +58,7 @@
       "total_commissions": 0.000213,
       "total_spread": 0.000425,
       "total_slippage": 0.000213,
+      "total_regulatory_fees": 0.0,
       "total_friction": 0.015805
     },
     "quantile_returns": {
@@ -46,12 +66,30 @@
       "short_leg_ann": -0.3843,
       "gross_spread_ann": -0.1073,
       "net_spread_ann": -0.115
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.0,
+      "assumption_status": "research_assumption",
+      "provenance": "Standard US equity research baseline (uncalibrated assumption)",
+      "source_document": "TITAN Architecture Equity Research Standard v1.1",
+      "source_url": "",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "25e463e8bfab684acd04c39427b1a6dc2087747589a7c61a1a6060e8144a7d5f"
     }
   },
   "adverse_oos": {
     "hypothesis_id": "EQ-002",
     "partition": "OOS_ADVERSE",
-    "annualized_net_sharpe": -0.9511,
+    "annualized_net_sharpe": -0.9512,
     "annualized_net_return": -0.1302,
     "max_drawdown": 0.2807,
     "monthly_turnover": 0.1713,
@@ -62,13 +100,32 @@
       "total_commissions": 0.000425,
       "total_spread": 0.001275,
       "total_slippage": 0.000638,
-      "total_friction": 0.047204
+      "total_regulatory_fees": 3.4e-05,
+      "total_friction": 0.047238
     },
     "quantile_returns": {
       "long_leg_ann": 0.277,
       "short_leg_ann": -0.3843,
       "gross_spread_ann": -0.1073,
       "net_spread_ann": -0.1302
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.01,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 3.0,
+      "slippage_bps": 1.5,
+      "annual_short_borrow_bps": 150.0,
+      "name": "stressed_adverse_us_equity",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 2.0,
+      "regulatory_fees_bps": 0.08,
+      "assumption_status": "research_assumption",
+      "provenance": "Adverse stress test assumption",
+      "source_document": "TITAN Adversarial Simulation Suite",
+      "source_url": "",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
     }
   },
   "gates": {
@@ -89,8 +146,8 @@
       "ic_positive_fraction": 0.5416666666666666,
       "monthly_turnover": 0.17130518234165068,
       "max_drawdown": 0.2677774694841508,
-      "adverse_annualized_net_return": -0.13017365437220013
+      "adverse_annualized_net_return": -0.13019009966970493
     }
   },
-  "generated_at": "2026-08-18T07:36:41.612842+00:00"
+  "generated_at": "2026-08-26T07:56:56.147746+00:00"
 }

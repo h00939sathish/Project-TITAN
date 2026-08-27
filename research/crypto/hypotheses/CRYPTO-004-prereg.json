@@ -1,0 +1,52 @@
+{
+  "hypothesis_id": "CRYPTO-004",
+  "name": "maker_basis_funding_carry",
+  "asset_class": "CRYPTO_DERIVATIVES",
+  "instruments": ["BTCUSDT", "ETHUSDT"],
+  "economic_rationale": "Perpetual futures trade at a structural funding rate premium (contango) relative to spot index during crypto market expansion. Long Spot + Short Perpetual captures this funding rate cashflow every 8 hours. Capturing this carry via passive post-only maker execution overcomes the taker fee friction that constrained CRYPTO-001, provided legging delay and basis risk are dynamically managed.",
+  "execution_microstructure_model": {
+    "entry_structure": "Long Spot + Short Perpetual",
+    "order_type": "POST_ONLY_MAKER_LIMIT",
+    "legging_sequence": "Perpetual Maker Limit placed at Best Ask. Upon fill, Spot Maker Limit placed at Best Bid.",
+    "max_legging_timeout_min": 15,
+    "taker_fallback_rule": "If Spot Maker unfilled after 15 min -> Execute immediate Market Taker Spot order to eliminate delta drift",
+    "settlement_timestamps_utc": ["00:00", "08:00", "16:00"],
+    "captured_funding_rule": "Funding cashflow earned ONLY on matched hedged notional active at exact 8h settlement timestamps"
+  },
+  "cost_schedule": {
+    "venue": "BINANCE_USDM",
+    "spot_maker_fee_bps": 2.0,
+    "spot_taker_fee_bps": 5.0,
+    "perp_maker_fee_bps": 1.0,
+    "perp_taker_fee_bps": 4.0,
+    "slippage_bps": 0.5,
+    "leverage_limit": 5.0,
+    "initial_margin_pct": 20.0,
+    "maintenance_margin_pct": 10.0
+  },
+  "partitions": {
+    "is_partition": {
+      "from": "2024-08-01",
+      "to": "2025-07-31"
+    },
+    "oos_partition": {
+      "from": "2025-08-01",
+      "to": "2026-07-31"
+    }
+  },
+  "control_baselines": {
+    "frictionless_theoretical_gross_carry": "Instantaneous 100% synchronized hedge with 0.0% fees",
+    "pure_taker_baseline": "Immediate market taker execution on both legs (10 bps spot + 5 bps perp)",
+    "random_entry_control": "Position entered at random dates regardless of funding magnitude (N=500 MC)"
+  },
+  "decision_gates": {
+    "gate_1_synchronized_fill_rate": ">= 80% of entries fully hedged via maker orders without triggering 15-min taker fallback",
+    "gate_2_delta_neutral_integrity": "Mean unhedged delta exposure duration < 5.0 minutes per rebalance",
+    "gate_3_maker_vs_taker_superiority": "Maker Net Sharpe exceeds Pure Taker Sharpe by at least +0.80",
+    "gate_4_net_economic_carry_hurdle": {
+      "annualized_net_return_min_pct": 8.0,
+      "oos_net_sharpe_min": 1.50,
+      "max_drawdown_limit_pct": 5.0
+    }
+  }
+}

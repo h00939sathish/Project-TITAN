@@ -1,17 +1,22 @@
 {
   "hypothesis_id": "EQ-004",
-  "factor_name": "reversal_12_1m",
-  "universe_label": "us_top50_sp500_2020_01_02_pit",
+  "factor_name": "short_term_reversal_5d",
+  "universe_label": "us_core_7_equities_v1",
+  "economic_rationale": "Short-horizon price shocks induce temporary cross-sectional dislocations and liquidity imbalances that partially mean-revert as market makers provide liquidity and order flow normalizes.",
   "parameters": {
-    "lookback_days": 252,
-    "skip_days": 21,
-    "top_k": 10,
-    "bottom_k": 10,
-    "gross_exposure": 2.0,
-    "rebalance_freq_days": 21,
-    "dollar_neutral": true
+    "lookback_days": 5,
+    "top_k": 2,
+    "bottom_k": 2,
+    "gross_exposure": 1.0,
+    "rebalance_freq_days": 5,
+    "dollar_neutral": true,
+    "execution_lag_days": 1
   },
-  "cost_label": "ibkr_pro_us_equities_standard_with_impact",
+  "cost_schedules": [
+    "baseline_alpaca_us_equity",
+    "baseline_ibkr_pro_tiered",
+    "stressed_adverse"
+  ],
   "is_partition": {
     "from": "2020-01-02",
     "to": "2022-12-31"
@@ -20,11 +25,13 @@
     "from": "2023-01-03",
     "to": "2024-12-31"
   },
+  "control_baseline": "exposure_matched_random_ranking",
   "pass_criteria": {
-    "oos_net_sharpe_positive": true,
     "mean_rank_ic_positive": true,
-    "decile_monotonicity_verified": true,
+    "ic_positive_fraction_min": 0.50,
+    "quantile_monotonicity_verified": true,
+    "oos_net_sharpe_positive": true,
     "max_drawdown_limit_pct": 25.0,
-    "replication_required": true
+    "information_exceeds_random_baseline": true
   }
 }

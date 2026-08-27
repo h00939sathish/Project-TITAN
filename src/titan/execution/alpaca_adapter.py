@@ -306,7 +306,7 @@ class AlpacaAdapter(BrokerAdapter):
             err_msg = str(e)
             if "client_order_id" in err_msg or "duplicate" in err_msg.lower() or "already exists" in err_msg.lower():
                 try:
-                    existing = client.get_order_by_client_id(client_order_id)
+                    existing = client.get_order_by_client_id(str(intent.client_order_id))
                     if existing:
                         broker_id = BrokerOrderId(id=str(existing.id))
                         return BrokerOrderAcknowledgement(
@@ -507,14 +507,43 @@ class AlpacaAdapter(BrokerAdapter):
         self._daily_order_date = state.get("daily_order_date")
         self._daily_order_count = state.get("daily_order_count", 0)
 
-    def tick(self, order_id: str) -> None:
-        """Poll status update from Alpaca for specified order_id."""
+    def _order_to_status(self, o) -> BrokerOrderStatus:
+        """Map an Alpaca order object to the engine's BrokerOrderStatus.
+        Status strings stay in Alpaca's vocabulary ("filled", "canceled",
+        "partially_filled"); the engine canonicalizes them centrally."""
+        side = self._map_alpaca_side(str(o.side))
+        return BrokerOrderStatus(
+            order_id=BrokerOrderId(id=str(o.id)),
+            instrument_id=str(o.symbol),
+            side=side,
+            quantity=str(o.qty) if o.qty else "0",
+            filled_quantity=str(o.filled_qty) if o.filled_qty not in (None, "") else "0",
+            price=str(o.filled_avg_price) if getattr(o, "filled_avg_price", None) else None,
+            status=str(o.status.value) if o.status else "",
+            created_at=str(o.created_at) if o.created_at else "",
+            updated_at=str(o.updated_at) if o.updated_at else "",
+        )
+
+    def query_order(self, client_order_id: str) -> Optional[BrokerOrderStatus]:
+        """P0 U1/T8: broker truth for an order, looked up by idempotency key
+        (client_order_id). Returns None when the broker knows no such order or
+        the lookup fails (engine treats None per its fail-safe rules)."""
         try:
             client = self._ensure_client()
-            client.get_order_by_id(order_id)
+            existing = client.get_order_by_client_id(client_order_id)
         except Exception:
-            pass
-        return None
+            return None
+        if existing is None:
+            return None
+        return self._order_to_status(existing)
+
+    def tick(self, order_id: str) -> Optional[BrokerOrderStatus]:
+        """Poll status update for an order tracked by client_order_id.
+
+        P0 U4: this previously fetched and DISCARDED the result, so async
+        fills/cancels were never absorbed on broker-paper. It now returns the
+        broker's current order state for the engine's poller."""
+        return self.query_order(order_id)
 
     def heartbeat(self) -> AdapterHealth:
 

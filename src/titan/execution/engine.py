@@ -47,15 +47,47 @@ from titan.risk.session_initialization import (
 )
 from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate
 
-# Order statuses that mean "still alive at the broker" — a working order must
-# NEVER be rejected/cancelled locally (the broker may fill it any moment).
-_WORKING_ORDER_STATUSES = frozenset({
-    "Submitted", "PreSubmitted", "PendingSubmit", "PendingCancel",
-})
 # Terminal statuses where the broker will take no further action.
 _DEAD_ORDER_STATUSES = frozenset({
     "Filled", "Rejected", "Cancelled", "Inactive", "ApiCancelled", "ApiRejected",
 })
+# Canonicalization: brokers report statuses in different vocabularies (TWS
+# "Filled"/"PreSubmitted", Alpaca "filled"/"canceled", sim "partially_filled").
+# Everything is normalized HERE so engine logic compares one vocabulary only.
+_CANONICAL_STATUS_MAP = {
+    "filled": "Filled",
+    "partiallyfilled": "PartiallyFilled",
+    "partially_filled": "PartiallyFilled",
+    "cancelled": "Cancelled",
+    "canceled": "Cancelled",
+    "rejected": "Rejected",
+    "expired": "Expired",
+    "apicancelled": "ApiCancelled",
+    "apirejected": "ApiRejected",
+    "inactive": "Inactive",
+    "submitted": "Submitted",
+    "pendingsubmit": "PendingSubmit",
+    "presubmitted": "PreSubmitted",
+    "pendingcancel": "PendingCancel",
+    "pending_new": "Submitted",
+    "new": "Submitted",
+    "accepted": "Submitted",
+    "done_for_day": "Expired",
+}
+
+
+def _canonical_status(status: str) -> str:
+    s = (status or "").strip()
+    return _CANONICAL_STATUS_MAP.get(s.lower(), s)
+
+
+def _parse_qty(value) -> int:
+    """Parse a broker filled-quantity ("3", "3.0", "3.5") as an integer share
+    count. Unparseable values parse as 0 — never raise into the fill path."""
+    try:
+        return int(float(str(value)))
+    except (TypeError, ValueError):
+        return 0
 from titan.operations._metrics_integration import (
     intents_evaluated,
     intents_rejected,
@@ -150,6 +182,9 @@ class PaperTradingEngine:
         self.certificate_registry = PromotionCertificateRegistry(public_key_hex=pub_key)
         
         self._seen_init_nonces: set[str] = set()
+        # Consumed certificate nonces (P0 A1): a nonce-bearing promotion
+        # certificate authorizes exactly ONE accepted broker order.
+        self._seen_cert_nonces: set[str] = set()
         # Reconstruct replay protection from durable events: a restart must
         # not allow a previously-used initialization nonce to be replayed
         # (nonce replay protection survives process restarts, ADR-020).
@@ -224,6 +259,9 @@ class PaperTradingEngine:
         self._session = self.adapter.authenticate()
         loaded = self._replay_state_from_events() or self._load_state()
         self._restore_order_states()
+        # P0 U1/T8: resolve orders persisted non-terminally by a crash — the
+        # broker is queried by idempotency key; nothing is resent or guessed.
+        self._recover_unresolved_orders()
         if sync_from_broker:
             self._sync_from_broker()
         self._save_state()
@@ -376,6 +414,7 @@ class PaperTradingEngine:
             "intent_counter": self._intent_counter,
             "last_prices": dict(self._last_prices),
             "order_count": self.adapter.save_order_count_state(),
+            "cert_nonces": sorted(self._seen_cert_nonces),
         }
 
     def _append_state_snapshot(self) -> None:
@@ -416,6 +455,7 @@ class PaperTradingEngine:
 
         self._intent_counter = state.get("intent_counter", 0)
         self._last_prices = {k: str(v) for k, v in state.get("last_prices", {}).items()}
+        self._seen_cert_nonces = set(state.get("cert_nonces", []))
         for instr, price in self._last_prices.items():
             try:
                 self.portfolio.update_market_price(instr, price)
@@ -559,6 +599,14 @@ class PaperTradingEngine:
         except Exception:
             pass
 
+    def update_market_price(self, instrument_id: str, price: str | float) -> None:
+        """Alias for update_price."""
+        self.update_price(instrument_id, price)
+
+    def set_feed_health(self, feed_health: Optional[Callable[[], FeedHealthVerdict]]) -> None:
+        """Set or update the feed health provider callable."""
+        self._feed_health = feed_health
+
     def _rejection_payload(self, intent: TradeIntent, reason: str) -> dict:
         return {
             "side": intent.side,
@@ -570,6 +618,263 @@ class PaperTradingEngine:
             "account": str(intent.account_id),
         }
 
+    # ------------------------------------------------------------------
+    # Authoritative fill accounting (P0 U4/R1/C4).
+    #
+    # Invariant, per broker order:
+    #   broker cumulative filled qty
+    #     -> delta = cumulative - self._order_filled_quantity[order_id]
+    #     -> apply delta exactly once, under self._lock.
+    #
+    # There is exactly ONE application path (_absorb_broker_fill). Both the
+    # submit thread and the background poller route through it; neither does
+    # its own portfolio math.
+    # ------------------------------------------------------------------
+
+    def _absorb_broker_fill(
+        self,
+        order_id: str,
+        sm: OrderStateMachine,
+        cumulative_filled: int,
+        fill_price: Optional[str],
+        update_sm: bool = True,
+    ) -> Optional[BrokerFill]:
+        """Apply (cumulative_filled - already_applied) to the portfolio.
+
+        Caller MUST hold self._lock. Returns the applied BrokerFill, or None
+        when the delta is zero/non-positive or tracking metadata is absent.
+        update_sm=False lets a caller absorb a fill before moving the order to
+        a terminal state it computes itself (e.g. Cancelled-with-partial-fill).
+        """
+        meta = self._order_metadata.get(order_id)
+        if meta is None:
+            return None
+        cumulative = _parse_qty(cumulative_filled)
+        already = int(self._order_filled_quantity.get(order_id, 0))
+        delta = cumulative - already
+        if delta <= 0:
+            return None
+
+        instrument_id = meta["instrument_id"]
+        side = str(meta["side"])
+        price = str(fill_price) if fill_price not in (None, "") else (
+            self._last_prices.get(instrument_id, "0"))
+
+        old_pos = self.portfolio.get_position(instrument_id)
+        old_side = str(old_pos.side) if old_pos else "None"
+        old_qty = old_pos.quantity if old_pos else 0
+
+        self.portfolio.apply_fill(
+            instrument_id=instrument_id,
+            side=side.lower(),
+            quantity=delta,
+            price=Money(price, self.config.currency),
+        )
+        self._last_prices[instrument_id] = price
+        orders_filled.inc()
+        self.fills_by_instrument[instrument_id] += 1
+
+        new_pos = self.portfolio.get_position(instrument_id)
+        if old_pos is None or old_pos.quantity == 0:
+            evt_type = "PositionOpened"
+        elif new_pos is not None and new_pos.quantity == 0:
+            evt_type = "PositionClosed"
+        else:
+            evt_type = "PositionChanged"
+        self._event_store.append(EventEnvelope(
+            evt_type, "Portfolio", instrument_id, "titan_python",
+            json.dumps({
+                "instrument_id": instrument_id,
+                "old_side": old_side,
+                "old_quantity": old_qty,
+                "side": side,
+                "quantity": delta,
+                "price": price,
+            }),
+        ))
+        self._event_store.append(EventEnvelope(
+            "OrderFilled", "Execution", order_id, "titan_python",
+            json.dumps({
+                "client_order_id": order_id,
+                "instrument_id": instrument_id,
+                "side": side,
+                "filled_quantity": delta,
+                "fill_price": price,
+            }),
+        ))
+
+        # Ledger updated AFTER successful application — it IS the applied qty.
+        self._order_filled_quantity[order_id] = cumulative
+
+        if update_sm and not sm.current.is_terminal():
+            total_qty = int(meta.get("quantity", 0))
+            from_state = sm.current
+            try:
+                if total_qty > 0 and cumulative >= total_qty:
+                    sm.transition(OrderState.Filled)
+                    sm.persist_transition(self._event_store, order_id,
+                                          from_state, OrderState.Filled, "full_fill")
+                elif from_state == OrderState.Acknowledged:
+                    sm.transition(OrderState.PartiallyFilled)
+                    sm.persist_transition(self._event_store, order_id,
+                                          from_state, OrderState.PartiallyFilled, "partial_fill")
+            except ValueError as e:
+                if self.logger:
+                    self.logger.error("engine", f"Fill SM transition failed for {order_id}: {e}")
+
+        return BrokerFill(
+            execution_id=str(uuid.uuid4()),
+            order_id=BrokerOrderId(id=order_id),
+            instrument_id=instrument_id,
+            side=side.upper(),
+            quantity=str(delta),
+            price=price,
+            fees=Money("0", self.config.currency),
+            currency=self.config.currency,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _resolve_unknown_order(self, order_id: str) -> bool:
+        """Resolve an order in Unknown state by querying the broker by its
+        idempotency key. NEVER resends. Resolution outcomes: Filled / Partial /
+        Open (still working) / Cancelled / Rejected. Returns True if resolved.
+
+        P0 U1: an uncertain broker outcome must never be treated as rejection;
+        the order stays tracked until the broker's truth is known.
+        """
+        query = getattr(self.adapter, "query_order", None)
+        if query is None:
+            return False
+        try:
+            result = query(order_id)
+        except Exception as e:
+            if self.logger:
+                log_adapter_event(self.logger, "unknown_resolution_error", order_id,
+                                  payload={"error": str(e)})
+            return False
+        if result is None:
+            return False
+        status = _canonical_status(str(getattr(result, "status", "") or ""))
+        cumulative = _parse_qty(getattr(result, "filled_quantity", 0))
+        price = getattr(result, "price", None)
+
+        with self._lock:
+            sm = self.order_states.get(order_id)
+            if sm is None or sm.current != OrderState.Unknown:
+                return False
+            dead_no_fill = status in (_DEAD_ORDER_STATUSES - {"Filled"})
+            if status == "Filled" or (not dead_no_fill):
+                # Working or filled: adopt into Acknowledged, then let the one
+                # authoritative path apply any cumulative fill delta.
+                try:
+                    sm.transition(OrderState.Acknowledged)
+                    sm.persist_transition(self._event_store, order_id,
+                                          OrderState.Unknown, OrderState.Acknowledged,
+                                          "broker_outcome_resolved")
+                except ValueError:
+                    return False
+                self._absorb_broker_fill(order_id, sm, cumulative, price)
+                return True
+            # Dead without further fills possible (Cancelled/Rejected/...):
+            # preserve any partial fill FIRST, then take the terminal state.
+            self._absorb_broker_fill(order_id, sm, cumulative, price, update_sm=False)
+            target = OrderState.Cancelled if status == "Cancelled" else OrderState.Rejected
+            from_state = sm.current
+            try:
+                sm.transition(target)
+                sm.persist_transition(self._event_store, order_id, from_state, target,
+                                      f"broker_outcome_{status.lower()}")
+            except ValueError as e:
+                if self.logger:
+                    self.logger.error("engine", f"Unknown-resolution transition failed for {order_id}: {e}")
+                return False
+            self._order_metadata.pop(order_id, None)
+            self._order_filled_quantity.pop(order_id, None)
+        if self.logger:
+            log_adapter_event(self.logger, "unknown_resolved", order_id,
+                              payload={"status": status, "filled": cumulative})
+        return True
+
+    def _recover_unresolved_orders(self) -> None:
+        """Startup crash recovery for non-terminal persisted orders.
+
+        New/Validated: the send path persists these strictly BEFORE contacting
+        the broker, so they were never sent — reject locally (deterministic).
+
+        Submitted: ambiguous (crash between persist and send, or lost broker
+        response). Query the broker by idempotency key: found -> adopt into
+        Unknown and resolve; definitively not found -> rejected locally; query
+        capability absent -> FAIL CLOSED (kill switch), never guess.
+        """
+        with self._lock:
+            unresolved = [(oid, sm.current) for oid, sm in self.order_states.items()
+                          if sm.current in (OrderState.New, OrderState.Validated,
+                                            OrderState.Submitted)]
+        query = getattr(self.adapter, "query_order", None)
+        unresolvable = False
+        for oid, from_current in unresolved:
+            if from_current in (OrderState.New, OrderState.Validated):
+                with self._lock:
+                    sm = self.order_states.get(oid)
+                    if sm is None or sm.current != from_current:
+                        continue
+                    try:
+                        sm.transition(OrderState.Rejected)
+                        sm.persist_transition(self._event_store, oid, from_current,
+                                              OrderState.Rejected, "never_submitted_to_broker")
+                    except ValueError:
+                        continue
+                continue
+            # Submitted at startup: resolve against broker truth.
+            if query is None:
+                # Adapter cannot answer "does this order exist?" (e.g. IBKR).
+                # Never guess — fail closed.
+                unresolvable = True
+                continue
+            try:
+                found = query(oid)
+            except Exception:
+                found = None
+            adopted = False
+            with self._lock:
+                sm = self.order_states.get(oid)
+                if sm is None or sm.current != from_current:
+                    continue
+                if found is not None:
+                    if oid not in self._order_metadata:
+                        self._order_metadata[oid] = {
+                            "instrument_id": getattr(found, "instrument_id", "") or "",
+                            "side": getattr(found, "side", "") or "",
+                            "quantity": int(str(getattr(found, "quantity", "0") or "0") or 0),
+                        }
+                        self._order_filled_quantity.setdefault(oid, 0)
+                    try:
+                        sm.transition(OrderState.Unknown)
+                        sm.persist_transition(self._event_store, oid, from_current,
+                                              OrderState.Unknown, "startup_outcome_unknown")
+                        adopted = True
+                    except ValueError:
+                        continue
+            if adopted:
+                self._resolve_unknown_order(oid)
+            else:
+                with self._lock:
+                    sm2 = self.order_states.get(oid)
+                    if sm2 is not None and sm2.current == OrderState.Submitted:
+                        try:
+                            sm2.transition(OrderState.Rejected)
+                            sm2.persist_transition(self._event_store, oid,
+                                                   OrderState.Submitted, OrderState.Rejected,
+                                                   "not_found_at_broker")
+                        except ValueError:
+                            pass
+        if unresolvable:
+            if self.logger:
+                self.logger.warning("engine",
+                                    "Startup recovery: unresolved Submitted orders with no "
+                                    "broker query capability — failing closed")
+            self.trigger_kill_switch(reason="unresolved_orders_at_startup")
+
     def submit_intent(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
         if getattr(intent, "producer_kind", "") == "shadow" or "shadow" in str(getattr(intent, "strategy_id", "")).lower():
             raise ValueError("Shadow intents are strictly forbidden in the execution engine.")
@@ -577,17 +882,67 @@ class PaperTradingEngine:
         cert_json = getattr(intent, "certificate_ref", None)
         if not cert_json:
             raise ValueError("Missing execution certificate (certificate_ref is None). Unauthorized intent.")
-            
+
         try:
             cert_data = json.loads(cert_json)
             cert = Certificate(**cert_data)
             self.certificate_registry.verify(cert)
         except Exception as e:
             raise ValueError(f"Execution certificate verification failed: {str(e)}")
-            
-        return self._submit_intent_core(intent, correlation_id=correlation_id)
 
-    def _submit_intent_core(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
+        # P0 A1: a promotion certificate authorizes a bounded execution SCOPE,
+        # not merely a strategy identity. The signature already covers
+        # strategy_id/expiry/digest/parameters; here we bind the actual intent
+        # to that scope. Any mismatch is a hard rejection.
+        if str(cert.strategy_id) != str(intent.strategy_id):
+            raise ValueError(
+                f"Certificate scope violation: strategy mismatch "
+                f"(cert={cert.strategy_id}, intent={intent.strategy_id})")
+        scope = cert.parameters or {}
+        missing = [k for k in ("instrument", "side", "max_quantity", "account")
+                   if k not in scope]
+        if missing:
+            raise ValueError(
+                f"Certificate scope incomplete (missing: {missing}) — unauthorized intent")
+        if str(intent.instrument_id) != str(scope["instrument"]):
+            raise ValueError(
+                f"Certificate scope violation: instrument mismatch "
+                f"(cert={scope['instrument']}, intent={intent.instrument_id})")
+        allowed_side = str(scope["side"]).upper()
+        intent_side = str(intent.side).upper()
+        if allowed_side not in ("BOTH", "ANY") and intent_side != allowed_side:
+            raise ValueError(
+                f"Certificate scope violation: side mismatch "
+                f"(cert={allowed_side}, intent={intent_side})")
+        try:
+            if int(str(intent.quantity)) > int(str(scope["max_quantity"])):
+                raise ValueError(
+                    f"Certificate scope violation: quantity {intent.quantity} exceeds "
+                    f"max_quantity {scope['max_quantity']}")
+        except (TypeError, ValueError) as e:
+            if "scope violation" in str(e):
+                raise
+            raise ValueError(
+                f"Certificate scope invalid: max_quantity={scope['max_quantity']!r}") from e
+        if str(intent.account_id) != str(scope["account"]):
+            raise ValueError(
+                f"Certificate scope violation: account mismatch "
+                f"(cert={scope['account']}, intent={intent.account_id})")
+        if "order_types" in scope:
+            allowed_types = [str(t).upper() for t in scope["order_types"]]
+            if str(intent.order_type).upper() not in allowed_types:
+                raise ValueError(
+                    f"Certificate scope violation: order_type "
+                    f"{intent.order_type} not in {allowed_types}")
+        if getattr(cert, "nonce", None):
+            if cert.nonce in self._seen_cert_nonces:
+                raise ValueError("Certificate nonce replayed — unauthorized intent")
+
+        return self._submit_intent_core(intent, correlation_id=correlation_id,
+                                        cert_nonce=getattr(cert, "nonce", None))
+
+    def _submit_intent_core(self, intent: TradeIntent, *, correlation_id: str = "",
+                            cert_nonce: Optional[str] = None) -> OrderResult:
         instr_str = str(intent.instrument_id)
         self.intents_by_instrument[instr_str] += 1
 
@@ -678,6 +1033,19 @@ class PaperTradingEngine:
         self._trace_decision(correlation_id, "RiskDecision",
                              {"accepted": True})
 
+        # P2 (architecture freeze): TWAP is DISABLED. The slice executor called
+        # the adapter directly — bypassing risk gating, event ordering, and fill
+        # accounting — and imported a nonexistent module. It stays unavailable
+        # until reimplemented ON the engine pipeline. Rejected BEFORE any
+        # durable order artifact is created.
+        if self.config.use_twap:
+            self.rejections_by_instrument[instr_str] += 1
+            intents_rejected.inc()
+            return OrderResult(
+                accepted=False,
+                rejection_reason="TWAP disabled (execution-integrity freeze)",
+            )
+
         self._intent_counter += 1
         ts = datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
         client_order_id = f"{self.config.client_order_prefix}{ts}-{self._intent_counter}"
@@ -733,36 +1101,40 @@ class PaperTradingEngine:
 
         orders_submitted.inc()
 
-        # TWAP: split large orders into slices
-        qty = int(intent.quantity)
-        if self.config.use_twap and qty > 50:
-            from titan.execution.twap import TWAPExecutor, TWAPConfig
-            twap_config = TWAPConfig(slices=self.config.twap_slice_count, duration_seconds=self.config.twap_duration_seconds)
-            twap = TWAPExecutor(self, twap_config)
-            twap.execute(approved)
-            # The background thread handles child order submissions and tracking.
-            # Mark the parent order as acknowledged conceptually.
-            sm.transition(OrderState.Acknowledged)
+        try:
+            acknowledgement = self.adapter.place_order(approved)
+        except Exception as e:
+            # P0 U1: a broker exception means the outcome is UNKNOWN — the
+            # request may have failed before the broker saw it, OR the broker
+            # may have created the order and lost the response. We must NOT
+            # declare it Rejected (it may be live) and must NOT resend.
+            # Fail safe: park the order in Unknown (tracked, resolvable),
+            # halt routing, and resolve against broker truth by idempotency key.
+            orders_rejected.inc()
+            with self._lock:
+                try:
+                    sm.transition(OrderState.Unknown)
+                    sm.persist_transition(self._event_store, client_order_id,
+                                          OrderState.Submitted, OrderState.Unknown,
+                                          f"broker_error_unknown_outcome: {e}")
+                    self._order_metadata[client_order_id] = {
+                        "instrument_id": str(intent.instrument_id),
+                        "side": str(intent.side),
+                        "quantity": int(str(approved.quantity)),
+                    }
+                    self._order_filled_quantity.setdefault(client_order_id, 0)
+                except ValueError:
+                    pass
+            if self.logger:
+                self.logger.error("engine",
+                                  f"Broker submit outcome UNKNOWN (order parked, not resent): {e}")
+            if not self.risk_gate.kill_switch.blocks_routing():
+                self.trigger_kill_switch(reason="broker_outcome_unknown")
+            self._resolve_unknown_order(client_order_id)
             return OrderResult(
-                accepted=True,
-                rejection_reason="",
+                accepted=False,
+                rejection_reason=f"Broker outcome UNKNOWN (order parked, not resent): {e}",
             )
-        else:
-            try:
-                acknowledgement = self.adapter.place_order(approved)
-            except Exception as e:
-                self.rejections_by_instrument[instr_str] += 1
-                sm.transition(OrderState.Rejected)
-                sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Rejected, f"broker_error: {e}")
-                if self.logger:
-                    self.logger.error("engine", f"Broker submit failed: {e}")
-                orders_rejected.inc()
-                if not self.risk_gate.kill_switch.blocks_routing():
-                    self.trigger_kill_switch()
-                return OrderResult(
-                    accepted=False,
-                    rejection_reason=f"Broker submit failed: {e}",
-                )
         if not acknowledgement.accepted:
             self.rejections_by_instrument[instr_str] += 1
             sm.transition(OrderState.Rejected)
@@ -779,125 +1151,56 @@ class PaperTradingEngine:
 
 
         broker_id = acknowledgement.broker_order_id
-        sm.transition(OrderState.Acknowledged)
-        sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Acknowledged, "order_acknowledged_by_broker")
-        self._event_store.append(EventEnvelope(
-            "OrderAcknowledged", "Execution", client_order_id, "titan_python",
-            json.dumps({
-                "client_order_id": client_order_id,
-                "broker_order_id": str(broker_id.id) if broker_id else "",
+        fills: list[BrokerFill] = []
+        with self._lock:
+            sm.transition(OrderState.Acknowledged)
+            sm.persist_transition(self._event_store, client_order_id, OrderState.Submitted, OrderState.Acknowledged, "order_acknowledged_by_broker")
+            self._event_store.append(EventEnvelope(
+                "OrderAcknowledged", "Execution", client_order_id, "titan_python",
+                json.dumps({
+                    "client_order_id": client_order_id,
+                    "broker_order_id": str(broker_id.id) if broker_id else "",
+                    "instrument_id": str(intent.instrument_id),
+                }),
+            ))
+            self._trace_decision(correlation_id, "BrokerAcknowledgement",
+                                 {"broker_order_id": str(broker_id.id) if broker_id else None,
+                                  "client_order_id": client_order_id,
+                                  "accepted": True})
+
+            # Register poll tracking UNDER THE LOCK before any fill absorption.
+            # The poller can therefore never observe an Acknowledged order that
+            # lacks its ledger entry — this closes the old R1 double-apply race.
+            self._order_metadata[client_order_id] = {
                 "instrument_id": str(intent.instrument_id),
-            }),
-        ))
-        self._trace_decision(correlation_id, "BrokerAcknowledgement",
-                             {"broker_order_id": str(broker_id.id) if broker_id else None,
-                              "client_order_id": client_order_id,
-                              "accepted": True})
+                "side": str(intent.side),
+                "quantity": int(str(approved.quantity)),
+            }
+            self._order_filled_quantity.setdefault(client_order_id, 0)
 
-        # Track metadata for ALL accepted orders (filled AND still-working) so
-        # poll_fills can absorb async fills, partial fills and external cancels.
-        total_qty = int(str(approved.quantity))
-        self._order_metadata[client_order_id] = {
-            "instrument_id": str(intent.instrument_id),
-            "side": str(intent.side),
-            "quantity": total_qty,
-        }
-        self._order_filled_quantity.setdefault(client_order_id, 0)
+            # P0 U4/R1: single authoritative fill-application path. Any fill
+            # already present on the acknowledgement goes through the SAME
+            # locked delta function the poller uses — never separate math.
+            if acknowledgement.fill_quantity:
+                applied = self._absorb_broker_fill(
+                    client_order_id, sm,
+                    acknowledgement.fill_quantity,
+                    acknowledgement.fill_price or approved.price)
+                if applied is not None:
+                    fills.append(applied)
 
-        fills = self._resolve_fills(approved, broker_id, acknowledgement)
-        if fills:
-            total_filled = 0
-            for fill in fills:
-                qty = int(fill.quantity) if fill.quantity else 0
-                if qty <= 0:
-                    continue
-                total_filled += qty
-                old_pos = self.portfolio.get_position(fill.instrument_id)
-                old_side = str(old_pos.side) if old_pos else "None"
-                old_qty = old_pos.quantity if old_pos else 0
-
-                self.portfolio.apply_fill(
-                    instrument_id=fill.instrument_id,
-                    side=fill.side.lower(),
-                    quantity=qty,
-                    price=Money(fill.price, self.config.currency),
-                )
-                self.update_price(fill.instrument_id, fill.price)
-                orders_filled.inc()
-                self.fills_by_instrument[fill.instrument_id] += 1
-
-
-                new_pos = self.portfolio.get_position(fill.instrument_id)
-                new_side = str(new_pos.side) if new_pos else "None"
-                if old_pos is None or old_pos.quantity == 0:
-                    evt_type = "PositionOpened"
-                elif new_pos is not None and new_pos.quantity == 0:
-                    evt_type = "PositionClosed"
-                else:
-                    evt_type = "PositionChanged"
-                self._event_store.append(EventEnvelope(
-                    evt_type, "Portfolio", fill.instrument_id, "titan_python",
-                    json.dumps({
-                        "instrument_id": fill.instrument_id,
-                        "old_side": old_side,
-                        "old_quantity": old_qty,
-                        "side": fill.side,
-                        "quantity": qty,
-                        "price": fill.price,
-                    }),
-                ))
-                self._event_store.append(EventEnvelope(
-                    "OrderFilled", "Execution", client_order_id, "titan_python",
-                    json.dumps({
-                        "client_order_id": client_order_id,
-                        "instrument_id": fill.instrument_id,
-                        "side": fill.side,
-                        "filled_quantity": qty,
-                        "fill_price": fill.price,
-                    }),
-                ))
-
-            self._order_filled_quantity[client_order_id] = total_filled
-            if total_filled < total_qty:
-                sm.transition(OrderState.PartiallyFilled)
-                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.PartiallyFilled, "partial_fill")
-            else:
-                sm.transition(OrderState.Filled)
-                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Filled, "full_fill")
-        else:
-            ack_status = getattr(acknowledgement, "order_status", None) or ""
-            if ack_status in _WORKING_ORDER_STATUSES:
-                # Order is still working at the broker (Submitted/PreSubmitted) —
-                # the engine's fill timeout elapsed before a terminal status.
-                # Keep the order PENDING: poll_fills absorbs the fill or external
-                # cancel asynchronously via adapter.tick(). Never assume it dead.
-                if self.logger:
-                    log_adapter_event(self.logger, "order_working", client_order_id,
-                                      instrument_id=str(intent.instrument_id),
-                                      payload={"status": ack_status})
-            else:
-                sm.transition(OrderState.Rejected)
-                sm.persist_transition(self._event_store, client_order_id, OrderState.Acknowledged, OrderState.Rejected, "no_fill_quantity")
-                if self.logger:
-                    log_adapter_event(self.logger, "fill_failed", client_order_id,
-                                      instrument_id=str(intent.instrument_id),
-                                      payload={"reason": "no_fill_quantity"})
-                # The broker may still be working this order or may fill it after our
-                # timeout. Cancel it so TWS does not fill an order the engine already
-                # declared dead — otherwise positions drift (TWS holds what the engine
-                # thinks never existed).
-                if broker_id is not None:
-                    try:
-                        self.adapter.cancel(broker_id)
-                    except Exception:
-                        pass
-
+        # Consume the certificate nonce ONLY on a broker-accepted order.
+        if cert_nonce:
+            self._seen_cert_nonces.add(cert_nonce)
 
         self._save_state()
-        if fills and self.logger:
-            log_adapter_event(self.logger, "filled", client_order_id,
+        if self.logger:
+            log_adapter_event(self.logger,
+                              "filled" if fills else "order_working",
+                              client_order_id,
                               instrument_id=str(intent.instrument_id),
-                              payload={"fills": len(fills), "qty": str(intent.quantity)})
+                              payload={"fills": len(fills),
+                                       "qty": str(intent.quantity)})
 
         position = self.portfolio.get_position(str(intent.instrument_id))
         cash = self.portfolio.get_cash_balance()
@@ -910,26 +1213,34 @@ class PaperTradingEngine:
         )
 
     def poll_fills(self) -> None:
-        """Check all open Acknowledged/PartiallyFilled orders for new fills from the adapter.
-        Should be called periodically (e.g. on every market-data tick).
+        """Check all open orders (Acknowledged/PartiallyFilled/Unknown) against
+        the adapter and absorb broker truth. Runs on the background poller and
+        can also be invoked synchronously; all state changes go through the
+        single authoritative absorption path under self._lock.
         """
-        import copy
         with self._lock:
-            open_orders = list(self.order_states.items())
+            open_orders = [(oid, sm.current) for oid, sm in self.order_states.items()
+                           if sm.current in (OrderState.Acknowledged,
+                                             OrderState.PartiallyFilled,
+                                             OrderState.Unknown)]
 
-        for order_id, sm in open_orders:
+        for order_id, from_current in open_orders:
+            if from_current == OrderState.Unknown:
+                # Uncertain outcome: resolve by querying the broker — never
+                # guess, never resend (P0 U1).
+                try:
+                    self._resolve_unknown_order(order_id)
+                except Exception as e:
+                    log_adapter_event(self.logger, "unknown_resolution_warning",
+                                      order_id, payload={"error": str(e)})
+                continue
+
             with self._lock:
-                if sm.current not in (OrderState.Acknowledged, OrderState.PartiallyFilled):
-                    self._order_metadata.pop(order_id, None)
-                    self._order_filled_quantity.pop(order_id, None)
+                sm = self.order_states.get(order_id)
+                if sm is None or sm.current != from_current:
                     continue
-
                 meta = self._order_metadata.get(order_id)
                 already_filled = self._order_filled_quantity.get(order_id, 0)
-                # pyo3 enum objects are immutable — a plain reference is fine
-                # (deepcopy raises TypeError: cannot pickle OrderState).
-                from_state = sm.current
-
             if meta is None:
                 continue
 
@@ -944,93 +1255,49 @@ class PaperTradingEngine:
             if result is None:
                 continue
 
-            status = str(getattr(result, "status", "") or "")
-            if status in _DEAD_ORDER_STATUSES and status != "Filled":
-                # Terminal dead state reached outside the synchronous wait —
-                # typically an external cancel/reject from the TWS UI or a
-                # rejected fill. Transition the order and drop tracking.
-                with self._lock:
-                    try:
-                        sm.transition(OrderState.Rejected)
-                        sm.persist_transition(
-                            self._event_store, order_id, from_state,
-                            OrderState.Rejected, f"broker_{status.lower()}",
-                        )
-                    except Exception:
-                        pass
-                    self._order_metadata.pop(order_id, None)
-                    self._order_filled_quantity.pop(order_id, None)
-                log_adapter_event(self.logger, "broker_dead_order", order_id,
-                                  payload={"status": status, "instrument_id": result.instrument_id})
-                continue
-            if status not in ("Filled", ""):
-                # Still working at the broker — nothing to do this poll.
-                continue
+            status = _canonical_status(str(getattr(result, "status", "") or ""))
+            cumulative = _parse_qty(getattr(result, "filled_quantity", 0))
+            price = getattr(result, "price", None)
 
-            new_qty = int(result.filled_quantity or 0) - already_filled
-            if new_qty <= 0:
-                continue
-
-            fill_price = result.price or "0"
-            fill = BrokerFill(
-                execution_id=str(uuid.uuid4()),
-                order_id=BrokerOrderId(id=order_id),
-                instrument_id=result.instrument_id,
-                side=result.side.upper(),
-                quantity=str(new_qty),
-                price=fill_price,
-                fees=Money("0", self.config.currency),
-                currency=self.config.currency,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-            )
+            dead_no_fill = status in (_DEAD_ORDER_STATUSES - {"Filled"})
 
             with self._lock:
-                old_pos = self.portfolio.get_position(fill.instrument_id)
-                old_side = str(old_pos.side) if old_pos else "None"
-                old_qty = old_pos.quantity if old_pos else 0
+                sm = self.order_states.get(order_id)
+                if sm is None or sm.current != from_current or \
+                        self._order_metadata.get(order_id) != meta:
+                    continue
 
-                self.portfolio.apply_fill(
-                    instrument_id=fill.instrument_id,
-                    side=fill.side.lower(),
-                    quantity=int(fill.quantity),
-                    price=Money(fill.price, self.config.currency),
-                )
-                self._last_prices[fill.instrument_id] = fill.price
-                orders_filled.inc()
+                if dead_no_fill:
+                    # P0 C4: cancellation/rejection is an order-state outcome,
+                    # NOT proof that zero shares filled. Absorb any fill delta
+                    # BEFORE taking the terminal state, then drop tracking.
+                    if cumulative > already_filled:
+                        self._absorb_broker_fill(order_id, sm, cumulative, price,
+                                                 update_sm=False)
+                    target = (OrderState.Cancelled if status == "Cancelled"
+                              else OrderState.Rejected)
+                    try:
+                        sm.transition(target)
+                        sm.persist_transition(self._event_store, order_id, from_current,
+                                              target, f"broker_{status.lower()}")
+                    except ValueError as e:
+                        if self.logger:
+                            self.logger.error("engine",
+                                              f"Dead-order transition failed for {order_id}: {e}")
+                    self._order_metadata.pop(order_id, None)
+                    self._order_filled_quantity.pop(order_id, None)
+                    log_adapter_event(self.logger, "broker_dead_order", order_id,
+                                      payload={"status": status,
+                                               "instrument_id": result.instrument_id,
+                                               "absorbed_qty": cumulative})
+                    continue
 
-                new_pos = self.portfolio.get_position(fill.instrument_id)
-                if old_pos is None or old_pos.quantity == 0:
-                    evt_type = "PositionOpened"
-                elif new_pos is not None and new_pos.quantity == 0:
-                    evt_type = "PositionClosed"
-                else:
-                    evt_type = "PositionChanged"
-                self._event_store.append(EventEnvelope(
-                    evt_type, "Portfolio", fill.instrument_id, "titan_python",
-                    json.dumps({
-                        "instrument_id": fill.instrument_id,
-                        "old_side": old_side,
-                        "old_quantity": old_qty,
-                        "side": fill.side,
-                        "quantity": int(fill.quantity),
-                        "price": fill.price,
-                    }),
-                ))
+                if status not in ("Filled", ""):
+                    # Still working at the broker — nothing to do this poll.
+                    continue
 
-                self._order_filled_quantity[order_id] = int(result.filled_quantity or 0)
-                total_qty = meta.get("quantity", 0)
-
-                if int(result.filled_quantity or 0) < total_qty:
-                    if from_state == OrderState.Acknowledged:
-                        sm.transition(OrderState.PartiallyFilled)
-                        sm.persist_transition(self._event_store, order_id, from_state, OrderState.PartiallyFilled, "partial_fill_from_poll")
-                else:
-                    sm.transition(OrderState.Filled)
-                    sm.persist_transition(self._event_store, order_id, from_state, OrderState.Filled, "full_fill_from_poll")
-                if self.logger:
-                    log_adapter_event(self.logger, "filled_from_poll", order_id,
-                                      instrument_id=fill.instrument_id,
-                                      payload={"new_qty": new_qty, "total": result.filled_quantity})
+                # Filled (fully or partially): one authoritative delta path.
+                self._absorb_broker_fill(order_id, sm, cumulative, price)
 
     def reconcile(self) -> ReconciliationResult:
         with self._lock:
@@ -1421,31 +1688,6 @@ class PaperTradingEngine:
                 pass
             if self.logger:
                 self.logger.info("engine", "Kill switch released")
-
-    def _resolve_fills(
-        self,
-        intent: ApprovedOrderIntent,
-        broker_id: Optional[BrokerOrderId],
-        ack: Optional[BrokerOrderAcknowledgement] = None,
-    ) -> list[BrokerFill]:
-        if ack is None:
-            return []
-        raw_qty = ack.fill_quantity
-        if not raw_qty or str(raw_qty) == "0":
-            return []
-        fill_price = ack.fill_price if ack.fill_price else (str(intent.price) if intent.price else "0")
-        fill = BrokerFill(
-            execution_id=str(uuid.uuid4()),
-            order_id=broker_id or BrokerOrderId(id="unknown"),
-            instrument_id=str(intent.instrument_id),
-            side=str(intent.side),
-            quantity=str(raw_qty),
-            price=fill_price,
-            fees=Money("0", self.config.currency),
-            currency=self.config.currency,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-        )
-        return [fill]
 
     def _current_position_size(self, instrument_id: str) -> Optional[int]:
         pos = self.portfolio.get_position(instrument_id)

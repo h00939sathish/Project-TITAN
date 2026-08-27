@@ -1,13 +1,15 @@
 """Market-neutral cross-sectional factor portfolio simulator and cost engine.
 
 Research-only. Implements dollar-neutral long/short quantile portfolio construction,
-transaction costs (commissions, bid-ask spread), short borrowing fees, and
-Spearman rank Information Coefficient (IC) evaluation.
+transaction costs (commissions, bid-ask spread, slippage, regulatory fees), short
+borrowing fees, and Spearman rank Information Coefficient (IC) evaluation.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -19,26 +21,116 @@ from titan.data.equities_universe import EquitiesUniverseData
 
 
 @dataclass(frozen=True)
-class FactorCostModel:
+class VenueCostSchedule:
+    """Explicit versioned research cost assumption and schedule with provenance metadata."""
+
     commission_per_share_usd: float = 0.005
     assumed_avg_share_price: float = 100.0
     spread_bps: float = 1.0  # 1.0 bps = 0.0001
     slippage_bps: float = 0.5  # 0.5 bps = 0.00005
     annual_short_borrow_bps: float = 50.0  # 50 bps = 0.0050 per year
+    name: str = "baseline_ibkr_pro_fixed"
+    layer: str = "layer1_discovery"  # "layer1_discovery" | "layer2_historical" | "layer3_paper_calibrated"
+    min_commission_usd: float = 1.00
+    regulatory_fees_bps: float = 0.0
+    assumption_status: str = "research_assumption"  # "research_assumption" | "verified_from_published_schedule" | "observed_from_paper_telemetry"
+    provenance: str = "Standard US equity research baseline (uncalibrated assumption)"
+    source_document: str = "TITAN Architecture Equity Research Standard v1.1"
+    source_url: str = ""
+    source_hash: str = ""
+    effective_date: str = "2026-08-19"
 
     @classmethod
-    def standard_us_equity(cls) -> "FactorCostModel":
+    def baseline_alpaca_us_equity(cls) -> "VenueCostSchedule":
+        return cls(
+            name="baseline_alpaca_us_equity",
+            layer="layer1_discovery",
+            commission_per_share_usd=0.0,
+            min_commission_usd=0.0,
+            assumed_avg_share_price=100.0,
+            spread_bps=1.0,
+            slippage_bps=0.5,
+            annual_short_borrow_bps=50.0,
+            regulatory_fees_bps=0.04,
+            assumption_status="research_assumption",
+            provenance="Alpaca self-directed US pricing schedule (uncalibrated research assumption)",
+            source_document="Alpaca Commission and Fee Schedule 2026",
+            source_url="https://alpaca.markets/disclosures",
+            effective_date="2026-08-19",
+        )
+
+    @classmethod
+    def baseline_ibkr_pro_tiered(cls) -> "VenueCostSchedule":
+        return cls(
+            name="baseline_ibkr_pro_tiered",
+            layer="layer1_discovery",
+            commission_per_share_usd=0.0035,
+            min_commission_usd=0.35,
+            assumed_avg_share_price=100.0,
+            spread_bps=0.8,
+            slippage_bps=0.3,
+            annual_short_borrow_bps=50.0,
+            regulatory_fees_bps=0.04,
+            assumption_status="research_assumption",
+            provenance="IBKR Pro US tiered equity schedule (uncalibrated research assumption)",
+            source_document="IBKR Pro Commission Rates (US Stocks/ETFs)",
+            source_url="https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+            effective_date="2026-08-19",
+        )
+
+    @classmethod
+    def baseline_ibkr_pro_fixed(cls) -> "VenueCostSchedule":
+        return cls(
+            name="baseline_ibkr_pro_fixed",
+            layer="layer1_discovery",
+            commission_per_share_usd=0.0050,
+            min_commission_usd=1.00,
+            assumed_avg_share_price=100.0,
+            spread_bps=1.0,
+            slippage_bps=0.5,
+            annual_short_borrow_bps=50.0,
+            regulatory_fees_bps=0.04,
+            assumption_status="research_assumption",
+            provenance="IBKR Pro US fixed equity schedule (uncalibrated research assumption)",
+            source_document="IBKR Pro Fixed Commission Rates",
+            source_url="https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+            effective_date="2026-08-19",
+        )
+
+    @classmethod
+    def standard_us_equity(cls) -> "VenueCostSchedule":
         return cls()
 
     @classmethod
-    def stressed_adverse(cls) -> "FactorCostModel":
+    def stressed_adverse(cls) -> "VenueCostSchedule":
         return cls(
+            name="stressed_adverse_us_equity",
+            layer="layer1_discovery",
             commission_per_share_usd=0.010,
+            min_commission_usd=2.00,
+            assumed_avg_share_price=100.0,
             spread_bps=3.0,
             slippage_bps=1.5,
             annual_short_borrow_bps=150.0,
+            regulatory_fees_bps=0.08,
+            assumption_status="research_assumption",
+            provenance="Adverse stress test assumption",
+            source_document="TITAN Adversarial Simulation Suite",
+            effective_date="2026-08-19",
         )
 
+    def digest(self) -> str:
+        payload = asdict(self)
+        raw = json.dumps(payload, sort_keys=True)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["digest"] = self.digest()
+        return d
+
+
+FactorCostModel = VenueCostSchedule
 
 
 @dataclass
@@ -59,9 +151,10 @@ class FactorSimulationResult:
     mean_rank_ic: float
     ic_positive_fraction: float
     quantile_returns: dict[str, float] = field(default_factory=dict)
+    cost_schedule: VenueCostSchedule | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        res: dict[str, Any] = {
             "hypothesis_id": self.hypothesis_id,
             "partition": self.partition,
             "annualized_net_sharpe": round(self.annualized_net_sharpe, 4),
@@ -73,6 +166,9 @@ class FactorSimulationResult:
             "costs": {k: round(v, 6) for k, v in self.costs.items()},
             "quantile_returns": {k: round(v, 4) for k, v in self.quantile_returns.items()},
         }
+        if self.cost_schedule is not None:
+            res["cost_schedule"] = self.cost_schedule.to_dict()
+        return res
 
 
 def _compute_max_drawdown(returns: pd.Series) -> float:
@@ -92,7 +188,7 @@ def simulate_factor_portfolio(
     bottom_k: int = 3,
     rebalance_freq_days: int = 21,
     gross_exposure: float = 1.0,
-    cost_model: FactorCostModel | None = None,
+    cost_model: VenueCostSchedule | None = None,
 ) -> FactorSimulationResult:
     """Simulates a dollar-neutral long/short factor portfolio.
 
@@ -101,8 +197,10 @@ def simulate_factor_portfolio(
     gross_exposure : float
         Total gross exposure across both legs (default 1.0 = +50% long / -50% short;
         2.0 = +100% long / -100% short). Always maintains zero net dollar exposure.
+    cost_model : VenueCostSchedule | None
+        Venue cost schedule with explicit provenance and assumption layer.
     """
-    cost = cost_model or FactorCostModel.standard_us_equity()
+    cost = cost_model or VenueCostSchedule.standard_us_equity()
     prices = universe.prices
     returns = universe.returns
 
@@ -157,15 +255,16 @@ def simulate_factor_portfolio(
     daily_borrow_rate = (cost.annual_short_borrow_bps * 1e-4) / 252.0
     borrow_costs = short_w.abs().sum(axis=1) * daily_borrow_rate
 
-    # 2. Turnover friction (commissions + spread + slippage impact) on rebalances
+    # 2. Turnover friction (commissions + spread + slippage + regulatory fees) on rebalances
     delta_w = weights.diff().abs().sum(axis=1).fillna(0.0)
     # Commission approx: delta_w / avg_share_price * commission_per_share
     comm_rate = cost.commission_per_share_usd / cost.assumed_avg_share_price
     commission_costs = delta_w * comm_rate
     spread_costs = delta_w * (cost.spread_bps * 1e-4)
     slippage_costs = delta_w * (cost.slippage_bps * 1e-4)
+    regulatory_costs = delta_w * (cost.regulatory_fees_bps * 1e-4)
 
-    total_friction = borrow_costs + commission_costs + spread_costs + slippage_costs
+    total_friction = borrow_costs + commission_costs + spread_costs + slippage_costs + regulatory_costs
     net_daily = gross_daily - total_friction
 
     # Metrics
@@ -220,6 +319,7 @@ def simulate_factor_portfolio(
             "total_commissions": float(commission_costs.sum()),
             "total_spread": float(spread_costs.sum()),
             "total_slippage": float(slippage_costs.sum()),
+            "total_regulatory_fees": float(regulatory_costs.sum()),
             "total_friction": float(total_friction.sum()),
         },
         annualized_net_sharpe=ann_sharpe,
@@ -229,5 +329,5 @@ def simulate_factor_portfolio(
         mean_rank_ic=mean_ic,
         ic_positive_fraction=ic_pos_frac,
         quantile_returns=q_returns,
+        cost_schedule=cost,
     )
-

@@ -14,7 +14,9 @@ pytestmark = [pytest.mark.live, pytest.mark.timeout(15)]
 def _has_creds() -> bool:
     env_path = Path(__file__).resolve().parents[2] / ".env"
     load_dotenv(env_path)
-    return bool(os.getenv("APCA_API_KEY_ID") and os.getenv("APCA_API_SECRET_KEY"))
+    key = os.getenv("APCA_API_KEY_ID")
+    secret = os.getenv("APCA_API_SECRET_KEY")
+    return bool(key and secret and not key.startswith("YOUR_") and key != "YOUR_ALPACA_KEY_ID")
 
 
 def _creds():
