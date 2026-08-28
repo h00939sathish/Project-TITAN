@@ -147,7 +147,10 @@
       "monthly_turnover": 0.1679462571976967,
       "max_drawdown": 0.08303612083882615,
       "adverse_annualized_net_return": 0.054467079577353854
-    }
+    },
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "OOS rank IC inverted to -0.017; 12-1 month momentum factor had negative predictive power during mega-cap concentration regime shifts. IC positive fraction 0.458 (below 0.70 threshold). The underlying momentum signal was directionally inverted, not merely attenuated by friction.",
+    "failure_mode_confidence": "high"
   },
-  "generated_at": "2026-08-26T07:56:54.529146+00:00"
+  "generated_at": "2026-08-28T09:28:26.964391+00:00"
 }

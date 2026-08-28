@@ -29,6 +29,7 @@ Define the research-only US Equities and ETFs Cross-Sectional Factor Discovery S
 - Monotonicity test across all 10 Deciles ($D_1 > D_2 > \dots > D_{10}$) for 50-stock universes, where each decile contains 5 stocks, Long target is $D_1+D_2$ (Bottom 10 Laggards), and Short target is $D_9+D_{10}$ (Top 10 Leaders).
 - Detailed attribution bundles (`gross_pnl`, `long_leg_pnl`, `short_leg_pnl`, `short_borrow_cost`, `commissions`, `spread_cost`, `slippage_cost`, `turnover_rate`, `rank_ic_series`, `quantile_spreads`, `net_pnl`, `net_sharpe`, `max_drawdown`).
 - Frozen evidence bundle: `research/equities/results/EQ-00X-evidence-bundle.json`.
+- **Negative-result completeness rule:** A `negative_result` verdict is incomplete unless the evidence bundle contains a structured `failure_mode` (one of `execution_constrained` or `mechanism_failure` per AGENTS.md Rule 8), `failure_mode_basis` (plain-language description of what the evidence shows), and `failure_mode_confidence` (`high` or `medium`). An optional `disambiguation` field must be present when `failure_mode_confidence` is `medium`, recording the remaining ambiguity that prevents a `high` classification.
 
 ## Core Data Structures & Interfaces
 

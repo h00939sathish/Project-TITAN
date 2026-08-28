@@ -221,6 +221,23 @@ def run_factor_screen(
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_file = RESULTS_DIR / f"{prereg.hypothesis_id}-evidence-bundle.json"
+    if out_file.exists():
+        try:
+            existing = json.loads(out_file.read_text(encoding="utf-8"))
+            for field in ("failure_mode", "failure_mode_basis", "failure_mode_confidence", "disambiguation"):
+                if field in existing.get("gates", {}):
+                    gates_eval[field] = existing["gates"][field]
+        except Exception:
+            pass
+
     out_file.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+
+    if gates_eval["verdict"] == "negative_result" and "failure_mode" not in gates_eval:
+        import warnings
+        warnings.warn(
+            f"{prereg.hypothesis_id}: negative_result missing required failure_mode "
+            "classification per AGENTS.md Rule 8",
+            stacklevel=2,
+        )
 
     return bundle

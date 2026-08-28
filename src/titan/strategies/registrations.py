@@ -1,13 +1,18 @@
 """Import-time registration of all strategies into the global registry."""
 
-import json
-
+from titan.research.harness import (
+    make_bollinger_signal_fn,
+    make_dual_ma_signal_fn,
+    make_ma_signal_fn,
+    make_momentum_signal_fn,
+    make_mr_signal_fn,
+    make_orb_signal_fn,
+    make_rsi_signal_fn,
+    make_traderdev_ema9vwap_signal_fn,
+    make_vol_regime_signal_fn,
+    make_vwap_signal_fn,
+)
 from titan.strategies.registry import ParameterDef, StrategyRegistration, get_registry
-from titan.research.harness import (make_ma_signal_fn, make_momentum_signal_fn,
-                                    make_mr_signal_fn, make_vol_regime_signal_fn,
-                                    make_dual_ma_signal_fn, make_rsi_signal_fn,
-                                    make_bollinger_signal_fn)
-from titan.strategies.timeframes import Timeframe
 
 _reg = get_registry()
 
@@ -98,12 +103,6 @@ _reg.register(StrategyRegistration(
     # only by the promotion gate writing status=QUALIFIED to the research DB.
     qualified_variants=frozenset(),
 ))
-
-from titan.research.harness import (make_ma_signal_fn, make_momentum_signal_fn,
-                                    make_mr_signal_fn, make_vol_regime_signal_fn,
-                                    make_dual_ma_signal_fn, make_rsi_signal_fn,
-                                    make_bollinger_signal_fn, make_orb_signal_fn,
-                                    make_vwap_signal_fn, make_traderdev_ema9vwap_signal_fn)
 
 _reg.register(StrategyRegistration(
     strategy_id="bollinger",

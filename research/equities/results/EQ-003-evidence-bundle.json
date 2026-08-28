@@ -147,7 +147,10 @@
       "monthly_turnover": 0.22168905950095968,
       "max_drawdown": 0.10300082596830396,
       "adverse_annualized_net_return": 0.03347708920800846
-    }
+    },
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "Volatility-adjusted momentum OOS net Sharpe 0.47 (failed >= 1.0 hurdle). Vol adjustment did not rescue the inverted momentum signal from EQ-001; the underlying cross-sectional momentum mechanism lacked predictive power in the tested regime.",
+    "failure_mode_confidence": "high"
   },
-  "generated_at": "2026-08-26T07:56:57.789267+00:00"
+  "generated_at": "2026-08-28T09:28:28.363834+00:00"
 }

@@ -109,6 +109,9 @@
   },
   "gates": {
     "verdict": "candidate",
+    "failure_mode": "execution_constrained",
+    "failure_mode_basis": "Same 5-day reversal mechanism on Core-7 universe; friction from high-frequency rebalancing remained the binding constraint.",
+    "failure_mode_confidence": "high",
     "gates": {
       "oos_net_positive": true,
       "mean_rank_ic_positive": true,

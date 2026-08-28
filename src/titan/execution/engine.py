@@ -46,6 +46,7 @@ from titan.risk.session_initialization import (
     validate as validate_initialization,
 )
 from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate
+from titan.risk.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
 # Terminal statuses where the broker will take no further action.
 _DEAD_ORDER_STATUSES = frozenset({
@@ -140,6 +141,8 @@ class EngineStatus:
     portfolio_value: Money
     open_orders: int
     adapter_health: Optional[AdapterHealth] = None
+    circuit_breaker_stage: Optional[str] = None
+    circuit_breaker_consecutive_errors: int = 0
 
 
 class PaperTradingEngine:
@@ -169,6 +172,7 @@ class PaperTradingEngine:
 
         recon_config = config.reconciliation_config or ReconciliationConfig()
         self.reconciler = ReconciliationEngine(recon_config)
+        self.circuit_breaker = CircuitBreaker()
 
         self.order_states: dict[str, OrderStateMachine] = {}
         self.instruments: dict[str, Instrument] = {}
@@ -985,6 +989,19 @@ class PaperTradingEngine:
 
         intents_evaluated.inc()
 
+        # Circuit breaker: rate-limit and consecutive-error trip gate.
+        # Checked AFTER instrument validation (so we don't count malformed
+        # intents against the rate limit) and BEFORE the Rust RiskGate
+        # (so a tripped breaker prevents all downstream evaluation).
+        cb_ok, cb_reason = self.circuit_breaker.record_intent()
+        if not cb_ok:
+            self.rejections_by_instrument[instr_str] += 1
+            intents_rejected.inc()
+            if self.logger:
+                self.logger.warning("engine", f"{intent.side} rejected — circuit breaker: {cb_reason}",
+                                    correlation_id=correlation_id)
+            return OrderResult(accepted=False, rejection_reason=f"Circuit breaker: {cb_reason}")
+
         for instr, price in self._last_prices.items():
             try:
                 self.portfolio.update_market_price(instr, price)
@@ -1111,6 +1128,7 @@ class PaperTradingEngine:
             # Fail safe: park the order in Unknown (tracked, resolvable),
             # halt routing, and resolve against broker truth by idempotency key.
             orders_rejected.inc()
+            self.circuit_breaker.record_error(str(e))
             with self._lock:
                 try:
                     sm.transition(OrderState.Unknown)
@@ -1149,8 +1167,8 @@ class PaperTradingEngine:
                 rejection_reason=acknowledgement.rejection_reason,
             )
 
-
         broker_id = acknowledgement.broker_order_id
+        self.circuit_breaker.record_success()
         fills: list[BrokerFill] = []
         with self._lock:
             sm.transition(OrderState.Acknowledged)
@@ -1396,6 +1414,7 @@ class PaperTradingEngine:
             except Exception:
                 pass
 
+            cb_status = self.circuit_breaker.get_status()
             return EngineStatus(
                 trading_state=self.risk_gate.trading_state,
                 kill_switch=self.risk_gate.kill_switch,
@@ -1404,6 +1423,8 @@ class PaperTradingEngine:
                 portfolio_value=pv,
                 open_orders=open_count,
                 adapter_health=health,
+                circuit_breaker_stage=cb_status.stage.value,
+                circuit_breaker_consecutive_errors=cb_status.consecutive_errors,
             )
 
     def get_per_instrument_stats(self) -> dict[str, dict]:

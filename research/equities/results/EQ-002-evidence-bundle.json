@@ -147,7 +147,10 @@
       "monthly_turnover": 0.17130518234165068,
       "max_drawdown": 0.2677774694841508,
       "adverse_annualized_net_return": -0.13019009966970493
-    }
+    },
+    "failure_mode": "execution_constrained",
+    "failure_mode_basis": "5-day reversal signal generated cross-sectional spread but 414%/month portfolio turnover produced -2.64% annual friction drag (commissions + spread + slippage + borrow) that consumed the gross alpha. OOS net Sharpe -0.17.",
+    "failure_mode_confidence": "high"
   },
-  "generated_at": "2026-08-26T07:56:56.147746+00:00"
+  "generated_at": "2026-08-28T09:28:27.649752+00:00"
 }

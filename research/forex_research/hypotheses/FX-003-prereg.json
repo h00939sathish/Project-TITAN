@@ -1,0 +1,18 @@
+{
+  "id": "FX-003",
+  "symbol_universe": ["EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD", "NZD/USD", "USD/CAD"],
+  "mechanism_name": "Volatility-Gated Basket Carry",
+  "data": {
+    "start_date": "2018-01-01",
+    "end_date": "2026-08-01",
+    "required_resolution": "1d",
+    "features": ["swap_long_bps_day", "swap_short_bps_day", "close", "atr"]
+  },
+  "constraints": {
+    "max_drawdown": 0.15,
+    "required_net_sharpe": 0.8,
+    "max_correlated_usd_beta": 0.1,
+    "model": "FxCostModel v2"
+  },
+  "status": "APPROVED_FOR_SIMULATION"
+}

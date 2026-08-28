@@ -12,7 +12,6 @@
   ],
   "manifest_digest": "fe08445336597900a837677fdfe04ee962163a518db91ed7090b67f48b19d1c0",
   "is_median_dispersion_threshold": 0.007147245005429863,
-  "outcome_classification": "Case D \u2014 Regime Gating Ineffective / Redundant (Absorbing Negative Result)",
   "results_by_venue": {
     "alpaca": {
       "is": {
@@ -350,6 +349,17 @@
       "factor_max_dd": 0.3386,
       "active_days_pct": 0.7968,
       "spy_benchmark_return": 0.2348
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "Dispersion-gated long-side reversal proved redundant against unconditioned baseline. 33.86% max drawdown. Regime conditioning via rolling 21-day cross-sectional dispersion did not improve the underlying reversal signal's out-of-sample performance.",
+    "failure_mode_confidence": "high",
+    "gates": {
+      "oos_net_sharpe": false,
+      "max_drawdown": false,
+      "replication": false
     }
   }
 }

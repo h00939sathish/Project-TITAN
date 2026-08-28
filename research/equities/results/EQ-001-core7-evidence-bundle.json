@@ -109,6 +109,9 @@
   },
   "gates": {
     "verdict": "negative_result",
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "Same 12-1 month momentum mechanism on reduced Core-7 universe confirms IC inversion is structural, not an artifact of broad universe composition.",
+    "failure_mode_confidence": "high",
     "gates": {
       "oos_net_positive": false,
       "ic_frac": false,

@@ -211,6 +211,15 @@ def run_crypto_screen(
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out = RESULTS_DIR / f"{prereg.hypothesis_id}-evidence-bundle.json"
+    if out.exists():
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8"))
+            for field in ("failure_mode", "failure_mode_basis", "failure_mode_confidence", "disambiguation"):
+                if field in existing.get("gates", {}):
+                    gates[field] = existing["gates"][field]
+        except Exception:
+            pass
+
     out.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
     return bundle
 

@@ -30,30 +30,21 @@ def test_cost_model_deterministic_digest():
     assert m1.digest() == m2.digest()
 
 
-def test_cost_model_validation_rejects_non_usd_v1():
-    with pytest.raises(ValueError, match="account_currency"):
-        FxCostModel(
-            venue="IDEALPRO",
-            account_currency="EUR",
-            quote_currency="USD",
-            commission_bps=Decimal("0.2"),
-            minimum_commission=Decimal("2.00"),
-            half_spread_bps=Decimal("0.1"),
-            slippage_bps=Decimal("0.2"),
-            fill_mode="QUOTE_NEXT_EVENT",
-        )
+def test_cost_model_accepts_non_usd_v2():
+    model = FxCostModel(
+        venue="IDEALPRO",
+        account_currency="USD",
+        quote_currency="EUR",
+        commission_bps=Decimal("0.2"),
+        minimum_commission=Decimal("2.00"),
+        half_spread_bps=Decimal("0.1"),
+        slippage_bps=Decimal("0.2"),
+        fill_mode="QUOTE_NEXT_EVENT",
+    )
+    assert model.quote_currency == "EUR"
 
-    with pytest.raises(ValueError, match="quote_currency"):
-        FxCostModel(
-            venue="IDEALPRO",
-            account_currency="USD",
-            quote_currency="EUR",
-            commission_bps=Decimal("0.2"),
-            minimum_commission=Decimal("2.00"),
-            half_spread_bps=Decimal("0.1"),
-            slippage_bps=Decimal("0.2"),
-            fill_mode="QUOTE_NEXT_EVENT",
-        )
+
+
 
 
 def test_buy_quote_fill_uses_ask_and_charges_commission():
@@ -101,3 +92,10 @@ def test_missing_required_quote_rejects_quote_fill():
             cost_model=cost_model,
         )
 
+
+def test_wednesday_triple_swap():
+    model = FxCostModel.ibkr_spot_fx_tier_one()
+    # 0 = Mon, 1 = Tue, 2 = Wed, 3 = Thu, 4 = Fri, 5 = Sat, 6 = Sun
+    assert model.daily_swap_multiplier(0) == 1
+    assert model.daily_swap_multiplier(2) == 3
+    assert model.daily_swap_multiplier(5) == 0

@@ -147,3 +147,13 @@ research/crypto/results/
 .just-scrape/
 *.db
 
+# Transient debug / one-off fix scripts (orphaned research artifacts)
+fix_*.py
+rewrite_*.py
+update_*.py
+setup_engine_cert.py
+test_intents*.py
+test_rej.py
+run_fx.sh
+.research_tmp/
+

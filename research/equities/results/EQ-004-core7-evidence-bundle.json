@@ -11,7 +11,6 @@
     "MSFT"
   ],
   "manifest_digest": "fe08445336597900a837677fdfe04ee962163a518db91ed7090b67f48b19d1c0",
-  "outcome_classification": "Case D / Monotonicity Failure (Quantile Monotonicity Violated & Sub-Hurdle Sharpe \u2014 Absorbing Negative Result)",
   "results_by_venue": {
     "baseline_alpaca_us_equity": {
       "is": {
@@ -337,6 +336,17 @@
       "long_leg_ann": 0.2466,
       "short_leg_ann": -0.1566,
       "ew_benchmark_return": 0.2250086493118547
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "Quantile monotonicity violated: Top 2 Long +30.96%, Mid 3 +19.52%, Bot 2 Short +21.97%. The short leg returned more than the mid quintile, demonstrating no cross-sectional rank ordering power. OOS net Sharpe 0.18.",
+    "failure_mode_confidence": "high",
+    "gates": {
+      "oos_net_sharpe": false,
+      "monotonicity": false,
+      "replication": false
     }
   }
 }
