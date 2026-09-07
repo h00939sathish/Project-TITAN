@@ -167,6 +167,8 @@ class TestRiskGate:
         assert len(verdict.reason_detail) > 0
 
     def test_full_gate_to_portfolio_integration(self):
+        # NOTE: For full-stack engine-level gross exposure and submit_intent integration tests,
+        # see TestPaperTradingEngineSubmitIntent in tests/adapters/test_paper_trading_engine.py.
         gate = make_default_gate()
         portfolio = PortfolioEngine("USD", Money("100000", "USD"))
         portfolio.apply_fill("AAPL", "buy", 100, Money("150", "USD"))

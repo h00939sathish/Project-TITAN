@@ -23,6 +23,7 @@ from ._broker_types import (
 )
 from .alpaca_adapter import AlpacaAdapter, create_broker_paper_adapter
 from .engine import PaperConfig, PaperTradingEngine, EngineStatus
+from .fincept_adapter import FinceptBrokerAdapter
 from .simulated_adapter import SimFillQuality, SimOrderState, SimulatedAdapter
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "BrokerPositionSnapshot",
     "CancellationAcknowledgement",
     "EngineStatus",
+    "FinceptBrokerAdapter",
     "InstrumentSet",
     "OrderAmendment",
     "OrderResult",

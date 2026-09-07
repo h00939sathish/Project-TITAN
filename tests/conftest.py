@@ -7,12 +7,24 @@ from decimal import Decimal
 from enum import Enum
 
 # NautilusTrader IB adapter compatibility shim for ibapi 9.81
+try:
+    import ibapi.const
+except ImportError:
+    pass
+
 if "ibapi.const" not in sys.modules:
     const_mod = types.ModuleType("ibapi.const")
-    const_mod.UNSET_DECIMAL = Decimal(2**127 - 1)
-    const_mod.UNSET_INTEGER = 2**31 - 1
-    const_mod.UNSET_DOUBLE = 1.7976931348623157e308
     sys.modules["ibapi.const"] = const_mod
+
+const_mod = sys.modules["ibapi.const"]
+if not hasattr(const_mod, "UNSET_DECIMAL"):
+    const_mod.UNSET_DECIMAL = Decimal(2**127 - 1)
+if not hasattr(const_mod, "UNSET_INTEGER"):
+    const_mod.UNSET_INTEGER = 2**31 - 1
+if not hasattr(const_mod, "UNSET_DOUBLE"):
+    const_mod.UNSET_DOUBLE = 1.7976931348623157e308
+if not hasattr(const_mod, "NO_VALID_ID"):
+    const_mod.NO_VALID_ID = -1
 
 try:
     import ibapi.contract

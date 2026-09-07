@@ -1,0 +1,172 @@
+{
+  "hypothesis_id": "EQ-008",
+  "factor_name": "staggered_post_earnings_announcement_drift_42d",
+  "manifest_digest": "7f60a744750407366621f41125633a6cd4b757f32f9bb1ff9a808b3cebf21bff",
+  "is": {
+    "hypothesis_id": "EQ-008",
+    "partition": "IS",
+    "annualized_net_sharpe": 1.2608,
+    "annualized_net_return": 0.0569,
+    "max_drawdown": 0.0411,
+    "monthly_turnover": 0.1141,
+    "mean_rank_ic": -0.0205,
+    "ic_positive_fraction": 0.5075,
+    "costs": {
+      "total_borrow_cost": 0.006605,
+      "total_commissions": 0.000425,
+      "total_spread": 0.00085,
+      "total_slippage": 0.000425,
+      "total_regulatory_fees": 3.4e-05,
+      "total_friction": 0.008339
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.0599,
+      "short_leg_ann": -0.0004,
+      "gross_spread_ann": 0.0595,
+      "net_spread_ann": 0.0569
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.04,
+      "assumption_status": "research_assumption",
+      "provenance": "IBKR Pro US fixed equity schedule (uncalibrated research assumption)",
+      "source_document": "IBKR Pro Fixed Commission Rates",
+      "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "bb200fa2c22fa0fc36efa6dac3def7f41448fce64ea33b38ad3d10c9600eebdf"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "EQ-008",
+    "partition": "OOS",
+    "annualized_net_sharpe": 0.067,
+    "annualized_net_return": 0.0032,
+    "max_drawdown": 0.0688,
+    "monthly_turnover": 0.1733,
+    "mean_rank_ic": -0.0147,
+    "ic_positive_fraction": 0.4688,
+    "costs": {
+      "total_borrow_cost": 0.004891,
+      "total_commissions": 0.00043,
+      "total_spread": 0.00086,
+      "total_slippage": 0.00043,
+      "total_regulatory_fees": 3.4e-05,
+      "total_friction": 0.006645
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.0587,
+      "short_leg_ann": -0.0523,
+      "gross_spread_ann": 0.0064,
+      "net_spread_ann": 0.0032
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.04,
+      "assumption_status": "research_assumption",
+      "provenance": "IBKR Pro US fixed equity schedule (uncalibrated research assumption)",
+      "source_document": "IBKR Pro Fixed Commission Rates",
+      "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "bb200fa2c22fa0fc36efa6dac3def7f41448fce64ea33b38ad3d10c9600eebdf"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "EQ-008",
+    "partition": "OOS_ADVERSE",
+    "annualized_net_sharpe": -0.0624,
+    "annualized_net_return": -0.003,
+    "max_drawdown": 0.0726,
+    "monthly_turnover": 0.1733,
+    "mean_rank_ic": -0.0147,
+    "ic_positive_fraction": 0.4688,
+    "costs": {
+      "total_borrow_cost": 0.014673,
+      "total_commissions": 0.00086,
+      "total_spread": 0.00258,
+      "total_slippage": 0.00129,
+      "total_regulatory_fees": 6.9e-05,
+      "total_friction": 0.019471
+    },
+    "quantile_returns": {
+      "long_leg_ann": 0.0587,
+      "short_leg_ann": -0.0523,
+      "gross_spread_ann": 0.0064,
+      "net_spread_ann": -0.003
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.01,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 3.0,
+      "slippage_bps": 1.5,
+      "annual_short_borrow_bps": 150.0,
+      "name": "stressed_adverse_us_equity",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 2.0,
+      "regulatory_fees_bps": 0.08,
+      "assumption_status": "research_assumption",
+      "provenance": "Adverse stress test assumption",
+      "source_document": "TITAN Adversarial Simulation Suite",
+      "source_url": "",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
+    }
+  },
+  "monotonicity": {
+    "top_quantile_ann": 0.0678,
+    "mid_quantile_ann": 0.1739,
+    "bot_quantile_ann": 0.0942,
+    "quintile_returns": {
+      "Q1_ann": 0.0942,
+      "Q2_ann": 0.1711,
+      "Q3_ann": 0.1739,
+      "Q4_ann": 0.1401,
+      "Q5_ann": 0.0678
+    },
+    "is_monotonic": false
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_sharpe": false,
+      "rank_ic_fraction": false,
+      "rank_ic_magnitude": false,
+      "max_drawdown": true,
+      "turnover_capacity": false,
+      "target_turnover_enforced": false,
+      "quantile_monotonicity": false,
+      "adverse_net_positive": false,
+      "replication": false
+    },
+    "metrics": {
+      "annualized_net_sharpe": 0.06701297506052306,
+      "annualized_net_return": 0.0032121531292049936,
+      "mean_rank_ic": -0.014690400631887904,
+      "ic_positive_fraction": 0.46875,
+      "monthly_turnover": 0.17332053742802306,
+      "max_drawdown": 0.06882440645394226,
+      "adverse_annualized_net_return": -0.0029916641452671644
+    },
+    "failure_mode": "overfit_regime_fragile",
+    "failure_mode_basis": "In-sample performance (Sharpe 1.26) failed to generalize to out-of-sample partition (Sharpe 0.07 < 1.00).",
+    "failure_mode_confidence": "high",
+    "disambiguation": "Edge in 2020-2022 broke down under 2023-2024 out-of-sample regime."
+  },
+  "generated_at": "2026-09-01T13:21:04.112168+00:00"
+}

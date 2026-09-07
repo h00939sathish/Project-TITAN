@@ -1,6 +1,6 @@
 # ADR-023: Promotion gates fail closed — F1/F3/F7 enforcement
 
-- **Status:** Proposed (awaiting Architecture Council + Risk Owner review)
+- **Status:** Accepted (2026-09-01) — Architecture Council and Risk Owner
 - **Date:** 2026-08-07
 - **Owners:** Architecture Council, Risk Owner
 - **Supersedes:** N/A (complements ADR-022)

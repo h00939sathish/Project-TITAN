@@ -116,3 +116,39 @@ def factor_volatility_adjusted_momentum(
 
     vol_adj_mom = raw_mom / rolling_vol
     return cross_sectional_zscore(vol_adj_mom)
+
+
+def factor_quality_lowvol(
+    prices: pd.DataFrame,
+    vol_window: int = 63,
+    quality_lookback: int = 252,
+    skip: int = 21,
+    weight_lowvol: float = 0.5,
+    weight_quality: float = 0.5,
+) -> pd.DataFrame:
+    """Composite Quality & Low-Volatility Factor.
+
+    Combines inverse realized volatility (Low-Vol component) with
+    risk-adjusted return consistency / rolling Sharpe proxy (Quality component).
+    """
+    max_lookback = max(quality_lookback, vol_window)
+    if len(prices) < max_lookback + 1:
+        return pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
+
+    # 1. Low-volatility score (inverse rolling standard deviation)
+    daily_returns = prices.pct_change().fillna(0.0)
+    rolling_vol = daily_returns.rolling(vol_window).std().replace(0.0, np.nan)
+    inv_vol = 1.0 / rolling_vol
+    z_lowvol = cross_sectional_zscore(inv_vol)
+
+    # 2. Quality / Risk-adjusted return consistency score
+    p_lag = prices.shift(skip)
+    p_base = prices.shift(quality_lookback)
+    raw_ret = (p_lag - p_base) / p_base
+    quality_score = raw_ret / rolling_vol
+    z_quality = cross_sectional_zscore(quality_score)
+
+    # 3. Composite score
+    composite = (weight_lowvol * z_lowvol) + (weight_quality * z_quality)
+    return cross_sectional_zscore(composite)
+

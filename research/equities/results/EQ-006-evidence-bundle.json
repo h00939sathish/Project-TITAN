@@ -1,29 +1,29 @@
 {
-  "hypothesis_id": "EQ-002",
-  "factor_name": "reversal_12_1m",
+  "hypothesis_id": "EQ-006",
+  "factor_name": "turnover_constrained_quality_lowvol",
   "manifest_digest": "a99fbd0ab826b388b2e83bf0afc70617a11606c3fe576ed1127d240a6f154afe",
   "is": {
-    "hypothesis_id": "EQ-002",
+    "hypothesis_id": "EQ-006",
     "partition": "IS",
-    "annualized_net_sharpe": -2.1488,
-    "annualized_net_return": -0.2576,
-    "max_drawdown": 0.5702,
-    "monthly_turnover": 0.0671,
-    "mean_rank_ic": -0.1582,
-    "ic_positive_fraction": 0.24,
+    "annualized_net_sharpe": 0.6711,
+    "annualized_net_return": 0.0441,
+    "max_drawdown": 0.0721,
+    "monthly_turnover": 0.1522,
+    "mean_rank_ic": 0.0656,
+    "ic_positive_fraction": 0.5294,
     "costs": {
-      "total_borrow_cost": 0.016161,
-      "total_commissions": 0.000125,
-      "total_spread": 0.00025,
-      "total_slippage": 0.000125,
+      "total_borrow_cost": 0.007123,
+      "total_commissions": 0.000283,
+      "total_spread": 0.000567,
+      "total_slippage": 0.000283,
       "total_regulatory_fees": 0.0,
-      "total_friction": 0.016661
+      "total_friction": 0.008256
     },
     "quantile_returns": {
-      "long_leg_ann": 0.0889,
-      "short_leg_ann": -0.3412,
-      "gross_spread_ann": -0.2523,
-      "net_spread_ann": -0.2576
+      "long_leg_ann": 0.1015,
+      "short_leg_ann": -0.0547,
+      "gross_spread_ann": 0.0468,
+      "net_spread_ann": 0.0441
     },
     "cost_schedule": {
       "commission_per_share_usd": 0.005,
@@ -45,27 +45,27 @@
     }
   },
   "oos": {
-    "hypothesis_id": "EQ-002",
+    "hypothesis_id": "EQ-006",
     "partition": "OOS",
-    "annualized_net_sharpe": -0.8402,
-    "annualized_net_return": -0.115,
-    "max_drawdown": 0.2678,
-    "monthly_turnover": 0.1713,
-    "mean_rank_ic": 0.0169,
+    "annualized_net_sharpe": -0.1279,
+    "annualized_net_return": -0.0084,
+    "max_drawdown": 0.0764,
+    "monthly_turnover": 0.1612,
+    "mean_rank_ic": 0.0359,
     "ic_positive_fraction": 0.5417,
     "costs": {
-      "total_borrow_cost": 0.014955,
-      "total_commissions": 0.000213,
-      "total_spread": 0.000425,
-      "total_slippage": 0.000213,
+      "total_borrow_cost": 0.005159,
+      "total_commissions": 0.0002,
+      "total_spread": 0.0004,
+      "total_slippage": 0.0002,
       "total_regulatory_fees": 0.0,
-      "total_friction": 0.015805
+      "total_friction": 0.005959
     },
     "quantile_returns": {
-      "long_leg_ann": 0.277,
-      "short_leg_ann": -0.3843,
-      "gross_spread_ann": -0.1073,
-      "net_spread_ann": -0.115
+      "long_leg_ann": 0.149,
+      "short_leg_ann": -0.1545,
+      "gross_spread_ann": -0.0055,
+      "net_spread_ann": -0.0084
     },
     "cost_schedule": {
       "commission_per_share_usd": 0.005,
@@ -86,28 +86,34 @@
       "digest": "25e463e8bfab684acd04c39427b1a6dc2087747589a7c61a1a6060e8144a7d5f"
     }
   },
+  "oos_unconstrained_comparator": {
+    "monthly_turnover": 0.07389635316698656,
+    "annualized_net_sharpe": 0.5829843477457218,
+    "annualized_net_return": 0.05423384480615997,
+    "turnover_reduction_pct": -1.1818
+  },
   "adverse_oos": {
-    "hypothesis_id": "EQ-002",
+    "hypothesis_id": "EQ-006",
     "partition": "OOS_ADVERSE",
-    "annualized_net_sharpe": -0.9512,
-    "annualized_net_return": -0.1302,
-    "max_drawdown": 0.2807,
-    "monthly_turnover": 0.1713,
-    "mean_rank_ic": 0.0169,
+    "annualized_net_sharpe": -0.2149,
+    "annualized_net_return": -0.014,
+    "max_drawdown": 0.0792,
+    "monthly_turnover": 0.1612,
+    "mean_rank_ic": 0.0359,
     "ic_positive_fraction": 0.5417,
     "costs": {
-      "total_borrow_cost": 0.044866,
-      "total_commissions": 0.000425,
-      "total_spread": 0.001275,
-      "total_slippage": 0.000638,
-      "total_regulatory_fees": 3.4e-05,
-      "total_friction": 0.047238
+      "total_borrow_cost": 0.015476,
+      "total_commissions": 0.0004,
+      "total_spread": 0.0012,
+      "total_slippage": 0.0006,
+      "total_regulatory_fees": 3.2e-05,
+      "total_friction": 0.017708
     },
     "quantile_returns": {
-      "long_leg_ann": 0.277,
-      "short_leg_ann": -0.3843,
-      "gross_spread_ann": -0.1073,
-      "net_spread_ann": -0.1302
+      "long_leg_ann": 0.149,
+      "short_leg_ann": -0.1545,
+      "gross_spread_ann": -0.0055,
+      "net_spread_ann": -0.014
     },
     "cost_schedule": {
       "commission_per_share_usd": 0.01,
@@ -128,29 +134,38 @@
       "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
     }
   },
+  "monotonicity": {
+    "top_quantile_ann": 0.2591,
+    "mid_quantile_ann": 0.1841,
+    "bot_quantile_ann": 0.2452,
+    "is_monotonic": false
+  },
   "gates": {
     "verdict": "negative_result",
     "gates": {
       "oos_net_sharpe": false,
       "rank_ic_fraction": false,
       "rank_ic_magnitude": false,
-      "max_drawdown": false,
+      "max_drawdown": true,
       "turnover_capacity": true,
+      "target_turnover_enforced": false,
+      "quantile_monotonicity": false,
       "adverse_net_positive": false,
       "replication": false
     },
     "metrics": {
-      "annualized_net_sharpe": -0.8401654239273716,
-      "annualized_net_return": -0.11498680216490643,
-      "mean_rank_ic": 0.016941391941391947,
+      "annualized_net_sharpe": -0.12790308192660543,
+      "annualized_net_return": -0.00835894421008276,
+      "mean_rank_ic": 0.03594322344322345,
       "ic_positive_fraction": 0.5416666666666666,
-      "monthly_turnover": 0.17130518234165068,
-      "max_drawdown": 0.2677774694841508,
-      "adverse_annualized_net_return": -0.13019009966970493
+      "monthly_turnover": 0.16122840690978885,
+      "max_drawdown": 0.07640743252509381,
+      "adverse_annualized_net_return": -0.014041984517184466
     },
     "failure_mode": "mechanism_failure",
-    "failure_mode_basis": "12-1 Month reversal on broad ETF universe failed 6 of 7 decision gates: OOS net Sharpe was -0.840, mean rank IC was weak (0.0169), and OOS net return was -11.5%. The underlying cross-sectional reversal spread was negative in OOS, demonstrating lack of predictive alpha.",
-    "failure_mode_confidence": "high"
+    "failure_mode_basis": "Turnover-constrained Quality & Low-Vol factor failed statistical hurdles: Net Sharpe -0.13 < 1.00; IC positive fraction 54.2% < 70.0%; Mean Rank IC +0.036 < +0.050; Quantile monotonicity violated.",
+    "failure_mode_confidence": "high",
+    "disambiguation": "The underlying factor theory lacks sufficient cross-sectional predictive power."
   },
-  "generated_at": "2026-09-01T13:21:06.043284+00:00"
+  "generated_at": "2026-09-01T13:21:09.670715+00:00"
 }

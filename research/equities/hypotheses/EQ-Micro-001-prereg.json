@@ -1,0 +1,44 @@
+{
+  "hypothesis_id": "EQ-Micro-001",
+  "factor_name": "etf_constituent_intraday_lead_lag",
+  "etf_anchors": [
+    "SPY",
+    "QQQ",
+    "XLK",
+    "XLF"
+  ],
+  "universe_label": "us_sp50_liquid_intraday_v1",
+  "economic_rationale": "Index and sector ETFs price macro and factor shocks with near-zero latency, while single-stock constituents exhibit information diffusion lag. When an ETF experiences an intraday return impulse (|r| > 1.5 sigma), lagging constituents predictably drift to catch up over 15 to 60 minutes. Operates strictly on pure intraday market data without requiring fundamental consensus analyst estimate feeds. Positions are closed by 15:55 ET (flat-at-close), eliminating overnight gap risk.",
+  "parameters": {
+    "impulse_lookback_bars": 3,
+    "impulse_threshold_std": 1.5,
+    "holding_horizon_bars": 6,
+    "min_holding_bars_deadband": 3,
+    "bar_interval_minutes": 5,
+    "top_k": 10,
+    "bottom_k": 10,
+    "gross_exposure": 1.0,
+    "dollar_neutral": true,
+    "flat_at_close": true,
+    "close_exit_minute": 1555
+  },
+  "cost_label": "baseline_ibkr_pro_fixed",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "pass_criteria": {
+    "min_oos_net_sharpe": 1.2,
+    "min_ic_positive_frac": 0.65,
+    "min_mean_rank_ic": 0.03,
+    "max_drawdown": 0.06,
+    "max_friction_drag_ratio": 0.45,
+    "monotonicity_required": true,
+    "min_adverse_net_return": 0.0,
+    "replication_required": true
+  }
+}
