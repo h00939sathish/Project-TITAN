@@ -27,7 +27,9 @@ evidence — not a copy of any evaluated repository.
   (crypto market structure ADR-029, equities cross-sectional factors ADR-030)
   added 13 more pre-registered hypotheses (CRYPTO-001..004, EQ-001..008,
   EQ-Micro-001, FX-001/002) — likewise 0 survivors; evidence in
-  `research/crypto/results/` and `research/equities/results/`.
+  `research/crypto/results/` and `research/equities/results/`. CRYPTO-005
+  (passive spread capture) was rejected earlier, at its IS-month feasibility
+  probe, and never reached an OOS read (a probe-gated, not absorbing, outcome).
 
 ## Current status
 

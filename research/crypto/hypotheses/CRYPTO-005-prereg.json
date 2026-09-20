@@ -1,0 +1,55 @@
+{
+  "hypothesis_id": "CRYPTO-005",
+  "governing_adrs": ["ADR-029", "ADR-031"],
+  "universe": ["BTCUSDT", "ETHUSDT"],
+  "signal": "passive_two_sided_spread_capture_markout",
+  "mechanism_class": "liquidity_provision_compensation",
+  "distinctness": "Not CRYPTO-003 (directional taker OFI). Not CRYPTO-004 (funding/basis carry). Revenue object is half-spread net of markout and maker fee.",
+  "parameters": {
+    "quote_policy": "post_both_sides_one_tick_inside_top_of_book",
+    "fill_rule": "maker_at_aggressor_trade_price_when_tape_crosses_posted_side",
+    "markout_horizons_s": [1, 5, 60],
+    "inventory_penalty_bps_per_min": "0.05",
+    "min_quote_notional_usd": "1000",
+    "participation_cap": "0.02"
+  },
+  "cost_label": "binance_usdt_vip0_2026-08-14",
+  "maker_fee_rate": "0.0002",
+  "proxy_limitation": "Trade-tape top-of-book proxy (no historical um depth on Vision). Overestimates maker PnL. Fail-closed: proxy-negative rejects; proxy-positive certifies nothing without shadow phase.",
+  "is_partition": {
+    "from": "2024-01-01T00:00:00+00:00",
+    "to": "2025-08-31T23:59:59+00:00"
+  },
+  "oos_partition": {
+    "from": "2025-09-01T00:00:00+00:00",
+    "to": "2026-02-28T23:59:59+00:00"
+  },
+  "pass_criteria": {
+    "net_edge_bootstrap_lb95_positive_h60": true,
+    "min_fills_per_month_per_symbol": 1000,
+    "max_pnl_day_concentration": 0.30,
+    "replication_required": true,
+    "oos_read_count_max": 1
+  },
+  "data_contract": {
+    "source": "https://data.binance.vision/data/futures/um/daily/aggTrades",
+    "coverage_required_months_contiguous": 14,
+    "is_range": "2024-01..2025-08",
+    "oos_range": "2025-09..2026-02",
+    "manifest": "sha256 per zip, registered before OOS read"
+  },
+  "probe_register": {
+    "script": "research/crypto/mm_feasibility_probe.py",
+    "can_qualify": false,
+    "allowed_data": "in-sample months only",
+    "outcome": "probe_gated_rejection",
+    "outcome_date": "2026-09-20",
+    "evidence": "IS-window probe (BTCUSDT, 2024-06-01..03 and 2024-06-03..09): net edge/fill ~= -2.04 bps, bootstrap LB95 < 0 at all horizons, win_frac ~1%. Maker fee (~2.1 bps) is ~40x captured half-spread (~0.05 bps); markout slightly favourable. Section 6 of CRYPTO-005-maker-markout.md.",
+    "classification": "execution_constrained_rejection",
+    "reached_oos": false,
+    "absorbing_negative_result": false,
+    "downstream_actions": "14-month IS+OOS download and shadow phase NOT run (fail-closed proxy rule). Follow-up requires a distinct pre-registered hypothesis (different fee tier / instrument)."
+  },
+  "sealed_at": "2026-09-20",
+  "sealed_by": "Research Platform (pending Architecture Council countersignature)"
+}
