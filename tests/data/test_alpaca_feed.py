@@ -30,6 +30,28 @@ class TestAlpacaDataFeedBase:
             with pytest.raises(DataSourceError, match="not configured"):
                 AlpacaDataFeed()
 
+    def test_fetch_intraday_bars_with_mock(self):
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"APCA_API_KEY_ID": "key", "APCA_API_SECRET_KEY": "secret"}):
+            feed = AlpacaDataFeed()
+            mock_bar = MagicMock()
+            mock_bar.timestamp = "2023-01-03T14:30:00Z"
+            mock_bar.open = 100.0
+            mock_bar.high = 101.0
+            mock_bar.low = 99.0
+            mock_bar.close = 100.5
+            mock_bar.volume = 50000.0
+
+            mock_bar_set = MagicMock()
+            mock_bar_set.data = {"SPY": [mock_bar]}
+            feed._client.get_stock_bars = MagicMock(return_value=mock_bar_set)
+
+            bars = feed.fetch_intraday_bars("SPY", timeframe_minutes=5, limit=10)
+            assert len(bars) == 1
+            assert bars[0].symbol == "SPY"
+            assert bars[0].close == 100.5
+            assert bars[0].volume == 50000.0
+
 
 @pytest.mark.skip(reason="requires Alpaca paper credentials with data API access")
 class TestAlpacaDataFeedIntegration:

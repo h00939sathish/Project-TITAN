@@ -53,9 +53,34 @@ class CryptoCostModel:
             label="binance_usdt_vip0_2026-08-14",
         )
 
+    @staticmethod
+    def binance_usdt_vip1() -> "CryptoCostModel":
+        """Frozen 2026-08-14 snapshot for Binance VIP1. Not a live fee lookup."""
+        return CryptoCostModel(
+            venue_id="binance-vision",
+            spot_maker=Decimal("0.0002"),
+            spot_taker=Decimal("0.0005"),
+            perp_maker=Decimal("0.0001"),
+            perp_taker=Decimal("0.0004"),
+            assumed_spread_bps=Decimal("1.0"),
+            slippage_bps=Decimal("0.5"),
+            latency_ms=250,
+            min_notional=Decimal("5"),
+            qty_precision=6,
+            price_precision=2,
+            adverse_spot_taker=Decimal("0.0008"),
+            adverse_perp_taker=Decimal("0.0006"),
+            adverse_spread_bps=Decimal("3.0"),
+            label="binance_usdt_vip1_2026-08-14",
+        )
+
     def round_qty(self, qty: Decimal) -> Decimal:
         q = qty.quantize(Decimal("1").scaleb(-self.qty_precision))
         return q
+
+    def maker_fee(self, notional: Decimal, *, perp: bool) -> Decimal:
+        rate = self.perp_maker if perp else self.spot_maker
+        return (abs(notional) * rate).copy_abs()
 
     def taker_fee(self, notional: Decimal, *, perp: bool, adverse: bool = False) -> Decimal:
         rate = (

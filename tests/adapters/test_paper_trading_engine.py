@@ -208,6 +208,138 @@ class TestPaperTradingEngineSubmitIntent:
         assert exposure.amount == "0"
         assert exposure.currency == "USD"
 
+    def test_current_gross_exposure_short_position(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", side="SELL", quantity="100", price="150"))
+        exposure = self.engine._current_gross_exposure()
+        assert exposure.amount == "15000"  # gross, not net
+        assert exposure.currency == "USD"
+
+    def test_current_gross_exposure_long_and_short_sum(self):
+        self.engine.submit_intent(_make_intent(instrument="AAPL", quantity="100", price="150"))  # long $15k
+        self.engine.submit_intent(_make_intent(instrument="MSFT", side="SELL", quantity="50", price="400"))  # short $20k
+        exposure = self.engine._current_gross_exposure()
+        assert exposure.amount == "35000"  # gross sum, NOT net ($15k - $20k = -$5k would be wrong)
+        assert exposure.currency == "USD"
+
+    def test_submit_intent_rejected_at_exact_gross_exposure_limit(self):
+        risk_config = RiskConfig(
+            ["AAPL"],
+            Money("20000000", "USD"),
+            200000,
+            200000,
+            Money("10000000", "USD"),  # $10M limit
+            0.50,
+            Money("500000", "USD"),
+            5000,
+            100,
+        )
+        config = PaperConfig(
+            risk_config=risk_config,
+            reconciliation_config=ReconciliationConfig(),
+            currency="USD",
+            starting_capital="20000000",
+            account_id="test-10m",
+            state_path="",
+        )
+        engine = PaperTradingEngine(config, self.adapter, feed_health=_pressure_feed())
+        initialize_fresh(engine)
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        # Establish position exceeding $10M limit: 100,001 shares @ $100 = $10,000,100
+        engine.portfolio.apply_fill("AAPL", "buy", 100001, Money("100", "USD"))
+        assert engine._current_gross_exposure().amount == "10000100"
+
+        # Subsequent intent must be rejected at/above the $10M boundary
+        intent = _make_intent(instrument="AAPL", quantity="10", price="100")
+        result = engine.submit_intent(intent)
+        assert result.accepted is False
+        assert "GrossExposureExceeded" in result.rejection_reason or "gross exposure" in result.rejection_reason.lower()
+
+    def test_submit_intent_accepted_just_under_gross_exposure_limit(self):
+        risk_config = RiskConfig(
+            ["AAPL"],
+            Money("20000000", "USD"),
+            200000,
+            200000,
+            Money("10000000", "USD"),  # $10M limit
+            0.50,
+            Money("500000", "USD"),
+            5000,
+            100,
+        )
+        config = PaperConfig(
+            risk_config=risk_config,
+            reconciliation_config=ReconciliationConfig(),
+            currency="USD",
+            starting_capital="20000000",
+            account_id="test-10m-under",
+            state_path="",
+        )
+        engine = PaperTradingEngine(config, self.adapter, feed_health=_pressure_feed())
+        initialize_fresh(engine)
+        engine.start()
+        engine.register_instrument(
+            Instrument(InstrumentId("AAPL", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
+        # Establish position just under $10M: 99,999 shares @ $100 = $9,999,900
+        engine.portfolio.apply_fill("AAPL", "buy", 99999, Money("100", "USD"))
+        assert engine._current_gross_exposure().amount == "9999900"
+
+        # Subsequent intent is evaluated against current exposure $9,999,900 <= $10,000,000 -> accepted
+        intent = _make_intent(instrument="AAPL", quantity="10", price="100")
+        result = engine.submit_intent(intent)
+        assert result.accepted is True
+
+    def test_full_engine_gross_exposure_end_to_end(self):
+        # End-to-end integration test through PaperTradingEngine submit pipeline,
+        # proving the live engine path rejects intents when gross exposure exceeds $10M.
+        # NOTE: This exercises the live execution pipeline down through _submit_intent_core,
+        # verifying that real-time portfolio gross exposure correctly feeds the Rust RiskGate
+        # and trips GrossExposureExceeded on subsequent orders. (ADR-028 cryptographic
+        # certificate enforcement is validated separately in tests/test_execution_integrity.py).
+        risk_config = RiskConfig(
+            ["AAPL", "MSFT"],
+            Money("20000000", "USD"),
+            200000,
+            200000,
+            Money("10000000", "USD"),  # $10M limit
+            0.50,
+            Money("500000", "USD"),
+            5000,
+            100,
+        )
+        config = PaperConfig(
+            risk_config=risk_config,
+            reconciliation_config=ReconciliationConfig(),
+            currency="USD",
+            starting_capital="20000000",
+            account_id="test-e2e-10m",
+            state_path="",
+        )
+        engine = PaperTradingEngine(config, self.adapter, feed_health=_pressure_feed())
+        initialize_fresh(engine)
+        engine.start()
+        for sym in ("AAPL", "MSFT"):
+            engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            )
+
+        # 1. Fill bringing exposure to $11,000,000 (> $10M)
+        res1 = engine.submit_intent(_make_intent(instrument="AAPL", quantity="110000", price="100"))
+        assert res1.accepted is True
+        assert engine._current_gross_exposure().amount == "11000000"
+
+        # 2. Next intent submitted via submit_intent() must be rejected
+        res2 = engine.submit_intent(_make_intent(instrument="MSFT", side="SELL", quantity="2000", price="250"))
+        assert res2.accepted is False
+        assert "GrossExposureExceeded" in res2.rejection_reason or "gross exposure" in res2.rejection_reason.lower()
+
+        # 3. Portfolio gross exposure remains unchanged and MSFT is not created
+        assert engine._current_gross_exposure().amount == "11000000"
+        assert engine.portfolio.get_position("MSFT") is None
+
 
 def _pressure_test_auth(corr):
     from datetime import timedelta

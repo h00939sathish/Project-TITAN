@@ -152,5 +152,5 @@
     "failure_mode_basis": "Volatility-adjusted momentum OOS net Sharpe 0.47 (failed >= 1.0 hurdle). Vol adjustment did not rescue the inverted momentum signal from EQ-001; the underlying cross-sectional momentum mechanism lacked predictive power in the tested regime.",
     "failure_mode_confidence": "high"
   },
-  "generated_at": "2026-08-28T09:28:28.363834+00:00"
+  "generated_at": "2026-09-20T08:15:53.086273+00:00"
 }

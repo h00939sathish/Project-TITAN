@@ -1,0 +1,152 @@
+{
+  "hypothesis_id": "EQ-Micro-001",
+  "manifest_digest": "f9d3a2623766c9f7d389f1c274c0823ce5a2d72f473536fd9f8cb44a7743007c",
+  "is": {
+    "hypothesis_id": "EQ-Micro-001",
+    "partition": "IS",
+    "annualized_net_sharpe": -24.2007,
+    "annualized_net_return": -2.7979,
+    "max_drawdown": 0.9998,
+    "monthly_turnover": 539.8903,
+    "mean_rank_ic": 0.0473,
+    "ic_positive_fraction": 0.5747,
+    "costs": {
+      "commission_usd": 801993.0,
+      "spread_usd": 201044.863173,
+      "slippage_usd": 100522.431586,
+      "borrow_usd": 0.0,
+      "total_friction_usd": 1103560.294759,
+      "friction_drag_ratio": 4.68957
+    },
+    "quantile_returns": {
+      "long": 1.0501,
+      "short": 1.3031,
+      "monotonic": 1
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.04,
+      "assumption_status": "research_assumption",
+      "provenance": "IBKR Pro US fixed equity schedule (uncalibrated research assumption)",
+      "source_document": "IBKR Pro Fixed Commission Rates",
+      "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "bb200fa2c22fa0fc36efa6dac3def7f41448fce64ea33b38ad3d10c9600eebdf"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "EQ-Micro-001",
+    "partition": "OOS",
+    "annualized_net_sharpe": -32.4729,
+    "annualized_net_return": -3.3334,
+    "max_drawdown": 0.999,
+    "monthly_turnover": 568.5846,
+    "mean_rank_ic": 0.0453,
+    "ic_positive_fraction": 0.572,
+    "costs": {
+      "commission_usd": 582124.0,
+      "spread_usd": 141063.124518,
+      "slippage_usd": 70531.562259,
+      "borrow_usd": 0.0,
+      "total_friction_usd": 793718.686776,
+      "friction_drag_ratio": 7.591931
+    },
+    "quantile_returns": {
+      "long": 0.5554,
+      "short": 0.49,
+      "monotonic": 1
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.005,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 1.0,
+      "slippage_bps": 0.5,
+      "annual_short_borrow_bps": 50.0,
+      "name": "baseline_ibkr_pro_fixed",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 1.0,
+      "regulatory_fees_bps": 0.04,
+      "assumption_status": "research_assumption",
+      "provenance": "IBKR Pro US fixed equity schedule (uncalibrated research assumption)",
+      "source_document": "IBKR Pro Fixed Commission Rates",
+      "source_url": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "bb200fa2c22fa0fc36efa6dac3def7f41448fce64ea33b38ad3d10c9600eebdf"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "EQ-Micro-001",
+    "partition": "OOS_ADVERSE",
+    "annualized_net_sharpe": -42.5831,
+    "annualized_net_return": -8.196,
+    "max_drawdown": 1.0,
+    "monthly_turnover": 568.5846,
+    "mean_rank_ic": 0.0453,
+    "ic_positive_fraction": 0.572,
+    "costs": {
+      "commission_usd": 1164248.0,
+      "spread_usd": 423189.373553,
+      "slippage_usd": 211594.686776,
+      "borrow_usd": 0.0,
+      "total_friction_usd": 1799032.060329,
+      "friction_drag_ratio": 17.207769
+    },
+    "quantile_returns": {
+      "long": 0.5554,
+      "short": 0.49,
+      "monotonic": 1
+    },
+    "cost_schedule": {
+      "commission_per_share_usd": 0.01,
+      "assumed_avg_share_price": 100.0,
+      "spread_bps": 3.0,
+      "slippage_bps": 1.5,
+      "annual_short_borrow_bps": 150.0,
+      "name": "stressed_adverse_us_equity",
+      "layer": "layer1_discovery",
+      "min_commission_usd": 2.0,
+      "regulatory_fees_bps": 0.08,
+      "assumption_status": "research_assumption",
+      "provenance": "Adverse stress test assumption",
+      "source_document": "TITAN Adversarial Simulation Suite",
+      "source_url": "",
+      "source_hash": "",
+      "effective_date": "2026-08-19",
+      "digest": "23adeb0b88abcf197060f6007f7611b4995e5ec9ed641998d98f9373d5f50e0b"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "gate_1_oos_net_sharpe": false,
+      "gate_2_ic_positive_fraction": false,
+      "gate_3_mean_rank_ic": true,
+      "gate_4_quantile_monotonicity": true,
+      "gate_5_max_drawdown_limit": false,
+      "gate_6_friction_drag_ratio": false,
+      "gate_7_stressed_adverse_net_return": false
+    },
+    "metrics": {
+      "net_sharpe": -32.47286346158299,
+      "annualized_net_return_pct": -333.34183933973895,
+      "max_drawdown_pct": 99.90305680757113,
+      "friction_drag_ratio": 7.59193149966387,
+      "mean_rank_ic": 0.04531844830482508,
+      "ic_positive_fraction": 0.5719608001943792,
+      "adverse_net_return_pct": -819.5970603287444
+    },
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "ETF constituent lead-lag signal exhibited structural mechanism breakdown: Mean Rank IC (0.045) and IC positive fraction (57.2%) failed predictive thresholds, or quantile monotonicity was violated. Failed gates: ['gate_1_oos_net_sharpe', 'gate_2_ic_positive_fraction', 'gate_5_max_drawdown_limit', 'gate_6_friction_drag_ratio', 'gate_7_stressed_adverse_net_return'].",
+    "failure_mode_confidence": "high"
+  },
+  "generated_at": "2026-09-01T13:12:06.762164+00:00"
+}

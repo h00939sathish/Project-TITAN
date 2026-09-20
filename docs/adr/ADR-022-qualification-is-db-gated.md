@@ -1,6 +1,6 @@
 # ADR-022: Qualification is DB-gated — remove baked-in `qualified_variants`
 
-- **Status:** Proposed (awaiting Architecture Council + Risk Owner review)
+- **Status:** Accepted (2026-09-01) — Architecture Council and Risk Owner
 - **Date:** 2026-08-07
 - **Owners:** Architecture Council, Risk Owner
 - **Supersedes:** N/A (adds to ADR-016 governance loops)

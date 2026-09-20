@@ -7,7 +7,7 @@ from typing import Optional
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from titan.data.approved import DataSourceError
 from titan.data.normalize import ALLOWED_SYMBOLS
@@ -36,7 +36,7 @@ class AlpacaBar:
 
 
 class AlpacaDataFeed:
-    """Fetch daily bars from Alpaca's data API.
+    """Fetch daily and intraday bars from Alpaca's data API.
 
     Reads credentials from the same environment variables as AlpacaAdapter
     (APCA_API_KEY_ID, APCA_API_SECRET_KEY). Paper or live data endpoint
@@ -72,6 +72,50 @@ class AlpacaDataFeed:
         req = StockBarsRequest(
             symbol_or_symbols=symbol,
             timeframe=TimeFrame.Day,
+            start=start,
+            end=end,
+            limit=limit,
+            adjustment="all",
+        )
+        bar_set = self._client.get_stock_bars(req)
+        raw = bar_set.data.get(symbol, [])
+        bars: list[AlpacaBar] = []
+        for b in raw:
+            ts = b.timestamp
+            if isinstance(ts, datetime):
+                ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                ts_str = str(ts)
+            bars.append(AlpacaBar(
+                symbol=symbol,
+                timestamp=ts_str,
+                open=float(b.open),
+                high=float(b.high),
+                low=float(b.low),
+                close=float(b.close),
+                volume=float(b.volume),
+            ))
+        bars.sort(key=lambda x: x.timestamp)
+        return bars
+
+    def fetch_intraday_bars(
+        self,
+        symbol: str,
+        start: Optional[datetime | date] = None,
+        end: Optional[datetime | date] = None,
+        timeframe_minutes: int = 5,
+        limit: int = 10000,
+    ) -> list[AlpacaBar]:
+        """Fetch intraday N-minute bars for *symbol* from Alpaca."""
+        if symbol not in ALLOWED_SYMBOLS:
+            raise DataSourceError(
+                f"Symbol '{symbol}' is not in ALLOWED_SYMBOLS: {sorted(ALLOWED_SYMBOLS)}"
+            )
+
+        tf = TimeFrame.Minute if timeframe_minutes == 1 else TimeFrame(timeframe_minutes, TimeFrameUnit.Minute)
+        req = StockBarsRequest(
+            symbol_or_symbols=symbol,
+            timeframe=tf,
             start=start,
             end=end,
             limit=limit,

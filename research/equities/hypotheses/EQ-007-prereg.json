@@ -1,0 +1,44 @@
+{
+  "hypothesis_id": "EQ-007",
+  "factor_name": "post_earnings_announcement_drift_42d",
+  "universe": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLF",
+    "XLK",
+    "AAPL",
+    "MSFT"
+  ],
+  "universe_label": "us_core_7_equities_v1",
+  "economic_rationale": "Institutional under-reaction and slow re-pricing post earnings announcements. Stocks exhibiting positive earnings surprise / event gap drift are held long for 42 trading days (approx 2 months); negative surprise stocks are shorted. Low-turnover design ensures monthly turnover <= 10.0%-15.0%/month.",
+  "parameters": {
+    "event_frequency_days": 63,
+    "holding_days": 42,
+    "vol_window_days": 63,
+    "top_k": 2,
+    "bottom_k": 2,
+    "gross_exposure": 1.0,
+    "dollar_neutral": true,
+    "execution_lag_days": 1
+  },
+  "cost_label": "baseline_ibkr_pro_fixed",
+  "is_partition": {
+    "from": "2020-01-02",
+    "to": "2022-12-31"
+  },
+  "oos_partition": {
+    "from": "2023-01-03",
+    "to": "2024-12-31"
+  },
+  "pass_criteria": {
+    "min_oos_net_sharpe": 1.0,
+    "min_ic_positive_frac": 0.70,
+    "min_mean_rank_ic": 0.05,
+    "max_monthly_turnover": 0.15,
+    "target_monthly_turnover": 0.10,
+    "max_drawdown": 0.12,
+    "monotonicity_required": true,
+    "replication_required": true
+  }
+}
