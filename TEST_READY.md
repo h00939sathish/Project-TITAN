@@ -1,5 +1,10 @@
 # E2E Test Suite Ready
 
+> **Note:** "Profit Engine" is a historical file name, not a claim. These
+> suites certify the research/validation/risk **platform**; per
+> `research/ALPHA_SEARCH_TERMINAL_REPORT.md` no profitable strategy has been
+> found and none is promoted.
+
 ## Test Runner
 - Command: `.\.venv\Scripts\python -m pytest tests/e2e/test_profit_engine_e2e.py tests/e2e/test_profit_engine_v2_integration.py -v`
 - Expected: all tests pass with exit code 0

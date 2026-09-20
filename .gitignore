@@ -157,3 +157,4 @@ test_rej.py
 run_fx.sh
 .research_tmp/
 
+quarantine-*/

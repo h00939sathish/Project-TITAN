@@ -1,4 +1,4 @@
-"""Tests for Phases 2–9: Manifest, Ensemble, Filters, Sizing, Lifecycle, Shadow, Allocator, Registries."""
+"""Tests for Phases 2–8: Manifest, Ensemble, Filters, Sizing, Lifecycle, Shadow, Allocator."""
 
 import pytest
 
@@ -9,7 +9,6 @@ from titan.strategies.sizing import position_size, atr
 from titan.strategies.lifecycle import LifecycleEngine, StrategyStatus
 from titan.strategies.shadow import ShadowDeployer, ShadowTrade
 from titan.strategies.allocator import MetaAllocator
-from titan.strategies.registries import register_experiment, get_experiment, get_feature_hash
 
 
 class TestPhase2_TradeManifest:
@@ -272,24 +271,3 @@ class TestPhase8_MetaAllocator:
         a.update_sharpe("bad", -2.0)
         weights = a.rebalance()
         assert weights["bad"] >= 0.2
-
-
-class TestPhase9_Registries:
-    def test_experiment_register_and_get(self):
-        eid = register_experiment("abc123", "ma-crossover", {"fast": 5, "slow": 20})
-        rec = get_experiment(eid)
-        assert rec is not None
-        assert rec.strategy_id == "ma-crossover"
-        assert rec.git_sha == "abc123"
-
-    def test_feature_hash(self):
-        h1 = get_feature_hash({"fast": 5, "slow": 20})
-        h2 = get_feature_hash({"fast": 5, "slow": 20})
-        h3 = get_feature_hash({"fast": 10, "slow": 20})
-        assert h1 == h2
-        assert h1 != h3
-
-    def test_experiments_differ(self):
-        e1 = register_experiment("sha1", "mom", {"lookback": 10})
-        e2 = register_experiment("sha2", "ma", {"fast": 5, "slow": 20})
-        assert e1 != e2

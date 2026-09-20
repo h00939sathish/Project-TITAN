@@ -23,7 +23,11 @@ evidence — not a copy of any evaluated repository.
   pre-registered kill criteria, realistic costs, and reproducible scripts.
 - **A negative-results library:** ~40 experiments across 6 structural axes and
   2 asset classes (FX majors, spot gold), 0 survivors, each result documented
-  in `research/neg_results/` with evidence on file.
+  in `research/neg_results/` with evidence on file. The post-pivot programs
+  (crypto market structure ADR-029, equities cross-sectional factors ADR-030)
+  added 13 more pre-registered hypotheses (CRYPTO-001..004, EQ-001..008,
+  EQ-Micro-001, FX-001/002) — likewise 0 survivors; evidence in
+  `research/crypto/results/` and `research/equities/results/`.
 
 ## Current status
 
