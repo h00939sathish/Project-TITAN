@@ -1,6 +1,6 @@
 # Cross-Market Alpha Research Charter
 
-- **Status:** Proposed — Research-only; governed by ADR-032
+- **Status:** Proposed — Research-only; governed by ADR-033
 - **Date:** 2026-08-28
 - **Owners:** Research Platform, Architecture Council, Risk Owner
 - **Scope:** Cross-instrument information transmission, scheduled macroeconomic surprise transmission, and structural relative-value response; strictly no live capital authority.

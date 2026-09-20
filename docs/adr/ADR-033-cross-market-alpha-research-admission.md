@@ -1,4 +1,7 @@
-# ADR-032: Cross-Market Alpha Research Admission and Governance Boundary
+# ADR-033: Cross-Market Alpha Research Admission and Governance Boundary
+
+> Renumbered from ADR-032 (2026-09-20): the 032 slot was already taken by the
+> accepted ADR-032-crypto-004-shadow-deployment record when this proposal was drafted.
 
 - **Status:** Proposed (2026-08-28) — Architecture Council and Risk Owner review
 - **Date:** 2026-08-28
