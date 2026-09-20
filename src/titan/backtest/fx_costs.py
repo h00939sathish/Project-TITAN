@@ -27,6 +27,10 @@ class FxCostModel:
     data_manifest_digest: str = ""
 
     def __post_init__(self) -> None:
+        # commission_for_fill() treats notionals as USD; a non-USD account
+        # currency would silently mislabel costs (ADR-031 fidelity).
+        if self.account_currency != "USD":
+            raise ValueError("account_currency must be USD")
         if self.commission_bps < Decimal("0"):
             raise ValueError("commission_bps cannot be negative")
         if self.minimum_commission < Decimal("0"):

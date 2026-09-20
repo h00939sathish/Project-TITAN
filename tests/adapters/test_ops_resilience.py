@@ -234,14 +234,27 @@ def test_burst_20_orders_no_duplicates_no_deadlock():
     engine = _engine(adapter)
     initialize_fresh(engine)
     engine.start(sync_from_broker=False)
-    client_ids = set()
+    results = []
+    rejected_idx = []
     for i in range(20):
         instr = "AAPL" if i % 2 == 0 else "MSFT"
         result = engine.submit_intent(_make_intent(instrument=instr, quantity="1"))
-        assert result.accepted, f"order {i} rejected: {result.rejection_reason}"
-    # All 20 placed, no duplicate broker ids, engine responsive (no deadlock).
+        if result.accepted:
+            results.append(result)
+        else:
+            # Rate limiter (10 intents/sec rolling window) must reject cleanly.
+            assert "Rate limit" in result.rejection_reason, result.rejection_reason
+            rejected_idx.append(i)
+    assert len(results) >= 10  # limiter admits 10 per rolling second
+    # Wait out the window; breaker must recover and admit the throttled rest.
+    time.sleep(1.1)
+    for i in rejected_idx:
+        instr = "AAPL" if i % 2 == 0 else "MSFT"
+        result = engine.submit_intent(_make_intent(instrument=instr, quantity="1"))
+        assert result.accepted, f"retry order {i} rejected: {result.rejection_reason}"
+        results.append(result)
+    # All 20 placed exactly once, no duplicate broker ids, engine responsive.
     assert len(adapter.placed) == 20
-    broker_ids = [r.broker_order_id.id for r in [] ]  # collected below
     assert len({p.client_order_id for p in adapter.placed}) == 20
     st = engine.status()
     assert st.kill_switch == KillSwitchState.Armed or st.kill_switch == KillSwitchState.Released

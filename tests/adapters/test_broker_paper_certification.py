@@ -655,6 +655,9 @@ class TestOneOrderExecution:
         initialize_fresh(engine)
         session = engine.start()
         assert session.state == AdapterSessionState.CONNECTED
+        engine.register_instrument(
+            Instrument(InstrumentId("SPY", "STOCK"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+        )
         print(f"\n[CERT] Engine started, session={session.session_id}")
 
         # 4. Submit 1 share SPY MARKET DAY

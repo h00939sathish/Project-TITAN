@@ -6,13 +6,42 @@ import types
 from decimal import Decimal
 from enum import Enum
 
+
+def pytest_addoption(parser):
+    parser.addoption("--run-paper-orders", action="store_true", default=False,
+                     help="run tests marked paper_order (place real Alpaca paper orders)")
+    parser.addoption("--run-live", action="store_true", default=False,
+                     help="run tests marked live (hit the real Alpaca API)")
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if "paper_order" in item.keywords and not config.getoption("--run-paper-orders"):
+            item.add_marker(pytest.mark.skip(
+                reason="places real paper orders; requires --run-paper-orders (and US regular session hours)"))
+        if "live" in item.keywords and not config.getoption("--run-live"):
+            item.add_marker(pytest.mark.skip(
+                reason="requires live Alpaca API; run with --run-live"))
+
 # NautilusTrader IB adapter compatibility shim for ibapi 9.81
+try:
+    import ibapi.const
+except ImportError:
+    pass
+
 if "ibapi.const" not in sys.modules:
     const_mod = types.ModuleType("ibapi.const")
-    const_mod.UNSET_DECIMAL = Decimal(2**127 - 1)
-    const_mod.UNSET_INTEGER = 2**31 - 1
-    const_mod.UNSET_DOUBLE = 1.7976931348623157e308
     sys.modules["ibapi.const"] = const_mod
+
+const_mod = sys.modules["ibapi.const"]
+if not hasattr(const_mod, "UNSET_DECIMAL"):
+    const_mod.UNSET_DECIMAL = Decimal(2**127 - 1)
+if not hasattr(const_mod, "UNSET_INTEGER"):
+    const_mod.UNSET_INTEGER = 2**31 - 1
+if not hasattr(const_mod, "UNSET_DOUBLE"):
+    const_mod.UNSET_DOUBLE = 1.7976931348623157e308
+if not hasattr(const_mod, "NO_VALID_ID"):
+    const_mod.NO_VALID_ID = -1
 
 try:
     import ibapi.contract

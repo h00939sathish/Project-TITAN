@@ -445,9 +445,12 @@ class TestConcurrentSubmits:
 
         assert not errors
         accepted = [r for r in results if r and r.accepted]
-        assert len(broker.place_calls) == n
-        assert len(set(broker.place_calls)) == n          # unique client ids
-        assert len(accepted) >= 1
+        # Engine contract (risk/circuit_breaker.py): max_intents_per_second=10.
+        # Concurrency must not produce duplicates or lost/double fills; the
+        # exact split is window-boundary dependent, so assert invariants.
+        assert len(accepted) >= 10                    # limiter admits ~10 in-window
+        assert len(broker.place_calls) == len(accepted)  # exactly one broker call per accepted
+        assert len(set(broker.place_calls)) == len(broker.place_calls)  # unique client ids
         total_filled = sum(int(f.quantity) for r in accepted for f in r.fills)
         assert total_filled == position_qty(engine)
         assert sum(engine._order_filled_quantity.values()) == position_qty(engine)

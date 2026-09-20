@@ -79,14 +79,13 @@ class TestAdversarialFxCostModel:
 
     @pytest.mark.parametrize("invalid_kwargs,error_match", [
         ({"account_currency": "EUR"}, "account_currency"),
-        ({"quote_currency": "GBP"}, "quote_currency"),
         ({"commission_bps": Decimal("-0.1")}, "commission_bps"),
         ({"minimum_commission": Decimal("-1.0")}, "minimum_commission"),
         ({"half_spread_bps": Decimal("-0.5")}, "half_spread_bps"),
         ({"slippage_bps": Decimal("-0.5")}, "slippage_bps"),
     ])
     def test_input_validation_rejections(self, invalid_kwargs, error_match):
-        """Verify non-USD or negative parameters are strictly rejected in constructor."""
+        """Verify non-USD account or negative parameters are strictly rejected in constructor."""
         base_args = {
             "venue": "IDEALPRO",
             "account_currency": "USD",
@@ -100,6 +99,16 @@ class TestAdversarialFxCostModel:
         base_args.update(invalid_kwargs)
         with pytest.raises(ValueError, match=error_match):
             FxCostModel(**base_args)
+
+    def test_non_usd_quote_currency_is_accepted(self):
+        """v2 canonical model allows non-USD quote currencies (cross-pair research)."""
+        model = FxCostModel(
+            venue="IDEALPRO", account_currency="USD", quote_currency="JPY",
+            commission_bps=Decimal("0.20"), minimum_commission=Decimal("2.00"),
+            half_spread_bps=Decimal("0.10"), slippage_bps=Decimal("0.10"),
+            fill_mode="QUOTE_NEXT_EVENT",
+        )
+        assert model.quote_currency == "JPY"
 
     def test_sha256_digest_tamper_sensitivity(self):
         """Verify any configuration parameter change produces a completely distinct digest."""

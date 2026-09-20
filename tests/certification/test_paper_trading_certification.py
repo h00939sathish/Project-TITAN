@@ -1,6 +1,6 @@
 import json
 import pytest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from titan.data.approved import load_approved
 from titan.execution.engine import PaperTradingEngine, PaperConfig
@@ -26,13 +26,19 @@ SPY_15M_PATH = ROOT_DIR / "research" / "intraday_backtests" / "2026-07-30" / "sp
 
 
 def test_approved_data_preflight_certification():
-    """Verify preflight certification gates on approved market data source."""
+    """Verify preflight certification gates on approved market data source.
+
+    The snapshot is a fixed, checksummed 2026-07-30 artifact; pin the
+    reference date just after it so the staleness gate is exercised
+    deterministically instead of expiring with wall-clock time.
+    """
     assert SPY_15M_PATH.exists()
     approved = load_approved(
         str(SPY_15M_PATH),
         min_bar_count=100,
         max_stale_trading_days=30,
         require_checksum_match=True,
+        reference_date=date(2026, 8, 3),
     )
 
     assert approved.bar_count() == 1062
