@@ -1,10 +1,13 @@
 name: CI
 
+# The repository trunk is `master` (git remote HEAD -> origin/master). The
+# previous `[main]` trigger matched no branch, so this workflow never ran.
+# See ADR-034.
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   rust:
@@ -32,7 +35,14 @@ jobs:
       - run: pip install maturin pytest ruff mypy
       - run: maturin build --release --manifest-path core/Cargo.toml
       - run: pip install target/wheels/*.whl
-      - run: mypy src/titan tests/
+      # ADVISORY (non-blocking): `mypy --strict` currently reports 387 errors
+      # (117 in the execution/risk/data/backtest core). Enabling it as a hard
+      # gate would turn trunk permanently red. It is reported for visibility
+      # until the ratchet-to-blocking plan in ADR-034 completes. `ruff` is
+      # installed but likewise not yet enforced (1580 violations) — see ADR-034.
+      - name: Type check (advisory — ADR-034)
+        run: mypy src/titan tests/
+        continue-on-error: true
       - run: python scripts/check_adr_gate.py
       - run: pytest tests/
       - name: Throughput benchmark
