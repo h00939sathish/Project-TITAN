@@ -223,7 +223,7 @@ class ReplayEngine:
                         account_id=self._config.account_id,
                         instrument_id=bar["instrument_id"],
                         side=side_str,
-                        quantity=str(intent_qty),
+                        quantity=str(self._intent_qty),
                         order_type="MARKET",
                         time_in_force="DAY",
                         risk_profile_version="1.0",
@@ -294,11 +294,17 @@ class ReplayEngine:
                 # strategies (e.g. traderdev-ema9-vwap) ratchet their own trail
                 # in update_bar and must not be double-exited by a stale static.
                 if not hasattr(self._strategy, "update_bar"):
+                    # Read the levels from the strategy, the source of truth per
+                    # the bridge convention (strategies/bridge.py:152). Reading
+                    # them off `intent` below is always None: this engine builds
+                    # that intent itself and deliberately does not populate
+                    # broker-facing stop/TP legs (see TestBrokerSemanticsUnchanged).
+                    declared = getattr(self._strategy, "current_exits", None) or {}
                     attr_exits = {
-                    "stop_price": getattr(intent, "stop_price", None),
-                    "take_profit_price": getattr(intent, "take_profit_price", None),
-                    "trailing": getattr(intent, "trailing", None),
-                }
+                        "stop_price": declared.get("stop_price"),
+                        "take_profit_price": declared.get("take_profit_price"),
+                        "trailing": declared.get("trailing"),
+                    }
                     if any(v is not None for v in attr_exits.values()):
                         open_exits[bar["instrument_id"]] = {
                             "side": side_str.upper(),
