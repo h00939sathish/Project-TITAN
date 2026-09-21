@@ -41,6 +41,11 @@ class BacktestResult:
     bars_processed: int = 0
     rejected_intents: int = 0
     bar_results: list = field(default_factory=list)
+    # total_pnl is cash-only, so a run that ends holding a position reports the
+    # whole position cost as a loss. These two make that legible without
+    # redefining total_pnl, which existing research depends on.
+    final_equity: str = "0"
+    unrealized_pnl: str = "0"
 
 
 @dataclass
@@ -200,9 +205,43 @@ class ReplayEngine:
         # at open; intrabar pierce fills at the stop level; stop wins tie-breaks.
         open_exits: dict[str, dict] = {}
 
+        def _equity() -> float:
+            """Cash plus mark-to-market value of every open position."""
+            equity = float(engine.portfolio.get_cash_balance().amount)
+            for instr_id in instrument_ids:
+                p = engine.portfolio.get_position(instr_id)
+                if p is None or p.quantity == 0:
+                    continue
+                last = engine._last_prices.get(instr_id)
+                if last is None:
+                    continue
+                # Position.quantity is unsigned; the side carries the direction.
+                signed = -p.quantity if "short" in str(getattr(p, "side", "")).lower() else p.quantity
+                equity += signed * float(last)
+            return equity
+
+        equity_curve = [_equity()]
+
+        def _mark(instr_id: str, price) -> None:
+            """Update the portfolio's mark for one instrument.
+
+            Every bar must mark the book. Previously only signal-bearing bars
+            did, so a quiet holding period left equity frozen at the entry price
+            and any drawdown computed from it was silently wrong.
+            """
+            engine._last_prices[instr_id] = str(price)
+            try:
+                engine.portfolio.update_market_price(instr_id, str(price))
+            except Exception:
+                pass
+
         for bar in bars:
             adapter.advance_to(bar)
             engine._check_adapter_health()
+            # Sampled on entry to each bar; the marks were set by the previous
+            # iteration (including any forced-exit price), so this sees every
+            # bar-close valuation even on paths that `continue` early.
+            equity_curve.append(_equity())
 
             # 1) Protective-exit enforcement BEFORE the strategy's next signal
             # (only for strategies that cannot self-manage exits — see record).
@@ -217,13 +256,17 @@ class ReplayEngine:
                 if forced is not None:
                     side_str, exit_price = forced
                     fill_price = float(exit_price)
+                    # Close the whole open position, not a fixed intent size: a
+                    # partial exit would leave residual units exposed after
+                    # open_exits is popped below, i.e. permanently unprotected.
+                    exit_qty = int(pos.quantity)
                     intent = TradeIntent(
                         strategy_id=getattr(self._strategy, "strategy_id", "replay-exit"),
                         strategy_package_digest="",
                         account_id=self._config.account_id,
                         instrument_id=bar["instrument_id"],
                         side=side_str,
-                        quantity=str(self._intent_qty),
+                        quantity=str(exit_qty),
                         order_type="MARKET",
                         time_in_force="DAY",
                         risk_profile_version="1.0",
@@ -238,11 +281,7 @@ class ReplayEngine:
                     else:
                         result.rejected_intents += 1
                     open_exits.pop(bar["instrument_id"], None)
-                    engine._last_prices[bar["instrument_id"]] = str(fill_price)
-                    try:
-                        engine.portfolio.update_market_price(bar["instrument_id"], str(fill_price))
-                    except Exception:
-                        pass
+                    _mark(bar["instrument_id"], fill_price)
                     continue  # exit consumed this bar; do not double-signal
 
             # Prefer the full-OHLC path when the strategy supports it (intrabar
@@ -255,6 +294,7 @@ class ReplayEngine:
                 side_str = self._strategy.update(bar["close"])
             if not side_str:
                 result.bars_processed += 1
+                _mark(bar["instrument_id"], bar["close"])
                 continue
 
             intent_qty = self._intent_qty
@@ -340,16 +380,41 @@ class ReplayEngine:
 
             result.bars_processed += 1
 
-            engine._last_prices[bar["instrument_id"]] = str(bar["close"])
-            try:
-                engine.portfolio.update_market_price(bar["instrument_id"], str(bar["close"]))
-            except Exception:
-                pass
+            _mark(bar["instrument_id"], bar["close"])
 
+        # Sampled before stop(): stop() clears the mark-to-market prices, and the
+        # final bar's close has already been applied to the portfolio above.
+        final_marks = dict(engine._last_prices)
+        equity_curve.append(_equity())
         engine.stop()
 
         cash = engine.portfolio.get_cash_balance()
         result.final_cash = str(cash.amount)
         result.total_pnl = str(float(cash.amount) - float(self._config.starting_capital))
+
+        # Same running-peak convention as backtest/results.py so the two
+        # drawdown figures in the repo mean the same thing.
+        peak = equity_curve[0]
+        max_dd = 0.0
+        for eq in equity_curve:
+            if eq > peak:
+                peak = eq
+            if peak > 0:
+                max_dd = max(max_dd, (peak - eq) / peak * 100)
+        result.max_drawdown = str(round(max_dd, 4))
+        result.final_equity = str(equity_curve[-1])
+        # Cost-basis arithmetic belongs to the core ledger, not to a replay
+        # layer re-deriving average entry prices.
+        unrealized = 0.0
+        for instr_id in instrument_ids:
+            p = engine.portfolio.get_position(instr_id)
+            if p is None or p.quantity == 0:
+                continue
+            last = final_marks.get(instr_id)
+            if last is None:
+                continue
+            unrealized += float(engine.portfolio.get_unrealized_pnl(
+                instr_id, Money(str(last), self._config.currency)).amount)
+        result.unrealized_pnl = str(round(unrealized, 4))
 
         return result

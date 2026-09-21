@@ -57,7 +57,18 @@ class BacktestAdapter(BrokerAdapter):
 
         side = "buy" if intent.side and intent.side.lower() in ("buy", "long") else "sell"
         quantity = int(intent.quantity)
-        fill: FillResult = self._fill_model.fill(self._current_bar, side, quantity)
+        bar = self._current_bar
+        # A MARKET order carrying an explicit price is a simulation-computed
+        # execution level -- the protective-exit price ReplayEngine derives from
+        # the stop/TP level or the gap open. Fill from that level so the trigger
+        # price is not silently replaced by the bar close. Substituting the bar
+        # (rather than returning the level outright) keeps slippage and
+        # commission flowing through the single deterministic fill model, so a
+        # stop still slips adversely. LIMIT orders are ordinary strategy
+        # signals and keep the bar-conservative model.
+        if str(intent.order_type).upper() == "MARKET" and intent.price:
+            bar = {**bar, "close": str(intent.price)}
+        fill: FillResult = self._fill_model.fill(bar, side, quantity)
 
         return BrokerOrderAcknowledgement(
             accepted=True,

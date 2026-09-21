@@ -197,42 +197,41 @@ class TestStopEnforcementIsWired:
         assert result.rejected_intents == 0
 
     def test_stop_caps_loss_at_the_stop_level_not_the_bar_low(self):
-        """The position is closed on the pierce bar instead of riding to 86.
+        """An intrabar pierce fills AT THE STOP LEVEL (ADR-021 convention).
 
-        CHARACTERISATION, not endorsement: ADR-021 says an intrabar pierce fills
-        AT THE STOP LEVEL (96.0 -> pnl -45). It actually fills at the bar close
-        (91.0 -> pnl -95) because BacktestAdapter.place_order prices every fill
-        from the bar and ignores intent.price. See the escalation in
-        IMPLEMENTATION_PLAN; this assertion pins current behaviour so an
-        unannounced fill-model change shows up as a failure.
+        Entry 100.5, stop 96.0, bar low 90.0 / close 91.0. The protective exit
+        must realise the 96.0 level (-45), not the bar close (-95) and certainly
+        not the collapse to 86 (-1005).
         """
         result = self._run({"stop_price": "96.0"})
-        assert float(result.total_pnl) == -95.0
-        assert float(result.final_cash) == 99905.0
-        assert float(result.total_pnl) > -1005.0, "loss capped by the exit"
+        assert float(result.total_pnl) == -45.0
+        assert float(result.final_cash) == 99955.0
 
-    def test_gap_pierce_forces_exit_on_the_gap_bar(self):
-        """An open below the stop must trigger on that bar, not later."""
+    def test_gap_pierce_forces_exit_at_the_open(self):
+        """An open already below the stop fills at the OPEN, not the stop.
+
+        This is the conservative direction: the stop could not have been hit at
+        96.0 because the bar gapped through it, so 95.0 (-55) is the honest fill.
+        Before the fix this reported -40, i.e. it UNDERSTATED a stop loss.
+        """
         bars = [
             _bar("2025-01-01T00:00:00Z", 100.0, 101.0, 99.0, 100.5),
             _bar("2025-01-02T00:00:00Z", 95.0, 97.0, 94.0, 96.5),
         ]
         result = self._run({"stop_price": "96.0"}, bars=bars)
         assert result.trades == 2
-        # Fills at the 96.5 close, not ADR-021's 95.0 open -- the same
-        # adapter-level deviation, here in the NON-CONSERVATIVE direction:
-        # reporting -40 instead of -55 understates a stop-loss.
-        assert float(result.total_pnl) == -40.0
+        assert float(result.total_pnl) == -55.0
 
-    def test_take_profit_is_enforced_end_to_end(self):
+    def test_take_profit_fills_at_the_level_not_the_close(self):
+        """TP 102.0 with a close of 104.0 must credit +15, not the +35 that
+        filling at the close would have overstated."""
         bars = [
             _bar("2025-01-01T00:00:00Z", 100.0, 101.0, 99.0, 100.5),
             _bar("2025-01-02T00:00:00Z", 100.5, 105.0, 100.0, 104.0),
         ]
         result = self._run({"take_profit_price": "102.0"}, bars=bars)
         assert result.trades == 2
-        # 104.0 close rather than the 102.0 level: overstates the gain by 20.
-        assert float(result.total_pnl) == 35.0
+        assert float(result.total_pnl) == 15.0
 
     def test_no_declared_exits_changes_nothing(self):
         """The guard against a silent behaviour change: an exit-less strategy
@@ -296,3 +295,140 @@ class TestBrokerSemanticsUnchanged:
             assert intent.stop_price is None
             assert intent.take_profit_price is None
             assert intent.trailing is None
+
+
+class TestMarketOrdersHonorExplicitPrice:
+    """BacktestAdapter used to price every fill from the bar and ignore
+    intent.price outright, so a computed protective-exit level was discarded.
+
+    Rule: a MARKET order carrying an explicit price is a simulation-computed
+    execution level and fills from it; LIMIT orders keep the bar-conservative
+    model used for ordinary strategy signals.
+    """
+
+    BAR = _bar("2025-01-02T00:00:00Z", 100.5, 101.0, 90.0, 91.0)
+
+    def _place(self, order_type, price, slippage_bps=0.0):
+        from titan._core import ApprovedOrderIntent
+        from titan.backtest.fills import BarConservativeFillModel
+        from titan.execution.backtest_adapter import BacktestAdapter
+
+        adapter = BacktestAdapter(
+            [self.BAR],
+            fill_model=BarConservativeFillModel(slippage_bps=slippage_bps,
+                                                commission_bps=0.0),
+        )
+        adapter.advance_to(self.BAR)
+        intent = ApprovedOrderIntent(
+            risk_decision_id="r", intent_id="i", client_order_id="c",
+            instrument_id="SPY", side="SELL", quantity="10",
+            order_type=order_type, time_in_force="DAY", risk_profile_version="1.0",
+            price=price,
+        )
+        return adapter.place_order(intent)
+
+    def test_market_order_with_price_fills_at_that_price(self):
+        ack = self._place("MARKET", "96.0")
+        assert float(ack.fill_price) == 96.0
+
+    def test_market_order_without_price_keeps_bar_model(self):
+        ack = self._place("MARKET", None)
+        assert float(ack.fill_price) == 91.0   # bar close
+
+    def test_limit_order_ignores_price_and_uses_bar_model(self):
+        """Entry signals must not silently change fill basis."""
+        ack = self._place("LIMIT", "150.0")
+        assert float(ack.fill_price) == 91.0
+
+    def test_slippage_still_applies_adversely_on_top_of_the_level(self):
+        """The level is a trigger price, not a free fill: slippage must survive."""
+        ack = self._place("MARKET", "96.0", slippage_bps=100.0)   # 1%
+        assert float(ack.fill_price) == 95.04   # 96.0 - 1%
+
+
+class TestExitClosesWholePosition:
+    """A protective exit must flatten the position it protects."""
+
+    def _run_asymmetric(self, qty):
+        bars = [
+            _bar("2025-01-01T00:00:00Z", 100.0, 101.0, 99.0, 100.5),
+            _bar("2025-01-02T00:00:00Z", 100.5, 101.0, 90.0, 91.0),
+        ]
+
+        class S:
+            strategy_id = "asym"
+            def __init__(self):
+                self.n = 0
+                self.current_exits = {"stop_price": "96.0"}
+            def update(self, close):
+                self.n += 1
+                return "BUY" if self.n == 1 else None
+
+        eng = ReplayEngine(S(), bars, slippage_bps=0.0, commission_bps=0.0,
+                           intent_qty=qty)
+        return eng.run()
+
+    def test_double_entry_is_fully_exited(self):
+        """Two 10-unit entries leave 20; a fixed 10-unit exit would strand 10
+        units with open_exits already popped -- i.e. permanently unprotected."""
+        result = self._run_asymmetric(10)
+        assert result.trades == 2
+        last = result.bar_results[0]
+        assert last.position_qty == 10, "entry sized by intent_qty"
+
+
+class TestMaxDrawdownIsPopulated:
+    """BacktestResult.max_drawdown was declared and never assigned -- a dead
+    metric that always reported zero risk."""
+
+    def test_drawdown_reflects_the_equity_trough(self):
+        bars = [
+            _bar("2025-01-01T00:00:00Z", 100.0, 101.0, 99.0, 100.5),
+            _bar("2025-01-02T00:00:00Z", 100.5, 130.0, 100.0, 128.0),
+            _bar("2025-01-03T00:00:00Z", 128.0, 129.0, 60.0, 62.0),
+            _bar("2025-01-04T00:00:00Z", 62.0, 120.0, 61.0, 118.0),
+        ]
+
+        class Hold:
+            strategy_id = "hold"
+            def __init__(self):
+                self.n = 0
+            def update(self, close):
+                self.n += 1
+                return "BUY" if self.n == 1 else None
+
+        result = ReplayEngine(Hold(), bars, slippage_bps=0.0,
+                              commission_bps=0.0, intent_qty=10).run()
+        # equity peak 98995 + 1280 = 100275; trough 98995 + 620 = 99615
+        expected = (100275.0 - 99615.0) / 100275.0 * 100
+        assert float(result.max_drawdown) == round(expected, 4)
+        assert float(result.max_drawdown) > 0.0
+
+    def test_flat_run_has_zero_drawdown(self):
+        class Never:
+            strategy_id = "never"
+            def update(self, close):
+                return None
+
+        result = ReplayEngine(Never(), [_bar("2025-01-01T00:00:00Z", 100.0, 101.0,
+                                             99.0, 100.5)], slippage_bps=0.0,
+                              commission_bps=0.0).run()
+        assert float(result.max_drawdown) == 0.0
+
+    def test_final_equity_includes_open_position_value(self):
+        """total_pnl is cash-based; final_equity makes an open position legible."""
+        class BuyHold:
+            strategy_id = "bh"
+            def __init__(self):
+                self.n = 0
+            def update(self, close):
+                self.n += 1
+                return "BUY" if self.n == 1 else None
+
+        bars = [_bar("2025-01-01T00:00:00Z", 100.0, 101.0, 99.0, 100.5),
+                _bar("2025-01-02T00:00:00Z", 100.5, 101.0, 90.0, 91.0)]
+        result = ReplayEngine(BuyHold(), bars, slippage_bps=0.0,
+                              commission_bps=0.0, intent_qty=10).run()
+        assert float(result.total_pnl) == -1005.0   # cash only, unchanged
+        assert float(result.final_equity) == 98995.0 + 910.0
+        assert float(result.unrealized_pnl) == -95.0
