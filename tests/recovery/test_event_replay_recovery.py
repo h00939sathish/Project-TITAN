@@ -77,6 +77,10 @@ def test_recover_from_event_store_and_boot_reconciliation(temp_store_path):
     status = transition_on_boot(recon_res, restored_risk_gate)
 
     assert recon_res["has_drift"] is False
-    assert status == "ACTIVE"
+    # A store carrying fills but no RiskStateSnapshot restores Triggered/Halted,
+    # so boot recovery must not report ACTIVE (ADR-020 Decision 1: absence of
+    # risk state is never read as "safe to trade"). Reconciliation being clean
+    # proves the positions match; it does not authorize resuming routing.
+    assert status.startswith("HALTED (kill switch held")
 
 

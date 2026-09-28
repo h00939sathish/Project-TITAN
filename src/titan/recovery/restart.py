@@ -53,8 +53,13 @@ def recover_from_event_store(store_path: str = ":memory:") -> dict:
         portfolio: PortfolioEngine with replayed state
         adapter: SimulatedAdapter (no persisted state)
         recon_engine: ReconciliationEngine
+        store_was_empty: True when the store held no events at all
     """
     store = EventStore(store_path)
+    # Captured before anything is replayed or appended: an empty store is
+    # indistinguishable from a deleted or corrupt one, so it must never be read
+    # as "safe to trade" (ADR-020 Decision 1/2).
+    store_was_empty = store.count() == 0
     config = RiskConfig.default()
     risk_gate = RiskGate.load_or_default(config, store)
     portfolio = PortfolioEngine("USD", Money("100000", "USD"))
@@ -72,6 +77,7 @@ def recover_from_event_store(store_path: str = ":memory:") -> dict:
         "portfolio": portfolio,
         "adapter": adapter,
         "recon_engine": recon_engine,
+        "store_was_empty": store_was_empty,
     }
 
 
@@ -118,8 +124,29 @@ def reconcile_on_boot(portfolio: PortfolioEngine, adapter: Any,
 
 
 
-def transition_on_boot(recon_result: dict[str, Any], risk_gate: RiskGate) -> str:
-    """Transition system to ACTIVE if clean, HALTED if drift or fetch failure."""
+def transition_on_boot(recon_result: dict[str, Any], risk_gate: RiskGate, *,
+                       store_was_empty: bool = False) -> str:
+    """Transition system to ACTIVE if clean, HALTED if drift or fetch failure.
+
+    ``store_was_empty`` is checked first and wins: a store with no events is
+    indistinguishable from a deleted or corrupt one, and ADR-020 forbids reading
+    that as permission to trade. A clean reconciliation against a placeholder
+    adapter proves nothing about a session whose history is gone.
+
+    A held kill switch is checked next and is likewise never cleared by a clean
+    reconciliation. Routing was blocked for a reason that reconciliation does not
+    answer; only an authorized release (ADR-019) may unblock it.
+    """
+    if store_was_empty:
+        if risk_gate.trading_state != TradingState.Halted:
+            risk_gate.set_trading_state(TradingState.Halted)
+        return ("HALTED (event store empty: state loss; "
+                "explicit initialization required per ADR-020)")
+    if risk_gate.kill_switch.blocks_routing():
+        if risk_gate.trading_state != TradingState.Halted:
+            risk_gate.set_trading_state(TradingState.Halted)
+        return ("HALTED (kill switch held; "
+                "an authorized release is required per ADR-019)")
     if recon_result.get("snapshot_fetch_failed"):
         if risk_gate.trading_state != TradingState.Halted:
             risk_gate.set_trading_state(TradingState.Halted)

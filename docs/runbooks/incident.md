@@ -34,22 +34,45 @@ Incidents are detected through:
 
 ## Recovery
 
-1. Fix root cause
-2. Reconcile state: verify portfolio == broker truth
-3. Release kill switch: `release_initiated()` → `release_completed()`
-4. Verify with health endpoint
-5. Resume normal operation
+1. Fix root cause.
+2. Authorize the release — two distinct approvers, the kill trigger's
+   correlation id, an assessment reference and a remediation/rollback reference:
+   ```
+   python scripts/release_kill_switch.py \
+       --approver alice --approver bob \
+       --correlation ks-<id-from-trigger> \
+       --assessment "INC-9 root cause & scope" \
+       --remediation "rollback to v2.0.3 per INC-9"
+   ```
+3. Let the **running** session perform the release. It polls
+   `release_kill_switch.signal`, reconciles against broker truth, verifies
+   adapter and data-feed health, re-checks at commit time, and refuses (leaving
+   the switch held) if any predicate fails — ADR-019, RISK_POLICY.md.
+4. Confirm: `python -m titan.cli risk status` shows `Armed`/`Active`, and the
+   session log printed `kill switch RELEASED (authorized)`.
+5. `python -m titan.cli risk release` is a read-only diagnostic. It reports the
+   held state and the correlation id you need for step 2, and exits non-zero. It
+   authorizes nothing: a detached process cannot reconcile, and an unverified
+   risk snapshot written here would let the next session boot ready to route.
 
 ### Event store loss recovery
 
 1. Identify the last known good backup of the event store file.
 2. Restore the backup to the expected event store path.
-3. Run recovery:
+3. Read the boot state (diagnostic only, never modifies the store):
    ```
    python -m titan.cli recovery restart
    ```
-4. Verify system starts in ACTIVE and reconciliation is clean.
-5. If no backup exists, start a fresh session and reconstruct state manually.
+4. A restored store reports `ACTIVE` only if its persisted risk snapshot says
+   so and reconciliation is clean.
+5. If no backup exists, the store is empty and boot recovery reports `HALTED`.
+   That is the correct fail-closed outcome (ADR-020): an empty store is
+   indistinguishable from a deleted one. Do not attempt to resume trading. Start
+   a fresh session and arm it explicitly, once, with two approvers:
+   ```
+   python scripts/init_session.py --state-path .titan_state.json \
+       --approver alice --approver bob --rationale "state loss on INC-<n>"
+   ```
 
 ## Learning
 

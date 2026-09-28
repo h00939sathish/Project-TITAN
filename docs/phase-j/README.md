@@ -110,8 +110,8 @@ Document any failures in `docs/phase-j/incidents/`.
 
 | Situation | Action |
 |---|---|
-| State file corrupted | Stop runner. Restore from backup or EventStore replay: `python -m titan.cli recovery restart` |
-| Kill switch triggered | Investigate cause. Run reconciliation. Release with two-person approval: `python -m titan.cli risk release` |
+| State file corrupted | Stop runner. Restore the backup, then read the boot state (diagnostic only): `python -m titan.cli recovery restart`. A store with no events reports `HALTED` by design; arm a genuinely new environment only via `python scripts/init_session.py` (ADR-020). |
+| Kill switch triggered | Investigate cause. Authorize the release, then let the live session perform it: `python scripts/release_kill_switch.py --approver A --approver B --correlation <id> --assessment <ref> --remediation <ref>`. `python -m titan.cli risk release` reports status and authorizes nothing (ADR-019). |
 | Runner crash | Verify state file integrity. Restart: `python scripts/paper_session.py` |
 | Disk full | Archive old logs. Ensure at least 500MB free for state + logs |
 | Data staleness | Restart runner with fresh data file |

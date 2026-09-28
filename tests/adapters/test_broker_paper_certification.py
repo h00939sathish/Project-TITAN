@@ -560,8 +560,14 @@ class TestRestartFromStore:
         recon = reconcile_on_boot(store["portfolio"], store["adapter"], store["recon_engine"])
         assert not recon["has_drift"]
         transition = transition_on_boot(recon, store["risk_gate"])
-        assert "ACTIVE" in transition
+        # An empty store carries no risk state, so it restores Triggered/Halted
+        # and boot recovery must stay halted (ADR-020 Decision 1/2). A clean
+        # reconciliation against a placeholder adapter is not release authority;
+        # the previous "ACTIVE" assertion here certified the fail-open.
+        assert transition.startswith("HALTED")
         store["store"].close()
+        # The healthy counterpart (a persisted Armed snapshot boots ACTIVE) is
+        # covered by tests/cli/test_operator_control_surface.py.
 
 
 # ---------------------------------------------------------------------------

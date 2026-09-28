@@ -1,8 +1,42 @@
 """CLI entry point for Project TITAN."""
 
+import json
+import sys
+
 import click
-from titan._core import version, RiskConfig, RiskGate, TradingState, KillSwitchState
+from titan._core import EventStore, RiskGate, version
 from titan.risk.limits import load_config
+
+# The engine maps a session state path to its durable event store the same way.
+DEFAULT_STATE_PATH = ".titan_state.json"
+
+
+def _store_path(state_path: str) -> str:
+    return state_path.replace(".json", ".db") if state_path else ".titan_state.db"
+
+
+def _last_kill_trigger(store: EventStore) -> tuple[str, str]:
+    """Return (correlation_id, reason) from the last durable kill trigger.
+
+    The engine stores the kill correlation in ``aggregate_id`` and mirrors it in
+    the payload; the envelope's own ``correlation_id`` column is a generated id.
+    """
+    try:
+        events = store.replay_by_type("KillSwitchTriggered")
+    except Exception:
+        return ("unknown", "unknown")
+    if not events:
+        return ("unknown", "unknown")
+    event = events[-1]
+    reason = "unknown"
+    correlation = str(event.aggregate_id or "") or "unknown"
+    try:
+        payload = json.loads(event.payload)
+        reason = str(payload.get("reason") or "unknown")
+        correlation = str(payload.get("correlation_id") or correlation)
+    except Exception:
+        pass
+    return (correlation, reason)
 
 
 @click.group()
@@ -39,7 +73,7 @@ def status() -> None:
 @risk.command()
 @click.option("--reason", default="operator", help="Reason for kill switch")
 def halt(reason: str) -> None:
-    """Trigger kill switch — halt all trading."""
+    """Trigger kill switch - halt all trading."""
     from titan._core import EventStore
     store = EventStore(".titan_state.db")
     gate = RiskGate.load_or_default(load_config(), store)
@@ -50,35 +84,54 @@ def halt(reason: str) -> None:
         return
     gate.persist_state(store)
     click.echo(f"Kill switch triggered: {reason}")
-    click.echo("Trading halted. Use 'titan risk release' after reconciliation.")
+    click.echo("Trading halted. Release requires two authorized human approvals:")
+    click.echo("  python scripts/release_kill_switch.py --approver A --approver B "
+               "--correlation <id> --assessment <ref> --remediation <ref>")
+    click.echo("The running session then performs the gated release. "
+               "'titan risk release' reports status and authorizes nothing.")
 
 
 @risk.command()
-@click.confirmation_option(prompt="Are you sure you want to release the kill switch?")
-def release() -> None:
-    """Release kill switch after reconciliation."""
-    from titan._core import EventStore
-    store = EventStore(".titan_state.db")
-    config = load_config()
-    gate = RiskGate.load_or_default(config, store)
+@click.option("--state-path", default=DEFAULT_STATE_PATH, show_default=True,
+              help="Session state path; its event store holds the risk snapshot.")
+def release(state_path: str) -> None:
+    """Report a held kill switch. This command authorizes nothing (ADR-019).
+
+    Release belongs to PaperTradingEngine.release_kill_switch() and to no other
+    process: it must reconcile against broker truth and verify adapter and
+    data-feed health inside the live session, under that session's lock. A
+    detached process can do none of it, and writing an unverified risk snapshot
+    here would let the NEXT session boot ready to route (ADR-020). Read-only, and
+    exits non-zero while the switch is held so no script can mistake it for a
+    completed release.
+    """
+    store = EventStore(_store_path(state_path))
+    try:
+        gate = RiskGate.load_or_default(load_config(), store)
+        correlation, reason = _last_kill_trigger(store)
+    finally:
+        store.close()
 
     if not gate.kill_switch.blocks_routing():
-        click.echo("Kill switch is already released.")
+        click.echo("Kill switch is not held. Nothing to release.")
         return
 
-    # ponytail: broker reachability check only. Engine does the real reconciliation.
-    try:
-        from titan.execution.simulated_adapter import SimulatedAdapter
-        adapter = SimulatedAdapter()
-        adapter.health()
-    except Exception:
-        click.echo("Warning: broker adapter unreachable, relying on confirmation prompt.", err=True)
-
-    gate.release_initiated()
-    gate.release_completed()
-    gate.set_trading_state(TradingState.Active)
-    gate.persist_state(store)
-    click.echo("Kill switch released. Trading resumed.")
+    click.echo(f"Kill switch HELD: {gate.kill_switch} / trading {gate.trading_state}")
+    click.echo(f"Trigger: correlation={correlation} reason={reason}")
+    click.echo("NOT RELEASED - this command holds no release authority.")
+    click.echo("Release requires: two authorized human approvals, broker/order/position/")
+    click.echo("balance reconciliation, verified adapter and data-feed health, and an")
+    click.echo("approved remediation or rollback (ADR-019, RISK_POLICY.md).")
+    click.echo("Authorize it:")
+    click.echo("  python scripts/release_kill_switch.py --approver A --approver B \\")
+    click.echo(f"      --correlation {correlation} --assessment <ref> --remediation <ref>")
+    if correlation == "unknown":
+        click.echo("(No durable KillSwitchTriggered event: this halt was not raised by")
+        click.echo(" the engine. Read the correlation id from the session log.)")
+    click.echo("Then leave the live session to perform it; it polls")
+    click.echo("release_kill_switch.signal and stays halted if any predicate fails.")
+    click.echo("No state was modified.")
+    sys.exit(2)
 
 
 @cli.group()
@@ -113,19 +166,39 @@ def recovery() -> None:
 
 
 @recovery.command()
-def restart() -> None:
-    """Restart from event store: replay, reconcile, transition."""
-    from titan.recovery.restart import recover_from_event_store, reconcile_on_boot, transition_on_boot
-    click.echo("Recovering from event store...")
-    state = recover_from_event_store()
+@click.option("--state-path", default=DEFAULT_STATE_PATH, show_default=True,
+              help="Session state path to recover from; never modified.")
+def restart(state_path: str) -> None:
+    """Report boot-recovery state for a session store. Read-only.
+
+    A lost or empty event store is reported HALTED, never ACTIVE: absence of
+    risk state is not evidence that trading is safe (ADR-020). Arming happens
+    only through scripts/init_session.py.
+    """
+    from titan.recovery.restart import (
+        recover_from_event_store,
+        reconcile_on_boot,
+        transition_on_boot,
+    )
+
+    path = _store_path(state_path)
+    click.echo(f"Recovering from event store {path}...")
+    state = recover_from_event_store(path)
     click.echo("Reconciling...")
-    recon = reconcile_on_boot(state["portfolio"], state["adapter"], state["recon_engine"])
+    recon = reconcile_on_boot(
+        state["portfolio"], state["adapter"], state["recon_engine"])
     click.echo(f"Reconciliation {'clean' if not recon['has_drift'] else 'drift detected'}")
     click.echo(f"Drift count: {recon['drift_count']}")
-    if state.get("store_was_empty"):
-        click.echo("WARNING: Event store was empty — state loss detected, forcing HALTED")
-    transition = transition_on_boot(recon, state["risk_gate"], store_was_empty=state.get("store_was_empty", False))
+    store_was_empty = bool(state.get("store_was_empty"))
+    if store_was_empty:
+        click.echo("WARNING: Event store holds no events - state loss detected, forcing HALTED")
+    transition = transition_on_boot(
+        recon, state["risk_gate"], store_was_empty=store_was_empty)
     click.echo(f"System state: {transition}")
+    if not transition.startswith("ACTIVE"):
+        click.echo("Routing stays blocked. Arm a genuinely new environment with "
+                   "scripts/init_session.py; resume a halted one with an "
+                   "authorized release.")
 
 
 @metrics.command()
