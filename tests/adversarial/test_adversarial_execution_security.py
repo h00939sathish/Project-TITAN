@@ -660,6 +660,18 @@ class TestAdversarialKillSwitchRecovery:
         )
         assert validate_release_auth(auth_exp, kill_corr, seen_nonces=seen_nonces) == "authorization_expired"
 
+        # 4b. Empty / absent expiry (unbounded window) is refused, not treated
+        #     as a never-expiring authorization (ADR-019: bounded window).
+        auth_no_expiry = ReleaseAuthorization(
+            correlation_id=kill_corr, assessment="A", remediation="R",
+            approvers=[ReleaseApproval("alice", now.isoformat()),
+                       ReleaseApproval("bob", now.isoformat())],
+            issued_at=now.isoformat(), expiry="", nonce="rel-1"
+        )
+        assert (validate_release_auth(auth_no_expiry, kill_corr,
+                                      seen_nonces=seen_nonces)
+                == "authorization_incomplete")
+
         # 5. Mismatched correlation ID
         auth_mismatch = ReleaseAuthorization(
             correlation_id="ks-inc-DIFFERENT", assessment="A", remediation="R",

@@ -13,6 +13,7 @@ from typing import Callable, Optional
 
 from titan._core import (
     ApprovedOrderIntent,
+    BrokerPosition,
     ContractType,
     EventEnvelope,
     EventStore,
@@ -219,6 +220,11 @@ class PaperTradingEngine:
         # and the durable refusal ledger (kept separate from the kill reason).
         self._kill_correlation: Optional[str] = None
         self._seen_release_nonces: set[str] = set()
+        # Broker-truth verification flags (ADR-019): reconciliation is only a
+        # valid release predicate when broker positions/cash were actually
+        # fetched. Written by reconcile() under self._lock; default fail-closed.
+        self._broker_positions_verified = False
+        self._broker_cash_verified = False
         self._release_refusals: list[dict] = []
 
 
@@ -1319,11 +1325,14 @@ class PaperTradingEngine:
 
     def reconcile(self) -> ReconciliationResult:
         with self._lock:
+            self._broker_positions_verified = False
+            self._broker_cash_verified = False
             broker_positions = []
             positions_unavailable = False
             try:
                 pos_snapshot = self.adapter.positions(self.config.account_id)
                 broker_positions = pos_snapshot.positions
+                self._broker_positions_verified = True
             except Exception as e:
                 # One retry: transient API hiccups (TWS overload, reconnect window)
                 # must not halt a healthy session. A second failure fails closed —
@@ -1335,6 +1344,7 @@ class PaperTradingEngine:
                 try:
                     pos_snapshot = self.adapter.positions(self.config.account_id)
                     broker_positions = pos_snapshot.positions
+                    self._broker_positions_verified = True
                 except Exception as e2:
                     # Two consecutive failures: likely the TWS "API wedge"
                     # (account queries stall while market data flows). Force a
@@ -1349,6 +1359,7 @@ class PaperTradingEngine:
                     try:
                         pos_snapshot = self.adapter.positions(self.config.account_id)
                         broker_positions = pos_snapshot.positions
+                        self._broker_positions_verified = True
                     except Exception as e3:
                         positions_unavailable = True
                         if self.logger:
@@ -1358,6 +1369,7 @@ class PaperTradingEngine:
             try:
                 bal_snapshot = self.adapter.holdings(self.config.account_id)
                 broker_cash = bal_snapshot.cash
+                self._broker_cash_verified = True
             except Exception as e:
                 if self.logger:
                     self.logger.warning("engine", f"Reconcile: holdings fetch failed: {e}")
@@ -1368,6 +1380,18 @@ class PaperTradingEngine:
                 broker_cash = self.portfolio.get_cash_balance()
                 if self.logger:
                     self.logger.warning("engine", "Reconcile: cash verification skipped (broker cash unavailable)")
+
+            if positions_unavailable:
+                # Fail closed (ADR-019 / Risk.spec "risk unavailable -> fail
+                # closed"): an empty broker set is indistinguishable from a
+                # flat broker account, so comparing against [] could report
+                # InSync for a flat local portfolio. Compare against a
+                # sentinel instead, which forces Critical severity so both the
+                # periodic poll (trip the kill switch) and the release gate
+                # (refuse) fail closed.
+                broker_positions = [
+                    BrokerPosition("__BROKER_POSITIONS_UNAVAILABLE__", "BUY", 1)
+                ]
 
             result = self.reconciler.compare(
                 self.portfolio,
@@ -1645,6 +1669,17 @@ class PaperTradingEngine:
 
             # 1) Held: refuse on genuine critical drift, with a reason code.
             result = self.reconcile()
+            # 1a) Reconciliation is satisfied only when broker truth was
+            #     actually verified: a skipped fetch compares the portfolio
+            #     against itself, which is not reconciliation (ADR-019 /
+            #     Risk.spec "risk unavailable -> fail closed").
+            if not (self._broker_positions_verified and self._broker_cash_verified):
+                self._record_release_refusal("broker_truth_unavailable", {
+                    "positions_verified": self._broker_positions_verified,
+                    "cash_verified": self._broker_cash_verified,
+                })
+                raise RuntimeError(
+                    "Cannot release kill switch: kill_reason=broker_truth_unavailable")
             if result.severity is not None and result.severity == ReconciliationDriftSeverity.Critical:
                 self._record_release_refusal("critical_reconcile_drift", {
                     "position_drifts": len(result.position_drifts),
@@ -1674,6 +1709,13 @@ class PaperTradingEngine:
                 self._record_release_refusal("state_changed")
                 raise RuntimeError("Cannot release kill switch: kill_reason=state_changed")
             result2 = self.reconcile()
+            if not (self._broker_positions_verified and self._broker_cash_verified):
+                self._record_release_refusal("broker_truth_unavailable_toctou", {
+                    "positions_verified": self._broker_positions_verified,
+                    "cash_verified": self._broker_cash_verified,
+                })
+                raise RuntimeError(
+                    "Cannot release kill switch: kill_reason=broker_truth_unavailable_toctou")
             if result2.severity is not None and result2.severity == ReconciliationDriftSeverity.Critical:
                 self._record_release_refusal("critical_reconcile_drift_toctou")
                 raise RuntimeError("Cannot release kill switch: kill_reason=critical_reconcile_drift_toctou")

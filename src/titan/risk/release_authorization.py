@@ -95,6 +95,10 @@ def validate(
         return "release_not_authorized"
 
     now = now_iso or datetime.now(timezone.utc).isoformat()
+    # ADR-019: the bounded window is mandatory. An absent or blank expiry is an
+    # incomplete authorization — never a never-expiring one.
+    if not auth.expiry or not auth.expiry.strip():
+        return "authorization_incomplete"
     if auth.expiry:
         # Compare as datetimes, never lexicographically: producers may write
         # different offsets (Z vs +00:00) or precisions.

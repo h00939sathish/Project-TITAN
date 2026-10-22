@@ -77,6 +77,11 @@ class TestReleaseGate:
         # TOCTOU are under test (adapter/reconcile interplay is covered by the
         # existing engine suites).
         eng.reconcile = lambda: TestReleaseGate._Clean()
+        # The reconcile stub is out of scope for this class (auth + feed-health
+        # + TOCTOU only); mark broker truth verified so the release gate's
+        # broker-truth predicate (ADR-019) does not refuse everything here.
+        eng._broker_positions_verified = True
+        eng._broker_cash_verified = True
         eng._check_adapter_health = lambda force=False: True
         eng.trigger_kill_switch()
         return eng
@@ -131,6 +136,16 @@ class TestReleaseGate:
         auth = _auth(corr=eng._kill_correlation)
         auth.expiry = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
         with pytest.raises(RuntimeError, match="authorization_expired"):
+            eng.release_kill_switch(auth)
+        assert eng.risk_gate.kill_switch.blocks_routing()
+
+    def test_empty_expiry_refused(self):
+        """ADR-019: the bounded window is mandatory — an authorization with no
+        expiry must never read as a never-expiring release credential."""
+        eng = self._triggered_engine(_healthy_feed())
+        auth = _auth(corr=eng._kill_correlation)
+        auth.expiry = ""
+        with pytest.raises(RuntimeError, match="authorization_incomplete"):
             eng.release_kill_switch(auth)
         assert eng.risk_gate.kill_switch.blocks_routing()
 

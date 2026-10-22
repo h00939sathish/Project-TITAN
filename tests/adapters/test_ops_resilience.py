@@ -326,6 +326,56 @@ def test_positions_timeout_fail_closed():
     engine.stop()
 
 
+def test_positions_timeout_flat_portfolio_fail_closed():
+    """A flat local portfolio must NOT reconcile InSync against an empty set
+    when broker positions are unverifiable — empty is indistinguishable from a
+    flat broker account, so unavailability itself fails closed (ADR-019)."""
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    adapter.timeout_positions = True
+    result = engine.reconcile()
+    assert result.severity == ReconciliationDriftSeverity.Critical
+    st = engine.status()
+    assert st.kill_switch.is_triggered()  # cannot verify position truth → halt
+    engine.stop()
+
+
+# ── 5. Release gate refuses when broker truth is unavailable ─────────────────
+
+def test_release_refused_when_positions_unavailable():
+    """Release requires reconciliation; with broker positions unverifiable the
+    predicate is unsatisfied and the release must refuse (ADR-019), even with a
+    flat portfolio and an otherwise-valid authorization."""
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    engine.trigger_kill_switch()
+    adapter.timeout_positions = True
+    with pytest.raises(RuntimeError, match="broker_truth_unavailable"):
+        engine.release_kill_switch(_ops_auth(corr=engine._kill_correlation))
+    assert engine.risk_gate.kill_switch.blocks_routing()
+    engine.stop()
+
+
+def test_release_refused_when_cash_unavailable():
+    """Broker cash unavailability is skipped on the periodic path by design,
+    but the release gate must refuse: reconciliation that substitutes local
+    cash is self-comparison, not verification."""
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    engine.trigger_kill_switch()
+    adapter.timeout_holdings = True
+    with pytest.raises(RuntimeError, match="broker_truth_unavailable"):
+        engine.release_kill_switch(_ops_auth(corr=engine._kill_correlation))
+    assert engine.risk_gate.kill_switch.blocks_routing()
+    engine.stop()
+
+
 # ── 6. Kill switch survives restart (fail-closed recovery) ───────────────────
 
 def test_kill_switch_survives_restart():
