@@ -1,0 +1,19 @@
+# Nightly WF-v2 research queue. Human-edited; the runner reads it and never writes it.
+#
+# Each entry must already exist in research/hypotheses.py with a params["wf_v2"]
+# spec, or it is logged as REFUSED. Order is run order. Entries past
+# max_runs_per_night are deferred to the next night.
+#
+# Run it:  titan research queue            (evaluate)
+#          titan research queue --check-only (eligibility only)
+# Every attempt is appended to research/wf_v2/run_log.jsonl.
+#
+# Hard limits, enforced in src/titan/research/queue.py, not by this file:
+# no promotion, no live config, no edits to research/protocol_WF_v2_PRE_FROZEN.md
+# (a changed protocol aborts the whole night).
+
+max_runs_per_night = 5
+
+# [[experiment]]
+# id = "EXP-00042"
+# note = "why it is queued"

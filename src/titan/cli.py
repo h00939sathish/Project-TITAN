@@ -232,12 +232,40 @@ def research_run(exp_id: str, check_only: bool) -> None:
     """Run hypothesis EXP_ID through the frozen WF-v2 protocol.
 
     Exit 0 = PASS (or ELIGIBLE with --check-only), 1 = FAIL, 2 = refused.
+    Every invocation is appended to research/wf_v2/run_log.jsonl.
     """
-    from titan.research import wf_v2
+    import time
 
-    outcome = wf_v2.run(exp_id, check_only=check_only)
+    from titan.research import queue, wf_v2
+
+    started = time.monotonic()
+    digest = queue.protocol_digest(wf_v2.REPO_ROOT / wf_v2.PROTOCOL)
+    try:
+        outcome = wf_v2.run(exp_id, check_only=check_only)
+    except Exception as exc:
+        queue.log_outcome(wf_v2.REPO_ROOT, trigger="manual", exp_id=exp_id,
+                          check_only=check_only, started=started,
+                          error=f"{type(exc).__name__}: {exc}", protocol_sha256=digest)
+        raise
+    queue.log_outcome(wf_v2.REPO_ROOT, trigger="manual", exp_id=exp_id, check_only=check_only,
+                      started=started, outcome=outcome, protocol_sha256=digest)
     click.echo(outcome.report)
     sys.exit(outcome.exit_code)
+
+
+@research.command("queue")
+@click.option("--check-only", is_flag=True, help="Report eligibility for each queued hypothesis.")
+def research_queue(check_only: bool) -> None:
+    """Run every hypothesis in research/queue.toml through WF-v2, logging each attempt.
+
+    Exit 0 = all attempts completed (any verdict), 1 = at least one crashed,
+    3 = aborted (frozen protocol changed or queue file invalid).
+    """
+    from titan.research import queue
+
+    report = queue.run_queue(check_only=check_only)
+    click.echo("\n".join(report.lines))
+    sys.exit(report.exit_code)
 
 
 if __name__ == "__main__":

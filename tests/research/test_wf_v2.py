@@ -60,10 +60,16 @@ def test_classify_keeps_economic_rationale():
     ("EXP-00002", "legacy hypothesis with no economic rationale"),
     ("EXP-99999", "unknown hypothesis EXP-99999"),
 ])
-def test_cli_refuses_ineligible_hypotheses(exp_id, needle):
+def test_cli_refuses_ineligible_hypotheses(exp_id, needle, tmp_path, monkeypatch):
+    from titan.research import queue
+
+    log = tmp_path / "run_log.jsonl"
+    monkeypatch.setattr(queue, "RUN_LOG", str(log))
     result = CliRunner().invoke(cli, ["research", "run", exp_id])
     assert result.exit_code == 2, result.output
     assert "REFUSED" in result.output
+    record = json.loads(log.read_text(encoding="utf-8"))
+    assert (record["exp_id"], record["status"], record["trigger"]) == (exp_id, "REFUSED", "manual")
     assert needle in result.output
 
 
