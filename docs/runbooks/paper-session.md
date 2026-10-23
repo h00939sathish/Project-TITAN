@@ -20,7 +20,7 @@ python scripts/paper_session.py
 ### IBKR paper
 
 ```bash
-python scripts/ibkr_paper_session.py
+python scripts/paper_session.py --tws
 ```
 
 ## Multi-timeframe monitoring

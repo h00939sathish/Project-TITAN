@@ -537,16 +537,18 @@ def main() -> None:
     # to ~300s old. Allow 2 bars + 1s buffer — a genuinely stalled feed
     # (>~10 min stale) is rejected by the freshness gate (fail-closed).
     data_freshness_threshold_ms = (bar_seconds * 2 + 1) * 1000
+    # 1x gross cap = one full-size position at a time; raise via PAPER_GROSS_EXPOSURE.
+    gross_exposure = os.environ.get("PAPER_GROSS_EXPOSURE", args.starting_capital)
     risk_config = RiskConfig(
-        instruments,
-        Money(args.starting_capital, "USD"),
-        1000,
-        5000,
-        Money(args.starting_capital, "USD"),
-        0.10,
-        Money("5000", "USD"),
-        data_freshness_threshold_ms,
-        100,
+        instrument_eligibility=instruments,
+        max_order_notional=Money(args.starting_capital, "USD"),
+        max_order_quantity=1000,
+        max_position_size=5000,
+        max_gross_exposure=Money(gross_exposure, "USD"),
+        max_drawdown_fraction=0.10,
+        max_daily_loss=Money(os.environ.get("PAPER_DAILY_LOSS_LIMIT", "5000"), "USD"),
+        data_freshness_threshold_ms=data_freshness_threshold_ms,
+        clock_skew_tolerance_ms=100,
     )
     paper_config = PaperConfig(
         risk_config=risk_config,
@@ -858,7 +860,9 @@ def main() -> None:
             price = strategies.current_price(instr)
             if price is None:
                 continue
-            engine._last_prices[instr] = str(price)
+            # Route through update_price so the engine's price history and M2M
+            # valuation (read by the risk gate's correlation rule) stay current.
+            engine.update_price(instr, price)
 
         for instr in instruments:
             price = strategies.current_price(instr)

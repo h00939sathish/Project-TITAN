@@ -7,6 +7,7 @@ import threading
 from collections import Counter, deque
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -130,6 +131,15 @@ class PaperConfig:
     use_twap: bool = False
     twap_slice_count: int = 5
     twap_duration_seconds: int = 60
+    # Transaction cost in basis points of fill notional, charged on EVERY fill.
+    # Both default to "0", which means a cost-free session. That is retained for
+    # backward compatibility, but it is no longer silent: see
+    # PaperTradingEngine.cost_model_configured, which callers MUST surface.
+    # A paper session with cost_model_configured == False cannot produce net PnL
+    # and must not be reported as an economic result.
+    # Audit: engine.py:736 previously hardcoded fees=Money("0") regardless of config.
+    commission_bps: str = "0"
+    spread_bps: str = "0"
 
 
 @dataclass
@@ -635,6 +645,35 @@ class PaperTradingEngine:
     # its own portfolio math.
     # ------------------------------------------------------------------
 
+    @property
+    def cost_model_configured(self) -> bool:
+        """True when this session charges non-zero transaction cost.
+
+        Audit finding: engine.py:736 hardcoded fees=Money("0") for every fill, so a
+        paper session silently overstate results by the full cost. A caller that
+        reports PnL from a session where this is False is reporting a gross
+        number and saying it is net.
+        """
+        return (Decimal(self.config.commission_bps) > 0
+                or Decimal(self.config.spread_bps) > 0)
+
+    def _fill_fee(self, quantity: int, price: str) -> Money:
+        """Transaction cost for one fill, in the ledger currency.
+
+        NOTE (audit, unresolved): PortfolioEngine.apply_fill in core/src/portfolio.rs
+        has signature (instrument_id, side, quantity, price) and exposes no way to
+        debit cash for a fee, and the Rust extension cannot be rebuilt in this
+        environment (no cargo/rustc), so the fee is computed and REPORTED here but is
+        NOT yet booked against portfolio cash. Until apply_fill takes a fees
+        argument, `cost_model_configured == True` means the emitted fills carry the
+        correct fee but portfolio cash is still gross. Do not treat PnL as net
+        until that Rust change lands.
+        """
+        notional = Decimal(str(quantity)) * Decimal(str(price))
+        bps = Decimal(self.config.commission_bps) + Decimal(self.config.spread_bps)
+        fee = (notional * bps) / Decimal(10000)
+        return Money(str(fee.quantize(Decimal("0.00000001"))), self.config.currency)
+
     def _absorb_broker_fill(
         self,
         order_id: str,
@@ -733,7 +772,7 @@ class PaperTradingEngine:
             side=side.upper(),
             quantity=str(delta),
             price=price,
-            fees=Money("0", self.config.currency),
+            fees=self._fill_fee(delta, price),
             currency=self.config.currency,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )

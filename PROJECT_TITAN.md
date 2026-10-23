@@ -14,7 +14,7 @@ TITAN is an institutional autonomous quantitative research and trading operating
 
 ## Why this exists
 
-The comparative R&D found no repository that should be adopted wholesale. NautilusTrader supplies the strongest execution foundation; Jesse supplies mature research/validation primitives; LLM_trader supplies bounded reflection concepts; Fincept supplies broker-connector lessons; new trade supplies useful but independently re-validated risk and event-store ideas. The analysis also identified dangerous gaps: LLM risk control, unwired circuit breakers, auto-reset kill switches, singletons as critical state, and un-reconciled execution. [Evidence: `../BEST_OF_BREED_MATRIX.md`, `../HOSTILE_REVIEW.md`, `../FAILURE_ANALYSIS.md`]
+The comparative R&D found no repository that should be adopted wholesale. NautilusTrader supplies the strongest execution foundation; Jesse supplies mature research/validation primitives; LLM_trader supplies bounded reflection concepts; Fincept supplies broker-connector lessons; new trade supplies useful but independently re-validated risk and event-store ideas. The analysis also identified dangerous gaps: LLM risk control, unwired circuit breakers, auto-reset kill switches, singletons as critical state, and un-reconciled execution. [Evidence: `docs/reference/EVIDENCE_SYNTHESIS.md`, `docs/reference/REPOSITORY_CATALOG.md`]
 
 ## Objectives
 
@@ -41,7 +41,7 @@ TITAN is a modular event-driven core with explicit state and durable facts. It b
 
 ## Long-term vision and phases
 
-**Foundation:** deterministic core, data contracts, test harness, observability, simulation, and paper trading. **Controlled operation:** limited instruments/brokers, reconciliation and human live approval. **Scale:** multi-asset and multi-broker only after capacity and failure evidence. **Learning:** advisory knowledge and reflection improve research under governance. The original staged analysis is in `../IMPLEMENTATION_ROADMAP.md`.
+**Foundation:** deterministic core, data contracts, test harness, observability, simulation, and paper trading. **Controlled operation:** limited instruments/brokers, reconciliation and human live approval. **Scale:** multi-asset and multi-broker only after capacity and failure evidence. **Learning:** advisory knowledge and reflection improve research under governance. The staged admission criteria for further research programs are in `docs/adr/ADR-033-cross-market-alpha-research-admission.md` and `research/CROSS_MARKET_ALPHA_CHARTER.md`.
 
 ## Engineering culture
 

@@ -69,16 +69,18 @@ def _build_config(args) -> tuple[PaperConfig, str]:
 
     bar_seconds = _bar_seconds(args.bar_size)
     data_freshness_threshold_ms = (bar_seconds * 2 + 1) * 1000
+    # Mirrors paper_session.py: 1x gross cap, env-tunable daily loss and gross exposure.
+    gross_exposure = os.environ.get("PAPER_GROSS_EXPOSURE", args.starting_capital)
     risk_config = RiskConfig(
-        [],
-        Money(args.starting_capital, "USD"),
-        1000,
-        5000,
-        Money(args.starting_capital, "USD"),
-        0.10,
-        Money("5000", "USD"),
-        data_freshness_threshold_ms,
-        100,
+        instrument_eligibility=[],
+        max_order_notional=Money(args.starting_capital, "USD"),
+        max_order_quantity=1000,
+        max_position_size=5000,
+        max_gross_exposure=Money(gross_exposure, "USD"),
+        max_drawdown_fraction=0.10,
+        max_daily_loss=Money(os.environ.get("PAPER_DAILY_LOSS_LIMIT", "5000"), "USD"),
+        data_freshness_threshold_ms=data_freshness_threshold_ms,
+        clock_skew_tolerance_ms=100,
     )
     paper_config = PaperConfig(
         risk_config=risk_config,

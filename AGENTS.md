@@ -12,7 +12,7 @@
 
 ## Mission and north star
 
-Build a proprietary, evidence-led platform for autonomous research, strategy development, validation, paper trading, and human-approved live trading. The north star is a platform that is safer, clearer, and more maintainable than the individual systems studied—not a system that imitates any of them. Ground claims in the reports one directory above, especially `EXECUTIVE_SUMMARY.md`, `HOSTILE_REVIEW.md`, and `FINCEPT_DELTA_REPORT.md`.
+Build a proprietary, evidence-led platform for autonomous research, strategy development, validation, paper trading, and human-approved live trading. The north star is a platform that is safer, clearer, and more maintainable than the individual systems studied—not a system that imitates any of them. The original R&D reports are no longer in the repository; the durable synthesis of that evidence is `docs/reference/EVIDENCE_SYNTHESIS.md`, with per-system detail in `docs/reference/REPOSITORY_CATALOG.md` and adoption rationale in `docs/adr/`.
 
 ## Operating rules
 
@@ -57,11 +57,11 @@ A subsystem or cross-cutting change may be implemented only when all six conditi
 5. **Rollback defined** — the procedure for reverting the change without data loss or inconsistent state is documented.
 6. **Monitoring defined** — the metrics and alerts that will detect a malfunction in this subsystem are specified.
 
-This gate prevents the "exists but not wired" failure mode documented in `../FAILURE_ANALYSIS.md` by ensuring no control is declared before its verification, rollback, and observability are designed.
+This gate prevents the "exists but not wired" failure mode catalogued in `specifications/FAILURE_MATRIX.md` by ensuring no control is declared before its verification, rollback, and observability are designed.
 
 ## Architecture and adoption
 
-Use typed messages, an event-driven execution core, explicit trading states, and reconciliation patterns informed by NautilusTrader. Use Jesse-derived indicators, optimization, walk-forward, and Monte Carlo only within validation. Use LLM_trader reflection and memory only as advisory systems. Treat TradingAgents as research workflow only. Treat Fincept as connector-design evidence, not a license to reproduce its god-object shape. Do not adopt TRADE; retain it only as an anti-pattern source. See `../ADOPTION_DECISIONS.md` and `../FAILURE_ANALYSIS.md`.
+Use typed messages, an event-driven execution core, explicit trading states, and reconciliation patterns informed by NautilusTrader. Use Jesse-derived indicators, optimization, walk-forward, and Monte Carlo only within validation. Use LLM_trader reflection and memory only as advisory systems. Treat TradingAgents as research workflow only. Treat Fincept as connector-design evidence, not a license to reproduce its god-object shape. Do not adopt TRADE; retain it only as an anti-pattern source. Rationale per system is recorded in `docs/reference/EVIDENCE_SYNTHESIS.md`; binding decisions are in `docs/adr/`.
 
 ## Continuous loops and success criteria
 
@@ -71,3 +71,22 @@ Operate the Research, Architecture, Implementation, and Evolution loops defined 
 
 Do not commit secrets; broaden a model’s authority; add a dependency without an owner and reason; merge disabled tests; introduce a second owner for positions/orders; ship a risk control that is not wired into the order path; auto-reset a kill switch; self-issue promotion certificates; modify OOS parameters post-evaluation; cite frictionless simulation evidence; or promote live trading without the gates in `docs/reference/IMPLEMENTATION_PLAYBOOK.md` and `RISK_POLICY.md`.
 
+---
+
+## Second Brain (shared agent memory)
+
+This project is bound to the `titan` workspace of the shared brain at `/mnt/shared/projects/second-brain`.
+Any agent working here should use it: the workspace is detected from the cwd, so no
+configuration is needed.
+
+```bash
+brain whoami                 # confirm which workspace you are in
+brain brief                  # your context: leases, board, recent notes, top claims
+brain start --agent <you> --files <paths you will write>   # leases are enforced
+brain recall "..."           # knowledge other agents recorded for this project
+brain post "..."             # something the other agents should know right now
+brain claim "..." --source <path>    # anything durable you proved
+brain end <session-id> --summary "..." --test-status "pytest: N passed"
+```
+
+Full protocol: `brain bootstrap`, or read `/mnt/shared/projects/second-brain/AGENTS.md`.

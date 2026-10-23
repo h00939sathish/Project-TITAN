@@ -1,0 +1,80 @@
+{
+  "hypothesis_id": "CRYPTO-007",
+  "title": "Maker-rebate fee regime as a rescue for mid-band liquidity provision",
+  "governing_adrs": ["ADR-029", "ADR-030"],
+  "follows": "CRYPTO-006 (probe_gated_rejection, execution_constrained_rejection)",
+  "sanctioned_by": "CRYPTO-006 record S10.4 and CRYPTO-005 S6 both named a maker-rebate fee tier as a legitimate DISTINCT hypothesis, not a retune",
+  "status": "pre-registered-frozen",
+  "frozen_at": "2026-09-22T11:05:00Z",
+  "registered_by": "qoder_titan / brain s-20260922-7f009c",
+  "precedes_any_computation": true,
+
+  "design_change_vs_006": "ONLY the maker fee parameter. Instrument universe, quote policy, fill rule, markout horizon, notional and participation cap are inherited unchanged from CRYPTO-006.",
+
+  "key_identity_stated_before_running": "net_edge_bps(fee f) = half_spread_bps - f + markout60_bps. The fee enters ADDITIVELY and does not interact with spread or markout, so the per-fill distribution shifts rigidly: median(net at f) = median(net at 2bps) + (2 - f), and the same holds for any fixed quantile including a bootstrap lower bound. Therefore gross_bps := median_net_edge_bps + 2.0 is the exact spread-plus-markout term, and the break-even maker fee f_be = gross_bps. No re-download is required and NO new partition is read.",
+
+  "oos_exposure": {
+    "oos_partition_read": false,
+    "new_market_data_downloaded": false,
+    "input": "research/crypto/results/CRYPTO-006-probe.json (sealed in-sample artefact) plus the frozen 90d volume already in its universe manifest"
+  },
+
+  "schedule_unavailability_declared_upfront": "Binance's published USD-M VIP fee schedule is NOT retrievable from this environment: binance.com fee/announcement pages are JS-gated (WebFetch returned no content) and GET /fapi/v1/commissionRate returns 401 because it is USER_DATA signed. No credentials are used. Consequently ANY specific tier table used here is UNVERIFIED and may NOT be load-bearing. The verdict is gated ONLY on the schedule-independent part.",
+
+  "monotonicity_assumption": "Venue fee schedules are monotonically non-increasing in 30-day volume: more volume never buys a HIGHER maker fee. This is structural to VIP pricing and is the only property the load-bearing test relies on.",
+
+  "analysis_steps": {
+    "1_breakeven": "For each symbol compute f_be_median = median_net_edge + 2 and f_be_lb95 = bootstrap_lb95_net + 2, both in bps. f_be_lb95 is the fee below which the block-bootstrap 95% lower bound turns positive.",
+    "2_bias_bound": "The CRYPTO-006 reversal proxy OVERSTATES half-spread, so every computed f_be is an UPPER bound on the true break-even fee. The true fee required is STRICTER than reported. A symbol whose f_be_upper is already below any attainable fee cannot be rescued under any assumption.",
+    "3_attainable_volume": "Upper bound on the account's 30-day quote volume contributed by symbol i = participation_cap (0.02) x (volume_90d_usd / 3). This is generous: it assumes the account is at its cap on every print of that symbol for a full month, and it is the only volume source under test.",
+    "4_structural_test_LOAD_BEARING": "Measure corr(f_be_lb95, max_attainable_30d_volume) across symbols. Under the monotonicity assumption, a LOWER required fee can only be attained by HIGHER account volume. If the symbols needing the biggest fee CUTS are precisely those capable of the LEAST volume, then NO monotone schedule can satisfy them simultaneously. This disproof needs no tier table.",
+    "5_frontier_report": "Report the (max attainable volume, required fee) frontier so a human holding the real schedule can read feasibility directly. The schedule sweep used for illustration is labelled unverified and is NOT a gate."
+  },
+
+  "gates_frozen": {
+    "R1_robust_symbols_exist": {
+      "requirement": ">= 50% of the 20 CRYPTO-006 symbols have f_be_median > 0 (positive gross at a zero maker fee)",
+      "role": "necessary: if gross is negative even at fee=0, no rebate whatsoever helps that symbol",
+      "on_fail": "rebate_regime_impossible"
+    },
+    "R2_structural_anticorrelation": {
+      "requirement": "corr(f_be_lb95, max_attainable_30d_volume) <= -0.50, i.e. required fee cuts and volume capability move in opposite directions",
+      "role": "the load-bearing, schedule-independent test",
+      "on_pass": "rebate_attainment_contradiction",
+      "on_fail": "no structural contradiction; escalate to schedule verification with real account access"
+    },
+    "R3_depth_names": {
+      "requirement": "at least one symbol with 90d quote volume >= 2x the band median has f_be_lb95 > 0 (a name that can actually absorb size AND turns positive under a plausible cut)",
+      "role": "guards against an edge that exists only in uninvestable tails, the specific failure that killed CRYPTO-006",
+      "on_fail": "capacity_in_tail_only"
+    },
+    "verdict_rule": "REJECT rebate regime if R1 fails OR (R2 passes AND R3 fails). Report the frontier either way."
+  },
+
+  "authority": {
+    "live_capital": false, "paper_trading": false, "orders": false,
+    "credentials_used": false, "self_promotion_permitted": false
+  },
+  "expected_outcome_recorded_before_running": "Rejection is the prior, for two reasons stated in advance so a later result cannot look assumed: (1) CRYPTO-006's positive side lived in the illiquid tail, and rebate tiers are earned by volume, so the two requirements point opposite ways; (2) the f_be numbers are upper bounds computed from a knowingly inflated gross, so they are generous to the hypothesis and still marginal.",
+
+  "outcome": {
+    "recorded_at_utc": "2026-09-22T11:20:00Z",
+    "verdict": "NO_STRUCTURAL_CONTRADICTION_VERIFY_SCHEDULE_WITH_ACCOUNT_ACCESS",
+    "lifecycle": "RESEARCH -> SUSPEND (not RETIRE)",
+    "gates_result": {"R1": "PASS 20/20 positive gross at zero fee", "R2": "FAIL Pearson -0.379 / Spearman -0.441 vs frozen -0.50", "R3": "PASS ATOM, PEOPLE, STEEM, SUSHI"},
+    "prior_was_wrong": "The pre-registered expectation (rejection via attainment contradiction) did NOT materialise at the frozen threshold. Reported as a gate FAIL, not re-specified: the global correlation was under-powered for a relation that is monotone in rank but strongly non-linear, the contradiction being localised in the thinnest names (OGN needs fee < 13.2bps but can generate only ~$10M/30d). Altering the statistic post-hoc to recover a rejection is the exact move the constitution forbids.",
+    "headline_answer": "A rebate is NOT required. Names still negative at VIP0 need cuts of only 0.15-1.40 bps (median 0.90). Best-case monthly fee saving across all depth-capable names ~$9,700; total attainable 30d volume across the band $489M ($204M depth-capable).",
+    "why_still_not_pursued": [
+      "every f_be is an UPPER bound from an upward-biased proxy, and the required cuts (0.32-0.89 bps on depth-capable names) are smaller than the unquantified bias dominating them - the decision is set by measurement error, not by the fee",
+      "the ~$9.7k/month prize is the same order as the strategy's own most-trustworthy edge (~$3.1k/month, PEOPLEUSDT), while qualifying requires sustained 2% participation whose impact cost the model books as zero",
+      "the venue schedule is unverifiable from this environment and even the account's own tier needs signed USER_DATA access (401)",
+      "rebate terms are promotional and unilaterally revocable, so an edge contingent on them is not durable"
+    ],
+    "correction_to_crypto_006": "MATERIAL: the CRYPTO-006 write-up asserted the edge sat ENTIRELY in the illiquid half and that every deep name was net negative. False. PEOPLEUSDT ($7.11B 90d volume, 2nd largest in band) is net POSITIVE with LB95 +2.727 bps, and it is the study's most credible measurement because proxy bias grows with thinness. Corrected in CRYPTO-006 S10.2/S10.2b. Verdict unchanged (G2b failed 10/20 vs threshold 12) but CRYPTO-006 understated the mechanism. This correction is the reason CRYPTO-007 was run.",
+    "what_would_change_this": ["authenticated commissionRate + authoritative schedule (resolves access)", "historical L2 depth replacing the reversal proxy (the only item that can move the SIGN, so it dominates)", "queue-position-explicit fill model"],
+    "portfolio_effect": "no change; qualified_variants unchanged; no capital, paper or live instance; Architecture Council countersignature required to move this record",
+    "credentials_used": false,
+    "oos_partition_read": false,
+    "new_market_data_downloaded": false
+  }
+}

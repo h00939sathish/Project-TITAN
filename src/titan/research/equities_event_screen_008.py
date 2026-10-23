@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -466,7 +466,13 @@ def evaluate_factor_gates_008(
     prereg: FactorPreRegistration,
     *,
     is_monotonic: bool = False,
-    replicated: bool = False,
+    replicated: Optional[bool] = None,
+    # AUDIT FIX (2026-09-29): `replicated` defaulted to False, so the replication
+    # gate could never pass and `verdict` was a CONSTANT ("negative_result") for
+    # every screen, not a measurement. CRYPTO-001 passed 4/5 gates and EQ-007
+    # passed 5/9 (incl. OOS Sharpe 1.249) yet both were filed as failures.
+    # None now means "not measured" and yields `inconclusive`, which is the
+    # honest verdict. Only an explicit True/False is a measurement.
     is_res: FactorSimulationResult | None = None,
 ) -> dict[str, Any]:
     """Evaluates frozen decision gates for EQ-008 and classifies outcome per AGENTS.md Rule 8."""
@@ -486,11 +492,14 @@ def evaluate_factor_gates_008(
         "target_turnover_enforced": bool(oos_res.monthly_turnover <= target_turnover),
         "quantile_monotonicity": bool(is_monotonic),
         "adverse_net_positive": bool(adverse_res.annualized_net_return > 0.0),
-        "replication": bool(replicated),
+        "replication": replicated,
     }
 
-    all_passed = all(gates.values())
-    verdict = "candidate" if all_passed else "negative_result"
+    all_passed = all(v for v in gates.values() if v is not None)
+    if replicated is None:
+        verdict = "inconclusive"
+    else:
+        verdict = "candidate" if all_passed else "negative_result"
 
     # Rule 8 Failure Mode Attribution
     failure_mode = ""
@@ -563,7 +572,13 @@ def run_event_screen_008(
     universe: EquitiesUniverseData,
     prereg: FactorPreRegistration,
     *,
-    replicated: bool = False,
+    replicated: Optional[bool] = None,
+    # AUDIT FIX (2026-09-29): `replicated` defaulted to False, so the replication
+    # gate could never pass and `verdict` was a CONSTANT ("negative_result") for
+    # every screen, not a measurement. CRYPTO-001 passed 4/5 gates and EQ-007
+    # passed 5/9 (incl. OOS Sharpe 1.249) yet both were filed as failures.
+    # None now means "not measured" and yields `inconclusive`, which is the
+    # honest verdict. Only an explicit True/False is a measurement.
     allow_oos_for_parameters: bool = False,
 ) -> dict[str, Any]:
     """Runs the complete EQ-008 Staggered PEAD event screen and saves evidence bundle to research/equities/results."""

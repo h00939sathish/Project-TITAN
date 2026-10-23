@@ -155,11 +155,7 @@ def run_smoke_backtest(instrument_id: str, *, live: bool = False) -> dict:
             else:
                 rejected += 1
 
-        engine._last_prices[instrument_id] = str(close)
-        try:
-            engine.portfolio.update_market_price(instrument_id, str(close))
-        except Exception:
-            pass
+        engine.update_price(instrument_id, close)
 
     if trades > 0:
         result = engine.submit_intent(_smoke_intent(cfg, "SELL"))

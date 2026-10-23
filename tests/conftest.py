@@ -23,7 +23,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.skip(
                 reason="requires live Alpaca API; run with --run-live"))
 
-# NautilusTrader IB adapter compatibility shim for ibapi 9.81
+# IB adapter compatibility shim for ibapi 9.81
 try:
     import ibapi.const
 except ImportError:
