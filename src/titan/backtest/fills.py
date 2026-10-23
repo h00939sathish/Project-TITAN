@@ -24,9 +24,10 @@ class FillResult:
 class BarConservativeFillModel:
     """Conservative fill model supporting bar execution and quote-sided canonical FX simulation."""
 
-    def __init__(self, slippage_bps: float = 0.5, commission_bps: float = 1.0):
+    def __init__(self, slippage_bps: float = 0.5, commission_bps: float = 1.0, price_decimals: int = 2):
         self.slippage_bps = slippage_bps
         self.commission_bps = commission_bps
+        self.price_decimals = price_decimals
 
     def fill(
         self,
@@ -103,10 +104,10 @@ class BarConservativeFillModel:
         fill_cost = fill_price * float(quantity)
         commission = fill_cost * self.commission_bps / 10000.0
         return FillResult(
-            fill_price=round(fill_price, 2),
+            fill_price=round(fill_price, self.price_decimals),
             fill_quantity=int(quantity),
             fill_cost=round(fill_cost, 2),
-            slippage=round(slippage, 2),
+            slippage=round(slippage, self.price_decimals),
             commission=round(commission, 2),
             fidelity="standard",
         )

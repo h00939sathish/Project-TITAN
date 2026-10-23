@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Protocol
 
 
@@ -11,6 +12,7 @@ class StrategyLike(Protocol):
 from ..execution.backtest_adapter import BacktestAdapter
 from ..execution.engine import PaperConfig, PaperTradingEngine
 from ..backtest.fills import BarConservativeFillModel
+from ..risk.circuit_breaker import CircuitBreaker
 from .._core import ContractType, Instrument, InstrumentId, TradeIntent, Money, RiskConfig
 from ..risk.session_initialization import (
     InitializerApproval,
@@ -60,6 +62,20 @@ class BarResult:
     cash: str
 
 
+def _bar_epoch(timestamp, previous: float) -> float:
+    """Simulated clock reading for a bar: its UTC epoch, never moving backwards.
+
+    Unparseable timestamps advance the clock by one second per bar.
+    """
+    try:
+        dt = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+    except ValueError:
+        return previous + 1.0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return max(previous, dt.timestamp())
+
+
 class ReplayEngine:
     """Drives a strategy through PaperTradingEngine over historical bar data.
 
@@ -81,10 +97,16 @@ class ReplayEngine:
         slippage_bps: float = 0.0,
         commission_bps: float = 0.0,
         intent_qty: int = 10,
+        tick_size: str = "0.01",
     ):
         self._strategy = strategy
         self._bars = list(bars)
-        self._fill_model = BarConservativeFillModel(slippage_bps=slippage_bps, commission_bps=commission_bps)
+        self._tick = Decimal(tick_size)
+        if self._tick <= 0:
+            raise ValueError(f"tick_size must be positive, got {tick_size!r}")
+        self._precision = max(0, -self._tick.as_tuple().exponent)
+        self._fill_model = BarConservativeFillModel(
+            slippage_bps=slippage_bps, commission_bps=commission_bps, price_decimals=self._precision)
         self._slippage_bps = slippage_bps
         self._intent_qty = intent_qty
 
@@ -111,6 +133,9 @@ class ReplayEngine:
             risk_config=risk_config,
             state_path="",
         )
+
+    def _price_str(self, price) -> str:
+        return str((Decimal(str(price)) / self._tick).to_integral_value(ROUND_HALF_EVEN) * self._tick)
 
     def _check_exits(self, bar: dict, ex: dict) -> tuple[str, float] | None:
         """Evaluate one bar against active exit levels.
@@ -178,8 +203,13 @@ class ReplayEngine:
         adapter = BacktestAdapter(bars, fill_model=self._fill_model)
         engine = PaperTradingEngine(self._config, adapter)
         for instr_id in instrument_ids:
-            inst = Instrument(InstrumentId(instr_id, "BACKTEST"), "0.01", 1, "1.0", ContractType.Stock, "USD", 2)
+            inst = Instrument(InstrumentId(instr_id, "BACKTEST"), str(self._tick), 1, "1.0",
+                              ContractType.Stock, "USD", self._precision)
             engine.register_instrument(inst)
+        # The breaker's rate limits are wall-clock; a replay submits years of
+        # intents in seconds, so it must run on simulated bar time instead.
+        sim_now = [0.0]
+        engine.circuit_breaker = CircuitBreaker(clock=lambda: sim_now[0])
         now = datetime.now(timezone.utc)
         engine.initialize_new_session(SessionInitialization(
             approvers=[
@@ -234,6 +264,7 @@ class ReplayEngine:
                 pass
 
         for bar in bars:
+            sim_now[0] = _bar_epoch(bar.get("timestamp"), sim_now[0])
             adapter.advance_to(bar)
             engine._check_adapter_health()
             # Sampled on entry to each bar; the marks were set by the previous
@@ -269,7 +300,7 @@ class ReplayEngine:
                         time_in_force="DAY",
                         risk_profile_version="1.0",
                         market_data_timestamp=bar["timestamp"] if "T" in str(bar["timestamp"]) else bar["timestamp"] + "T00:00:00Z",
-                        price=str(round(fill_price, 2)),
+                        price=self._price_str(fill_price),
                     )
                     order_result = engine.submit_replay_intent(intent)
                     if order_result.accepted:
@@ -313,7 +344,7 @@ class ReplayEngine:
                 time_in_force="DAY",
                 risk_profile_version="1.0",
                 market_data_timestamp=bar["timestamp"] if "T" in str(bar["timestamp"]) else bar["timestamp"] + "T00:00:00Z",
-                price=str(round(fill_price, 2)),
+                price=self._price_str(fill_price),
             )
 
             order_result = engine.submit_replay_intent(intent)

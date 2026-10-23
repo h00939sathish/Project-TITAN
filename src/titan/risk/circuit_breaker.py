@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Callable
 
 
 class BreakerStage(str, Enum):
@@ -37,8 +37,10 @@ class CircuitBreakerStatus:
 class CircuitBreaker:
     """Multi-stage risk circuit breaker protecting execution pipelines from runaway orders."""
 
-    def __init__(self, config: CircuitBreakerConfig | None = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None,
+                 clock: Callable[[], float] = time.monotonic):
         self.config = config or CircuitBreakerConfig()
+        self._clock = clock
         self._stage = BreakerStage.NORMAL
         self._consecutive_errors = 0
         self._last_error_time = 0.0
@@ -53,7 +55,7 @@ class CircuitBreaker:
 
     def record_intent(self) -> tuple[bool, str]:
         """Record an incoming order intent. Returns (allowed, rejection_reason)."""
-        now = time.monotonic()
+        now = self._clock()
         self._evaluate_cooldown()
 
         if self._stage == BreakerStage.TRIPPED:
@@ -86,7 +88,7 @@ class CircuitBreaker:
 
     def record_error(self, error_msg: str = "") -> BreakerStage:
         """Record a broker submit or transport error."""
-        now = time.monotonic()
+        now = self._clock()
         self._consecutive_errors += 1
         self._last_error_time = now
 
@@ -104,7 +106,7 @@ class CircuitBreaker:
         """Record a successful order acknowledgement or fill."""
         self._consecutive_errors = 0
         if self._stage in (BreakerStage.NORMAL, BreakerStage.THROTTLED, BreakerStage.DEGRADED):
-            now = time.monotonic()
+            now = self._clock()
             if now >= self._cooldown_until:
                 self._stage = BreakerStage.NORMAL
                 self._reason = ""
@@ -123,7 +125,7 @@ class CircuitBreaker:
         self._reason = ""
 
     def get_status(self) -> CircuitBreakerStatus:
-        now = time.monotonic()
+        now = self._clock()
         self._evaluate_cooldown()
         sec_count = sum(1 for t in self._intent_timestamps if now - t <= 1.0)
         min_count = len([t for t in self._intent_timestamps if now - t <= 60.0])
@@ -140,6 +142,6 @@ class CircuitBreaker:
 
     def _evaluate_cooldown(self) -> None:
         if self._stage == BreakerStage.DEGRADED:
-            if time.monotonic() >= self._cooldown_until:
+            if self._clock() >= self._cooldown_until:
                 self._stage = BreakerStage.NORMAL
                 self._reason = ""

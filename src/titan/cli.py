@@ -218,5 +218,27 @@ def health() -> None:
     click.echo(f"Broker truth matches: {'YES' if broker_matches else 'NO'}")
 
 
+@cli.group()
+def research() -> None:
+    """Research commands. No LLM, no parameter search, no promotion."""
+    pass
+
+
+@research.command("run")
+@click.argument("exp_id")
+@click.option("--check-only", is_flag=True,
+              help="Report WF-v2 eligibility (including data coverage) without evaluating.")
+def research_run(exp_id: str, check_only: bool) -> None:
+    """Run hypothesis EXP_ID through the frozen WF-v2 protocol.
+
+    Exit 0 = PASS (or ELIGIBLE with --check-only), 1 = FAIL, 2 = refused.
+    """
+    from titan.research import wf_v2
+
+    outcome = wf_v2.run(exp_id, check_only=check_only)
+    click.echo(outcome.report)
+    sys.exit(outcome.exit_code)
+
+
 if __name__ == "__main__":
     cli()

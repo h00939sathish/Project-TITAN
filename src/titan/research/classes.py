@@ -52,6 +52,7 @@ def classify(experiment: Experiment, cls: HypothesisClass) -> Experiment:
     return Experiment(
         id=experiment.id,
         question=experiment.question,
+        economic_rationale=experiment.economic_rationale,
         dataset_id=experiment.dataset_id,
         features=experiment.features,
         target=experiment.target,

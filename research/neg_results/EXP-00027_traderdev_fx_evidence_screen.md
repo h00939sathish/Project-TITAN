@@ -49,3 +49,25 @@
 - **Reusable assets:** `source_traderdev_fx.py` (API sourcing), 
   `traderdev_fx_screen.py` (native re-implementation + corrected cost-aware
   backtest), `results/traderdev_fx_evidence_screen.json`.
+## Erratum (2026-10-23) — screen cost/sign correction, verdict unchanged
+
+The sealed table above was produced by a `backtest()` with two further bugs:
+shorts earned the *positive* bar return, and each position change was charged
+`COST_RT/2` regardless of size or leverage (a long->short flip paid half a
+round trip, unleveraged). `traderdev_fx_screen.py` now charges `COST_RT/2` per
+unit of leveraged notional traded and gives shorts the negative bar return.
+The sealed table and `results/traderdev_fx_evidence_screen.json` are left as
+they were; the rerun below imported the screen module and ran the old and
+corrected `backtest()` side by side without calling `main()` (same data, same
+folds, same kill gate).
+
+- **Verdicts: 0 of 16 changed — still 0/16 survive. Decision stays REJECT.**
+- Most cells get materially worse (e.g. EURUSD ema_cross_trend -2.86% -> -16.80%,
+  GBPUSD donchian_breakout +3.41% -> -16.26%).
+- One cell improves to an attractive-looking but non-surviving line:
+  EURUSD ema200_atr_range ann +3.13%, Sharpe 2.93, PF 10.6. It fails the 4%
+  return floor, and the Sharpe rests on 20 non-zero bars out of 644 (~14
+  entries). It is not a survivor and is not to be reported as one.
+- Further known screen flaw, not fixed here: the `trades >= 60` criterion is
+  checked against the number of *bars* (`n`), not trades. Applying it to
+  entries would only make the gate stricter, so no verdict can change.

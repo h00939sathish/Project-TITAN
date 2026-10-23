@@ -306,19 +306,22 @@ def backtest(s, signal, start, end):
     NO return from the new position (no same-bar lookahead). Returns are earned
     only on bars where the position was already held at bar-open (i.e. the
     signal from the PREVIOUS bar governs the return of THIS bar).
+
+    Cost is COST_RT/2 per unit of leveraged notional traded, so a long->short flip
+    (two units) pays a full round trip. Shorts earn the negative of the bar return.
     """
     rets = []
     pos = 0
+    lev = VOL_TARGET / EST_VOL
     for i in range(max(start, 1), end):
         # signal[i] was decided at bar i close; it can only affect bar i+1
         # -> use signal[i-1] to decide position during bar i (no lookahead)
         target = signal[i - 1] if i - 1 >= 0 else 0
-        ret = (s[i] / s[i - 1] - 1.0) * (VOL_TARGET / EST_VOL)
         if target != pos:
-            rets.append(-COST_RT / 2.0)      # entry/exit cost only, no bar return
+            rets.append(-COST_RT / 2.0 * abs(target - pos) * lev)  # no bar return
             pos = target
         else:
-            rets.append(ret if pos else 0.0)
+            rets.append(pos * (s[i] / s[i - 1] - 1.0) * lev)
     return rets
 
 
