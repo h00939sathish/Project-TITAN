@@ -1,0 +1,33 @@
+{
+  "exp_id": "EXP-00033",
+  "strategy_id": "traderdev-ema9-vwap",
+  "strategy_version": "1.0.0",
+  "verdict": "candidate",
+  "scope": "WF-v2 eligibility only. Not a promotion, not a live-trading approval, and no parameter of the frozen protocol is relaxed by this record.",
+  "recorded": "2026-10-24",
+  "why_a_candidate": [
+    "EXP-00025 screened the trader.dev families on real Dukascopy 1m bid/ask, resampled to 4h, EURUSD + GBPUSD, 2025-08..2026-07, with real spread + 0.5bps slippage + 0.2bps commission and intrabar stops. F1 ema9_vwap was the only family net positive: +408.3 pips pooled, EURUSD +71.8 (84 trades, 2/4 quarters positive), GBPUSD +336.5 (79 trades, 3/4 quarters positive). All other families were rejected.",
+    "research/results/ema9vwap_promotion_report.md (2026-08-07) evaluated this registered port against the promotion gate and left it a registered candidate: 4 of 7 gates fail, and nothing in that evaluation promotes it.",
+    "The promotion gate's walk_forward failure is recorded as honestly UNMET, not failed: the only dataset available was the 12 months the strategy was tuned on, and a split of already-seen data would not be out of sample. The report names fresh out-of-sample history as the requirement to unblock it."
+  ],
+  "unresolved_evidence": [
+    "walk_forward: UNMET on the tuning window; this WF-v2 run on 2022-08..2025-07 is the fresh out-of-sample test, and a FAIL here is a real FAIL.",
+    "parameter_stability: the 2D surface (ema_period 5-21 x trail_mult 2.0-3.0, 99 cells x 2 pairs) shows no compact plateau. EURUSD produced 44/99 positive cells, and the default neighbourhood (ema 7/9/11 x trail 2.0-2.2) only 3/9 positive with mean -203 pips; moving ema 9 -> 7 takes EURUSD from +72 to -438 pips. GBPUSD produced 74/99 positive cells, default neighbourhood 8/9, mean +298 pips.",
+    "Pair specificity: the two pairs favour different parameter corners, which is the signature of pair-specific noise rather than one transferable edge.",
+    "The base_qualification and independent_replication passes (IS Sharpe 5.93 EURUSD / 7.13 GBPUSD) come from the promotion gate's cost-free long/flat return series and are drift-dominated. They are not evidence of alpha and are not relied on here."
+  ],
+  "fidelity_limits": [
+    "EXP-00025's F1 used a daily-session VWAP and a trailing stop at 2.0 x ATR(14), both implemented inside research/run_traderdev_families.py. The registered port traderdev-ema9-vwap computes a rolling VWAP proxy over the last vwap_period closes (volume-weighted, default 120) and a trail of trail_mult x mean(bar range) over atr_period bars. The two are close but not identical, so EXP-00025's pips do not validate this exact code path.",
+    "The registered default trail_mult is 3.0; EXP-00025 used 2.0 and the audit trail records a reproduction that ran 3.0 as a different strategy. EXP-00033 pre-registers 2.0, the value the candidate result was produced with."
+  ],
+  "data": {
+    "dataset_id": "dukascopy_1m_ba_prior",
+    "window": ["2022-08", "2025-07"],
+    "instrumentation": "Dukascopy 1m bid bars resampled to 4h by WF-v2; no bar overlaps the exhausted 2025-08..2026-07 window."
+  },
+  "not_authorised": [
+    "any change to the frozen protocol or its pinned hash",
+    "promotion, qualification, live or paper allocation",
+    "re-tuning ema_period, vwap_period, atr_period or trail_mult after seeing the WF-v2 result"
+  ]
+}

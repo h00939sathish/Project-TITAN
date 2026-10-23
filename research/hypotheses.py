@@ -43,6 +43,38 @@ hypotheses = [
               "cost_bps": 10, "tenor": "1W", "baseline": "EXP-00023"},
     ),
 
+    # ── TREND: registered trader.dev F1 candidate, first honest OOS ──────
+    h(HypothesisClass.TREND,
+      id="EXP-00033",
+      question="Does the registered traderdev-ema9-vwap candidate keep a positive, "
+               "cost-surviving edge on data it was never tuned on? EXP-00025 found "
+               "the F1 family net positive at 4h on EURUSD + GBPUSD (+408.3 pips "
+               "pooled) but only over the 12 months the port was tuned on, and the "
+               "promotion gate recorded walk_forward as UNMET for that reason. The "
+               "2D surface has no compact plateau and the two pairs favour different "
+               "corners. WF-v2 runs the frozen parameters over 2022-08..2025-07.",
+      economic_rationale="A short-EMA cross of a volume-weighted price tracks the "
+               "direction in which traded volume has recently been leaning, so it "
+               "should capture persistent flow after a policy-rate turn rather than "
+               "before it. If the EURUSD/GBPUSD result in EXP-00025 were real trend "
+               "persistence it must reappear on unseen years; if it were the "
+               "pair-specific surface noise the sensitivity sweep found, it must not. "
+               "Either answer is decisive for TITAN's only registered candidate.",
+      dataset_id="dukascopy_1m_ba_prior",
+      features=("close", "high", "low", "volume"),
+      target="next_bar_return",
+      params={"wf_v2": {
+          "strategy_id": "traderdev-ema9-vwap",
+          "strategy_params": {"ema_period": 9, "vwap_period": 120,
+                              "atr_period": 14, "trail_mult": 2.0},
+          "instruments": ["EURUSD", "GBPUSD"],
+          "timeframe_minutes": 240,
+          "window": ["2022-08", "2025-07"],
+          "position_mode": "long_short",
+          "evidence_record": "research/evidence/EXP-00033.json",
+      }},
+    ),
+
 ]
 
 
