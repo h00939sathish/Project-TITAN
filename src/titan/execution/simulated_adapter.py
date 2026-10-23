@@ -183,7 +183,7 @@ class SimulatedAdapter(BrokerAdapter):
 
         quality = self._fill_quality.get(order_id, self._default_fill_quality)
 
-        if quality == SimFillQuality.PARTIAL_THEN_FULL and state.filled_quantity > 0:
+        if quality == SimFillQuality.PARTIAL_THEN_FULL:
             remaining = state.quantity - state.filled_quantity
             self._apply_fill(state, remaining)
         elif quality == SimFillQuality.NEVER_FILL:
@@ -206,6 +206,10 @@ class SimulatedAdapter(BrokerAdapter):
         return False
 
     def _apply_fill(self, state: SimOrderState, quantity: int) -> None:
+        if quantity <= 0:
+            # A unit order has no integer half: record no fill rather than a
+            # zero-size fill that would falsely mark the order partially filled.
+            return
         state.filled_quantity += quantity
         fill_price = float(state.price) if state.price else 0.0
         state.fills.append({

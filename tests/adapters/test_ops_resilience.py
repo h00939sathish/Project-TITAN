@@ -297,6 +297,81 @@ def test_partial_fill_accounting():
     engine.stop()
 
 
+def test_working_partial_fill_booked_before_terminal():
+    """A partial reported while the order is still working must reach the
+    portfolio on that poll — not only when the order reaches Filled."""
+    adapter = FakeAdapter()
+    adapter.ack_override = BrokerOrderAcknowledgement(
+        accepted=True,
+        broker_order_id=BrokerOrderId(id="b-part"),
+        fill_quantity=None,
+        fill_price=None,
+        order_status="Submitted",       # broker accepted; nothing filled yet
+    )
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    result = engine.submit_intent(_make_intent())
+    assert result.accepted
+    assert result.fills == []
+    assert engine.portfolio.get_position("AAPL") is None  # nothing phantom
+
+    client_id = next(iter(engine.order_states))
+    # Broker truth: 40 of 100 filled, order still working.
+    adapter.tick_status[client_id] = _status(
+        "b-part", status="partially_filled", filled="40", price="150.0")
+    engine.poll_fills()
+
+    pos = engine.portfolio.get_position("AAPL")
+    assert pos is not None and pos.quantity == 40
+    assert engine.order_states[client_id].current == OrderState.PartiallyFilled
+
+    # Re-polling the same cumulative quantity must not double-book.
+    engine.poll_fills()
+    assert engine.portfolio.get_position("AAPL").quantity == 40
+
+    # Remaining 60 fill at 150.5 -> exactly-once terminal booking.
+    adapter.tick_status[client_id] = _status(
+        "b-part", status="Filled", filled="100", price="150.5")
+    engine.poll_fills()
+    pos = engine.portfolio.get_position("AAPL")
+    assert pos is not None and pos.quantity == 100
+    assert engine.order_states[client_id].current == OrderState.Filled
+    assert float(pos.cost_basis.amount) == pytest.approx(
+        (40 * 150.0 + 60 * 150.5) / 100, abs=0.01)
+    engine.stop()
+
+
+def test_reconcile_agrees_with_working_partial():
+    """Reconciliation must compare against broker truth that includes a
+    working partial, instead of reporting phantom drift and halting."""
+    adapter = FakeAdapter()
+    adapter.ack_override = BrokerOrderAcknowledgement(
+        accepted=True,
+        broker_order_id=BrokerOrderId(id="b-part2"),
+        fill_quantity=None,
+        fill_price=None,
+        order_status="Submitted",
+    )
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    assert engine.submit_intent(_make_intent()).accepted
+
+    client_id = next(iter(engine.order_states))
+    adapter.tick_status[client_id] = _status(
+        "b-part2", status="partially_filled", filled="40", price="150.0")
+    engine.poll_fills()
+
+    adapter.broker_positions = [BrokerPosition("AAPL", "BUY", 40)]
+    adapter.broker_cash = Money("94000", "USD")   # 100000 - 40 * 150
+    result = engine.reconcile()
+
+    assert result.severity == ReconciliationDriftSeverity.InSync
+    assert not engine.status().kill_switch.is_triggered()
+    engine.stop()
+
+
 # ── 4. Broker timeout → no phantom positions/cash drift ─────────────────────
 
 def test_holdings_timeout_no_phantom_cash_drift():

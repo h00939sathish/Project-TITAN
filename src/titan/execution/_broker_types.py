@@ -58,6 +58,13 @@ class BrokerFill:
 
 @dataclass
 class BrokerOrderStatus:
+    """Broker truth for one order, as reported by an adapter poll.
+
+    ``filled_quantity`` is CUMULATIVE for the order (all fills to date), never
+    incremental. ``price`` carries the price reported with this status; adapters
+    that expose only a cumulative average report that average.
+    """
+
     order_id: BrokerOrderId
     instrument_id: str
     side: str

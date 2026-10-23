@@ -30,6 +30,31 @@ class TestSimulatedAdapterContract:
         assert updated.status == "filled"
         assert updated.filled_quantity == 100
 
+    def test_partial_then_full_odd_quantity(self):
+        self.adapter.set_default_fill_quality(SimFillQuality.PARTIAL_THEN_FULL)
+        order = self.adapter.submit_order("ord-odd", "AAPL", "buy", 3, "150.00")
+        assert order.status == "partially_filled"
+        assert order.filled_quantity == 1
+        updated = self.adapter.tick("ord-odd")
+        assert updated is not None
+        assert updated.status == "filled"
+        assert updated.filled_quantity == 3
+        assert self.adapter.tick("ord-odd") is None
+
+    def test_partial_then_full_unit_quantity_terminates(self):
+        """Quantity 1 has no integer half: the order must stay unfilled at
+        submit and complete on the next tick instead of hanging forever."""
+        self.adapter.set_default_fill_quality(SimFillQuality.PARTIAL_THEN_FULL)
+        order = self.adapter.submit_order("ord-unit", "AAPL", "buy", 1, "150.00")
+        assert order.filled_quantity == 0
+        assert order.status == "pending"
+        assert order.fills == []
+        updated = self.adapter.tick("ord-unit")
+        assert updated is not None
+        assert updated.status == "filled"
+        assert updated.filled_quantity == 1
+        assert self.adapter.tick("ord-unit") is None
+
     def test_timeout_simulated(self):
         self.adapter.set_default_fill_quality(SimFillQuality.TIMEOUT)
         order = self.adapter.submit_order("ord-4", "AAPL", "buy", 100, "150.00")

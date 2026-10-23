@@ -1374,11 +1374,13 @@ class PaperTradingEngine:
                                                "absorbed_qty": cumulative})
                     continue
 
-                if status not in ("Filled", ""):
-                    # Still working at the broker — nothing to do this poll.
-                    continue
-
-                # Filled (fully or partially): one authoritative delta path.
+                # Broker fill truth is cumulative and authoritative regardless
+                # of whether the order is still working: a working order can
+                # carry a partial fill. Book the delta now so positions,
+                # exposure, risk and reconciliation match the broker during the
+                # working window. _absorb_broker_fill is a no-op when the delta
+                # is zero/negative and derives PartiallyFilled/Filled from the
+                # cumulative quantity, not from the status label.
                 self._absorb_broker_fill(order_id, sm, cumulative, price)
 
     def reconcile(self) -> ReconciliationResult:

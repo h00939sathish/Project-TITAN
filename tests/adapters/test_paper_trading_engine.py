@@ -15,6 +15,7 @@ from titan._core import (
     Instrument,
     InstrumentId,
     Money,
+    OrderState,
     PortfolioEngine,
     ReconciliationConfig,
     ReconciliationDriftSeverity,
@@ -628,6 +629,33 @@ class TestPaperTradingEngineFullPipeline:
         self.engine.start()
         result = self.engine.reconcile()
         assert len(result.position_drifts) == 0
+
+
+class TestWorkingPartialFills:
+    def test_engine_books_unit_partial_then_full(self):
+        """A qty-1 PARTIAL_THEN_FULL order must terminate through the real
+        submit/poll path with exactly one share booked."""
+        config = _default_config()
+        adapter = SimulatedAdapter()
+        adapter.set_default_fill_quality(SimFillQuality.PARTIAL_THEN_FULL)
+        engine = PaperTradingEngine(config, adapter)
+        initialize_fresh(engine)
+        engine.start()
+        for sym in ("AAPL", "MSFT"):
+            engine.register_instrument(
+                Instrument(InstrumentId(sym, "STOCK"), "0.01", 1, "1.0",
+                           ContractType.Stock, "USD", 2)
+            )
+        try:
+            result = engine.submit_intent(_make_intent(quantity="1", price="150"))
+            assert result.accepted
+            engine.poll_fills()
+            pos = engine.portfolio.get_position("AAPL")
+            assert pos is not None and pos.quantity == 1
+            client_id = next(iter(engine.order_states))
+            assert engine.order_states[client_id].current == OrderState.Filled
+        finally:
+            engine.stop()
 
 
 class TestPaperTradingEngineStatePersistence:
