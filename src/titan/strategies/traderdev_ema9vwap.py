@@ -168,5 +168,10 @@ class TraderDevEMA9VWAP:
         return signal
 
     @property
+    def position(self) -> int:
+        """Held position after the last bar: +1 long, -1 short, 0 flat."""
+        return self._position
+
+    @property
     def is_ready(self) -> bool:
         return len(self.closes) >= self.vwap_period

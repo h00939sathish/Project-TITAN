@@ -262,6 +262,8 @@ def make_traderdev_ema9vwap_signal_fn(params: dict):
     def signal_fn(bar):
         return strat(bar)
     signal_fn.strat = strat
+    # BUY/SELL here are also trailing-stop exits; WF-v2 reads the held position instead.
+    signal_fn.position = lambda: strat.position
     return signal_fn
 
 

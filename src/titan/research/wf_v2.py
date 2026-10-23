@@ -77,6 +77,11 @@ INTERPRETATION = {
               "Ratified in ADR-036.",
     "missing_ticks": "Expected minutes are all minutes except Fri 22:00 to Sun 22:00 UTC. DST "
                      "and holidays are not modelled, which overstates the missing rate.",
+    "positions": "Position after each bar close. A strategy that reports its own held "
+                 "position (signal_fn.position()) is read directly, so BUY/SELL used as "
+                 "exits stay exits; otherwise BUY = long and SELL = short (long_short) or "
+                 "flat (long_flat). long_flat floors a reported short at flat. Stops act "
+                 "at bar-close granularity. ADR-038.",
     "regime_pivot": "At least one CENTRAL_BANK_PIVOTS date inside the window.",
     "multi_instrument": "Every instrument must pass on its own.",
     "verdict": "PASS only if every instrument passes every criterion; anything else is FAIL.",
@@ -369,16 +374,23 @@ def _strategy_factory(strategy_id: str):
 
 
 def positions(bars: list[dict], spec: WFv2Spec, instrument: str) -> list[int]:
-    """Position held after each bar's close, from the strategy's BUY/SELL signals."""
+    """Position held after each bar's close (see INTERPRETATION["positions"], ADR-038)."""
     signal_fn = _strategy_factory(spec.strategy_id)(dict(spec.strategy_params))
-    short = -1 if spec.position_mode == "long_short" else 0
+    reported = getattr(signal_fn, "position", None)
+    floor = -1 if spec.position_mode == "long_short" else 0
     pos, out = 0, []
     for bar in bars:
         sig = signal_fn(dict(bar, instrument_id=instrument))
-        if sig == "BUY":
+        if reported is not None:
+            held = reported()
+            if held not in (-1, 0, 1):
+                raise ValueError(f"{spec.strategy_id} reported position {held!r}, "
+                                 "expected -1, 0 or 1")
+            pos = max(held, floor)
+        elif sig == "BUY":
             pos = 1
         elif sig == "SELL":
-            pos = short
+            pos = floor
         out.append(pos)
     return out
 

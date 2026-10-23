@@ -155,6 +155,74 @@ def test_weekend_minutes_are_not_expected():
     assert wf_v2._is_trading_minute(datetime(2024, 1, 7, 22, 0, tzinfo=timezone.utc))
 
 
+# ---- positions ------------------------------------------------------------------
+
+
+def _scripted(signals, reported=None):
+    """Factory for a signal fn that replays `signals`; optionally reports `reported`."""
+    def factory(_params):
+        it = iter(signals)
+        state = iter(reported) if reported is not None else None
+        held = [0]
+
+        def signal_fn(_bar):
+            if state is not None:
+                held[0] = next(state)
+            return next(it)
+        if state is not None:
+            signal_fn.position = lambda: held[0]
+        return signal_fn
+    return factory
+
+
+_EXITS = ["BUY", "SELL", "SELL", "BUY", None]  # enter long, exit, enter short, exit, idle
+_HELD = [1, 0, -1, 0, 0]
+
+
+@pytest.mark.parametrize("reported, mode, expected", [
+    (None, "long_short", [1, -1, -1, 1, 1]),   # signal-only: stop-and-reverse
+    (None, "long_flat", [1, 0, 0, 1, 1]),
+    (_HELD, "long_short", [1, 0, -1, 0, 0]),   # reported: exits stay exits
+    (_HELD, "long_flat", [1, 0, 0, 0, 0]),
+])
+def test_positions_read_reported_state_when_available(monkeypatch, reported, mode, expected):
+    monkeypatch.setattr(wf_v2, "_strategy_factory", lambda _id: _scripted(_EXITS, reported))
+    bars = [{"close": 1.0}] * len(_EXITS)
+    assert wf_v2.positions(bars, _parsed(position_mode=mode), "EURUSD") == expected
+
+
+def test_positions_reject_a_reported_size_outside_unit(monkeypatch):
+    monkeypatch.setattr(wf_v2, "_strategy_factory", lambda _id: _scripted(["BUY"], [2]))
+    with pytest.raises(ValueError, match="reported position 2"):
+        wf_v2.positions([{"close": 1.0}], _parsed(), "EURUSD")
+
+
+def test_traderdev_ema9vwap_positions_match_its_own_state():
+    from titan.strategies.traderdev_ema9vwap import TraderDevEMA9VWAP
+
+    rng = random.Random(3)
+    price, bars = 1.10, []
+    for i in range(800):
+        move = rng.gauss(0, 2e-3)
+        close = price * (1 + move)
+        bars.append({"timestamp": f"t{i}", "open": price, "close": close,
+                     "high": max(price, close) * (1 + abs(rng.gauss(0, 5e-4))),
+                     "low": min(price, close) * (1 - abs(rng.gauss(0, 5e-4))), "volume": 240})
+        price = close
+    params = {"ema_period": 9, "vwap_period": 120, "atr_period": 14, "trail_mult": 2.0}
+    spec = _parsed(strategy_id="traderdev-ema9-vwap", strategy_params=params)
+
+    strat = TraderDevEMA9VWAP(**params)
+    own = []
+    for bar in bars:
+        strat(dict(bar, instrument_id="EURUSD"))
+        own.append(strat.position)
+
+    assert wf_v2.positions(bars, spec, "EURUSD") == own
+    stop_exits = sum(1 for a, b in zip(own, own[1:]) if a != 0 and b == 0)
+    assert stop_exits > 0, "fixture never exercised a trailing-stop exit"
+
+
 # ---- cost engine and statistics -------------------------------------------------
 
 
