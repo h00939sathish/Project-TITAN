@@ -5,6 +5,9 @@ from titan.execution.engine import PaperConfig, PaperTradingEngine
 from titan.execution.simulated_adapter import SimulatedAdapter
 from datetime import datetime, timezone
 from fixtures.session_init import initialize_fresh
+import pytest
+
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
 
 
 def _config() -> PaperConfig:

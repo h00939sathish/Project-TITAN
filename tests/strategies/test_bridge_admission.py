@@ -20,6 +20,8 @@ from titan._core import (
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
 from titan.strategies.bridge import StrategyBridge
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def _bridge(**kw) -> StrategyBridge:
     params = dict(strategy_id="ma-crossover", strategy_params={"fast": 2, "slow": 3},

@@ -50,6 +50,8 @@ from titan.execution._broker_types import (
 )
 from titan.operations.logging import StructuredLogger, LogSeverity
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def _config(state_path: str = "") -> PaperConfig:
     risk_config = RiskConfig(

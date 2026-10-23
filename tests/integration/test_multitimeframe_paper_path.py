@@ -21,6 +21,8 @@ from titan.strategies.timeframes import Timeframe
 from tests.adapters.test_ibkr_paper_adapter import FakeIBKRPaperAdapter, FakeTransport
 from tests.fixtures.session_init import initialize_fresh
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 class TestMultiTimeframePaperPath:
     """Closed bar through risk gate to adapter."""

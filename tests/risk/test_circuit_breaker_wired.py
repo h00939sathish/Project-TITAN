@@ -25,6 +25,8 @@ from titan.execution import (
 )
 from titan.risk.circuit_breaker import BreakerStage, CircuitBreakerConfig
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def _config() -> PaperConfig:
     risk_config = RiskConfig(

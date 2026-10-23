@@ -7,6 +7,9 @@ from titan._core import ContractType, Money, ReconciliationConfig, RiskConfig, T
 from titan.data.forex_pairs import FOREX_SYMBOLS, forex_instrument
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
 from tests.fixtures.session_init import initialize_fresh
+import pytest
+
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
 
 
 def test_forex_instrument_registration():

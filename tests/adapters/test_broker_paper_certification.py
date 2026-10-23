@@ -45,6 +45,8 @@ from titan.execution._broker_types import (
 )
 from titan.operations.logging import StructuredLogger
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def _has_creds() -> bool:
     env_path = Path(__file__).resolve().parent.parent.parent / ".env"

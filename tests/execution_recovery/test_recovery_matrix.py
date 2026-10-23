@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 
 import pytest
 
-import conftest as _root_conftest
 from fixtures.session_init import initialize_fresh
 
 from titan._core import (
@@ -52,6 +51,10 @@ from titan.research.promotion_certificate import (
     create_signed_certificate,
     execution_scope_parameters,
 )
+
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
+_REAL_SUBMIT = PaperTradingEngine.submit_intent
 
 TS_NOW = datetime.now(timezone.utc).isoformat()
 
@@ -561,10 +564,9 @@ def cert_json(cert) -> str:
 class TestCertificateScope:
     @pytest.fixture
     def real_gate(self, monkeypatch):
-        # conftest patches submit_intent for legacy suites; the scope gate IS
-        # submit_intent, so restore the real implementation here.
-        monkeypatch.setattr(PaperTradingEngine, "submit_intent",
-                            _root_conftest.original_submit)
+        # This module opts into sign_uncertified_intents; the scope gate IS
+        # submit_intent, so these tests undo that wrapper.
+        monkeypatch.setattr(PaperTradingEngine, "submit_intent", _REAL_SUBMIT)
 
     def test_t7_valid_scope_passes(self, tmp_path, real_gate):
         engine = make_engine(tmp_path, StubBroker())

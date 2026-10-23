@@ -13,6 +13,8 @@ from titan.execution import (
     FinceptBrokerAdapter,
 )
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def make_approved_intent(
     instrument_id: str,

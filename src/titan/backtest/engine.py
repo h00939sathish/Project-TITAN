@@ -81,14 +81,12 @@ class ReplayEngine:
         slippage_bps: float = 0.0,
         commission_bps: float = 0.0,
         intent_qty: int = 10,
-        certificate_ref: str = "replay-engine-cert",
     ):
         self._strategy = strategy
         self._bars = list(bars)
         self._fill_model = BarConservativeFillModel(slippage_bps=slippage_bps, commission_bps=commission_bps)
         self._slippage_bps = slippage_bps
         self._intent_qty = intent_qty
-        self._certificate_ref = certificate_ref
 
         if risk_config is None:
             from .._core import RiskConfig as RC
@@ -272,9 +270,8 @@ class ReplayEngine:
                         risk_profile_version="1.0",
                         market_data_timestamp=bar["timestamp"] if "T" in str(bar["timestamp"]) else bar["timestamp"] + "T00:00:00Z",
                         price=str(round(fill_price, 2)),
-                        certificate_ref=self._certificate_ref,
                     )
-                    order_result = engine.submit_intent(intent)
+                    order_result = engine.submit_replay_intent(intent)
                     if order_result.accepted:
                         result.trades += 1
                         result.bars_processed += 1
@@ -317,10 +314,9 @@ class ReplayEngine:
                 risk_profile_version="1.0",
                 market_data_timestamp=bar["timestamp"] if "T" in str(bar["timestamp"]) else bar["timestamp"] + "T00:00:00Z",
                 price=str(round(fill_price, 2)),
-                certificate_ref=self._certificate_ref,
             )
 
-            order_result = engine.submit_intent(intent)
+            order_result = engine.submit_replay_intent(intent)
 
             if order_result.accepted:
                 result.trades += 1

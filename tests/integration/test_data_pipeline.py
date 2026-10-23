@@ -19,6 +19,9 @@ from titan.data.normalize import normalize_row
 from titan.data.quality import validate_and_quarantine
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
 from tests.fixtures.session_init import initialize_fresh
+import pytest
+
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
 
 
 

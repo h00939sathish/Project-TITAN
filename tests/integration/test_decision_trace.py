@@ -18,6 +18,8 @@ from titan.runtime.events import MarketEvent, StrategyDefinition, TriggerSpec, D
 from titan.runtime.evaluator import RuntimeEvaluator
 from titan.strategies.timeframes import Timeframe
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 @pytest.fixture
 def event_factory():

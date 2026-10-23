@@ -33,6 +33,8 @@ from titan.execution import (
     SimulatedAdapter,
 )
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 def _default_config() -> PaperConfig:
     risk_config = RiskConfig(

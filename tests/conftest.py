@@ -68,19 +68,51 @@ except ImportError:
 
 from titan.execution.engine import PaperTradingEngine
 
-# We monkeypatch the engine submit_intent for older tests that do not provision
-# a cryptographic certificate, so they don't all fail due to ADR-028 enforcement.
-# The integrity tests in test_execution_integrity.py will NOT use this patch,
-# proving the engine works exactly as designed out of the box.
 
-original_submit = PaperTradingEngine.submit_intent
+def certify(intent):
+    """Return `intent` re-issued with a test-key certificate scoped exactly to it."""
+    from dataclasses import asdict
+    from titan._core import TradeIntent
+    from titan.research.promotion_certificate import (
+        create_signed_certificate, execution_scope_parameters)
 
-def submit_intent_patched(self, intent, *args, **kwargs):
-    return self._submit_intent_core(intent, *args, **kwargs)
+    scope = execution_scope_parameters(
+        instrument=intent.instrument_id, side=intent.side,
+        max_quantity=int(Decimal(intent.quantity)), account=intent.account_id)
+    cert = create_signed_certificate(_TEST_PRIV, intent.strategy_id, "2099-01-01T00:00:00Z",
+                                     parameters=scope)
+    # Constructor, not from_json: from_json re-validates fields, and tests behind the
+    # gate deliberately submit malformed timestamps/prices for the engine to reject.
+    return TradeIntent(
+        intent.strategy_id, intent.strategy_package_digest, intent.account_id,
+        intent.instrument_id, intent.side, intent.quantity, intent.order_type,
+        intent.time_in_force, intent.risk_profile_version, intent.market_data_timestamp,
+        price=intent.price, stop_price=intent.stop_price,
+        take_profit_price=intent.take_profit_price, trailing=intent.trailing,
+        expiry=intent.expiry, certificate_ref=json.dumps(asdict(cert)))
 
-@pytest.fixture(autouse=True)
-def patch_submit_intent_for_legacy_tests(monkeypatch, request):
-    # Don't patch if we are running the execution integrity, adversarial, or e2e tests
-    if "test_execution_integrity" not in request.node.nodeid and "test_profit_engine_e2e" not in request.node.nodeid and "e2e" not in request.node.nodeid and "adversarial" not in request.node.nodeid:
-        monkeypatch.setattr(PaperTradingEngine, "submit_intent", submit_intent_patched)
+
+@pytest.fixture
+def sign_uncertified_intents(monkeypatch):
+    """Opt-in for tests about engine behaviour behind the gate, not the gate itself.
+
+    Intents with no certificate, or a placeholder string such as "test-cert", get a
+    real signed certificate and then pass through the real submit_intent, so
+    signature, scope and nonce checks all still run. Intents carrying a JSON
+    certificate object, forged or not, are passed through untouched.
+    """
+    real_submit = PaperTradingEngine.submit_intent
+
+    def is_certificate_object(ref):
+        try:
+            return isinstance(json.loads(ref), dict)
+        except (TypeError, ValueError):
+            return False
+
+    def submit(self, intent, *args, **kwargs):
+        if not is_certificate_object(getattr(intent, "certificate_ref", None)):
+            intent = certify(intent)
+        return real_submit(self, intent, *args, **kwargs)
+
+    monkeypatch.setattr(PaperTradingEngine, "submit_intent", submit)
 

@@ -19,6 +19,8 @@ from titan._core import (
 from titan.execution.engine import PaperConfig, PaperTradingEngine
 from tests.adapters.test_ibkr_paper_adapter import FakeIBKRPaperAdapter, FakeTransport
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 class TestMultiTimeframeRecovery:
     """Restart, disconnect, and drift-halt recovery."""

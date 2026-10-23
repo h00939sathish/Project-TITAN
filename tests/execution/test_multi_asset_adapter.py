@@ -19,6 +19,8 @@ from titan.execution import FinceptBrokerAdapter, PaperConfig, PaperTradingEngin
 from titan.data.feed_health import FeedHealthVerdict
 from fixtures.session_init import initialize_fresh
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 
 @pytest.fixture
 def mock_multi_asset_fn():

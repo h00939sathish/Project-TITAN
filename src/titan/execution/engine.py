@@ -990,6 +990,25 @@ class PaperTradingEngine:
         return self._submit_intent_core(intent, correlation_id=correlation_id,
                                         cert_nonce=getattr(cert, "nonce", None))
 
+    def submit_replay_intent(self, intent: TradeIntent, *, correlation_id: str = "") -> OrderResult:
+        """Historical-replay entry point (ADR-035): no promotion certificate required.
+
+        Authorization comes from the adapter, not from a token: the exact
+        BacktestAdapter type fills only against caller-supplied bars and has no
+        route to a venue. Subclasses are refused because one could override
+        place_order. Risk checks in _submit_intent_core still apply.
+        """
+        from .backtest_adapter import BacktestAdapter
+
+        if type(self.adapter) is not BacktestAdapter:
+            raise ValueError(
+                "Replay authorization refused: submit_replay_intent requires a "
+                f"BacktestAdapter, got {type(self.adapter).__name__}. Paper and live "
+                "intents must go through submit_intent with a signed certificate.")
+        if getattr(intent, "producer_kind", "") == "shadow" or "shadow" in str(getattr(intent, "strategy_id", "")).lower():
+            raise ValueError("Shadow intents are strictly forbidden in the execution engine.")
+        return self._submit_intent_core(intent, correlation_id=correlation_id)
+
     def _submit_intent_core(self, intent: TradeIntent, *, correlation_id: str = "",
                             cert_nonce: Optional[str] = None) -> OrderResult:
         instr_str = str(intent.instrument_id)

@@ -6,6 +6,9 @@ from titan._core import Money, ReconciliationConfig, RiskConfig, TradeIntent
 from titan.data.spot_metals import spot_metal_instrument
 from titan.execution import PaperConfig, PaperTradingEngine, SimulatedAdapter
 from tests.fixtures.session_init import initialize_fresh
+import pytest
+
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
 
 
 def test_engine_rejects_unregistered_xauusd():

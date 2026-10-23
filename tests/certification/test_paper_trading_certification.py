@@ -21,6 +21,8 @@ from titan._core import (
     ContractType,
 )
 
+pytestmark = pytest.mark.usefixtures("sign_uncertified_intents")
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 SPY_15M_PATH = ROOT_DIR / "research" / "intraday_backtests" / "2026-07-30" / "spy_15m.csv"
 
