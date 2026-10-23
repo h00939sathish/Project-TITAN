@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from titan.backtest.crypto_costs import CryptoCostModel
 from titan.backtest.crypto_simulator import (
@@ -120,7 +120,12 @@ def evaluate_gates(
         "adverse_capacity": cap_ok,
         "replication": rep_ok,
     }
-    verdict = "candidate" if all(gates.values()) else "negative_result"
+    if replicated is None:
+        verdict = "inconclusive"
+    elif all(v for v in gates.values() if v is not None):
+        verdict = "candidate"
+    else:
+        verdict = "negative_result"
     return {
         "verdict": verdict,
         "gates": gates,
@@ -137,7 +142,13 @@ def run_crypto_screen(
     manifest: CryptoDataManifest,
     prereg: PreRegistration,
     *,
-    replicated: bool = False,
+    replicated: Optional[bool] = None,
+    # AUDIT FIX (2026-09-29): `replicated` defaulted to False, so the replication
+    # gate could never pass and `verdict` was a CONSTANT ("negative_result") for
+    # every screen, not a measurement. CRYPTO-001 passed 4/5 gates and EQ-007
+    # passed 5/9 (incl. OOS Sharpe 1.249) yet both were filed as failures.
+    # None now means "not measured" and yields `inconclusive`, which is the
+    # honest verdict. Only an explicit True/False is a measurement.
     allow_oos_for_parameters: bool = False,
 ) -> dict[str, Any]:
     """Run a preregistered crypto screen through the standard evidence pipeline.
@@ -251,7 +262,13 @@ def run_crypto_001(
     manifest: CryptoDataManifest,
     prereg: PreRegistration,
     *,
-    replicated: bool = False,
+    replicated: Optional[bool] = None,
+    # AUDIT FIX (2026-09-29): `replicated` defaulted to False, so the replication
+    # gate could never pass and `verdict` was a CONSTANT ("negative_result") for
+    # every screen, not a measurement. CRYPTO-001 passed 4/5 gates and EQ-007
+    # passed 5/9 (incl. OOS Sharpe 1.249) yet both were filed as failures.
+    # None now means "not measured" and yields `inconclusive`, which is the
+    # honest verdict. Only an explicit True/False is a measurement.
     allow_oos_for_parameters: bool = False,
 ) -> dict[str, Any]:
     """Run the CRYPTO-001 funding-basis screen through the shared evidence pipeline."""

@@ -30,6 +30,26 @@ PAIRS = ("EURUSD", "GBPUSD")
 
 
 def backtest(bars, side_fn):
+    """Signal at close of bar i -> fill at the OPEN of bar i+1. No lookahead.
+
+    AUDIT FIX (2026-09-29). `side_fn(i)` is the DESIRED position on bar i:
+    "BUY" = long, "SELL" = short, None = flat. The previous version only ever
+    ENTERED: `pos` was set at :49 and never reset, and the sole exit was the
+    final bar at :56-61, so n_trades was always 1. The committed
+    results.json recorded "trades": 1 in every cell, which voided the
+    "0/15 concepts survive" row of ALPHA_SEARCH_TERMINAL_REPORT.md:27.
+
+    Every concept in make_concepts() is naturally target-position shaped
+    (long on cross-up, short on cross-down, flat in between), so this
+    interpretation needs no change to the signal functions.
+
+    KNOWN DEFECT, NOT FIXED HERE (research decision, not a bug):
+    BARS_PER_YEAR = 2190 but this data is Dukascopy 4h, which yields 1,610
+    bars/yr (no weekend bars). That inflates pips_per_year by
+    sqrt(2190/1610) = 1.167x, i.e. in the direction that helps a candidate
+    pass. Changing it also moves the 200 pips/yr kill threshold, so it is a
+    gate change and must be re-registered, not slipped in.
+    """
     cash = 0.0
     pos = 0
     entry = 0.0
@@ -37,28 +57,45 @@ def backtest(bars, side_fn):
     peak = 100000.0
     maxdd = 0.0
     n = len(bars)
+
+    def _fill_price(bar, side):
+        f = bar["o_ask"] if side > 0 else bar["o_bid"]
+        slip = (SLIPPAGE_BPS / 10000) * f
+        return f + slip if side > 0 else f - slip
+
     for i in range(n - 1):
-        if pos == 0:
-            s = side_fn(i)
-            if s in ("BUY", "SELL"):
-                nb = bars[i + 1]
-                fill = nb["o_ask"] if s == "BUY" else nb["o_bid"]
-                fill = fill + (SLIPPAGE_BPS / 10000) * fill if s == "BUY" else fill - (SLIPPAGE_BPS / 10000) * fill
-                cash -= (COMMISSION_BPS / 10000) * fill * QTY
-                entry = fill
-                pos = 1 if s == "BUY" else -1
+        s = side_fn(i)
+        desired = 0 if s is None else (1 if s == "BUY" else -1)
+        if desired == pos:
+            continue
+        nb = bars[i + 1]
+        # Close and open at the SAME price (next bar's open) so a flip is not
+        # credited with a free intrabar move.
         if pos != 0:
-            c = bars[i + 1]["c_bid"] if pos > 0 else bars[i + 1]["c_ask"]
-            eq = 100000.0 + (cash + (c - entry) * QTY * pos)
-            peak = max(peak, eq)
-            if peak > 0:
-                maxdd = max(maxdd, (peak - eq) / peak)
+            px = _fill_price(nb, -pos)
+            cash += (px - entry) * QTY * pos
+            cash -= (COMMISSION_BPS / 10000) * px * QTY
+            n_trades += 1
+            pos = 0
+            entry = 0.0
+        if desired != 0:
+            px = _fill_price(nb, desired)
+            cash -= (COMMISSION_BPS / 10000) * px * QTY
+            entry = px
+            pos = desired
+        c = bars[i + 1]["c_bid"] if pos > 0 else bars[i + 1]["c_ask"]
+        eq = 100000.0 + (cash + (c - entry) * QTY * pos)
+        peak = max(peak, eq)
+        if peak > 0:
+            maxdd = max(maxdd, (peak - eq) / peak)
+
     if pos != 0:
         last = bars[n - 1]
-        fill = last["c_bid"] if pos > 0 else last["c_ask"]
-        cash += (fill - entry) * QTY * pos
-        cash -= (COMMISSION_BPS / 10000) * fill * QTY
+        px = last["c_bid"] if pos > 0 else last["c_ask"]
+        cash += (px - entry) * QTY * pos
+        cash -= (COMMISSION_BPS / 10000) * px * QTY
         n_trades += 1
+
     pips = cash / (QTY * PIP)
     frac = max(n / BARS_PER_YEAR, 1.0)
     return {"trades": n_trades, "net_pips": round(pips, 1),

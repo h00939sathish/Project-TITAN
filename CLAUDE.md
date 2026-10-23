@@ -26,3 +26,23 @@ Project TITAN is an autonomous quantitative research and trading OS divided into
 ## Governance & Standard
 - **ADR Gateline**: Production code changes in `core/` or `src/titan/` (excluding tests) require an accepted Architecture Decision Record (ADR) under `docs/adr/`. Enforced via pre-commit.
 - **Evidence-Led**: Testing layers start at Unit (Rust bounds) and go through Simulation (Cost Frictions) and Chaos. Never claim an undocumented consequence. All behavior modifications must be tested (Recovery/Replay).
+
+---
+
+## Second Brain (shared agent memory)
+
+This project is bound to the `titan` workspace of the shared brain at `/mnt/shared/projects/second-brain`.
+Any agent working here should use it: the workspace is detected from the cwd, so no
+configuration is needed.
+
+```bash
+brain whoami                 # confirm which workspace you are in
+brain brief                  # your context: leases, board, recent notes, top claims
+brain start --agent <you> --files <paths you will write>   # leases are enforced
+brain recall "..."           # knowledge other agents recorded for this project
+brain post "..."             # something the other agents should know right now
+brain claim "..." --source <path>    # anything durable you proved
+brain end <session-id> --summary "..." --test-status "pytest: N passed"
+```
+
+Full protocol: `brain bootstrap`, or read `/mnt/shared/projects/second-brain/AGENTS.md`.

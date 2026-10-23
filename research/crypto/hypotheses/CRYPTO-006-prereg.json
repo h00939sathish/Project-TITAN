@@ -1,0 +1,161 @@
+{
+  "hypothesis_id": "CRYPTO-006",
+  "title": "Maker spread capture on a mid-liquidity USDT-M perp band",
+  "governing_adrs": ["ADR-029", "ADR-030", "ADR-031"],
+  "charter": "research/crypto/CRYPTO_MARKET_STRUCTURE_CHARTER.md#candidate-3",
+  "status": "pre-registered-frozen",
+  "frozen_at": "2026-09-22T10:00:00Z",
+  "registered_by": "qoder_titan / brain s-20260922-db6e58",
+  "precedes_any_measurement": true,
+
+  "distinctness": "Single variable vs CRYPTO-005 is the instrument liquidity tier. Quote policy, fill rule, VIP0 2bps maker fee, markout horizons, 1000 USD notional and 2% participation cap are held IDENTICAL. CRYPTO-005 S6 explicitly prescribed this follow-up ('wider-spread/less-liquid instrument where quoted spread clears the fee'). Not directional OHLCV, not bar-close constant-bps, so not in the Absorbing Exclusion Registry.",
+
+  "universe": {
+    "rule_is_price_independent": true,
+    "source_snapshot": "GET https://fapi.binance.com/fapi/v1/exchangeInfo",
+    "filters": {
+      "status": "TRADING",
+      "contractType": "PERPETUAL",
+      "quoteAsset": "USDT",
+      "min_listing_age_months": 12,
+      "onboard_date_max": "2024-03-10",
+      "exclude_peg_or_fiat_base": [
+        "USDC", "FDUSD", "TUSD", "DAI", "USDE", "USDF", "BUSD",
+        "EUR", "EURR", "TRY", "BRL", "ARS", "AUD", "GBP", "JPY"
+      ]
+    },
+    "ranking": {
+      "metric": "sum(daily klines quoteVolume)",
+      "window": "2024-12-01..2025-02-28",
+      "window_is_strictly_before_probe": true
+    },
+    "band": {
+      "volume_rank_low": 51,
+      "volume_rank_high": 150,
+      "ranks_1_50_excluded_reason": "that is the CRYPTO-005 fee-dominated regime, already measured",
+      "sample_size": 20,
+      "selection": "uniform stride band[i*floor(len/20)] for i in 0..19",
+      "selection_is_deterministic": true
+    }
+  },
+
+  "signal": "passive_two_sided_spread_capture_markout",
+  "mechanism_class": "liquidity_provision_compensation",
+  "revenue_object": "half-spread net of maker fee and 60s markout",
+
+  "parameters": {
+    "quote_policy": "post_both_sides_one_tick_inside_top_of_book",
+    "fill_rule": "maker_at_aggressor_trade_price_when_tape_crosses_posted_side",
+    "markout_horizons_s": [1, 5, 60],
+    "min_quote_notional_usd": "1000",
+    "participation_cap": "0.02",
+    "respect_venue_tickSize": true,
+    "respect_venue_MIN_NOTIONAL": true
+  },
+
+  "cost_label": "binance_usdtm_vip0_maker_2bps",
+  "maker_fee_rate": "0.0002",
+
+  "edge_definition": "net_edge_bps_per_fill = captured_half_spread_bps - maker_fee_bps + markout60_bps; markout signed positive when price drifts in the resting inventory's favour",
+
+  "proxy_limitation": "Trade-tape top-of-book reversal proxy (Vision has NO historical bookTicker/depth; verified 2026-09-22 against S3 listing data/spot/monthly/). Overestimates maker PnL: blind to sub-trade quoted spread, queue position, cancel latency. Fail-closed: proxy-negative rejects at evidence grade; proxy-positive certifies nothing and only justifies paid-L2 acquisition.",
+
+  "probe_window": {
+    "from": "2025-03-10",
+    "to": "2025-03-16",
+    "days": 7,
+    "inside_in_sample_partition": true
+  },
+  "is_partition": { "from": "2024-01-01T00:00:00+00:00", "to": "2025-08-31T23:59:59+00:00" },
+  "oos_partition": { "from": "2025-09-01T00:00:00+00:00", "to": "2026-02-28T23:59:59+00:00" },
+  "oos_read_by_this_probe": false,
+
+  "gate_criteria_frozen": {
+    "G1_structural_spread_gt_fee": {
+      "requirement": "captured_half_spread_bps > maker_fee_bps for >= 50% of sampled symbols",
+      "rationale": "spread must exceed the toll before any markout luck is admitted",
+      "on_fail": "reject"
+    },
+    "G2_net_edge_positive": {
+      "requirement": "median net edge per fill > 0 across symbols AND per-symbol block-bootstrap 95% LB > 0 at h=60s for >= 60% of symbols",
+      "on_fail": "reject"
+    },
+    "G3_capacity": {
+      "requirement": ">= 1000 fills/month/symbol (>= 230 fills over 7 days)",
+      "rationale": "a wide spread nobody crosses is not an edge",
+      "on_fail": "reject"
+    },
+    "G4_no_day_concentration": {
+      "requirement": "pnl must not derive from < 30% of probe days",
+      "on_fail": "reject"
+    },
+    "G5_execution_realism": {
+      "requirement": "quotes respect venue tickSize and MIN_NOTIONAL; fills capped at 2% participation",
+      "on_fail": "invalid_not_rejected"
+    },
+    "escalation_requires": "ALL of G1..G5 pass"
+  },
+
+  "honest_prior_recorded_before_measurement": "On BTCUSDT the fee/spread ratio was ~40x; the mid band must scale harvestable half-spread from ~0.05bps to >~2bps to clear. Mid-cap perp quoted spreads plausibly 5-30bps, so the test is borderline and the ex-ante expectation leans toward rejection. Recorded so that a later result cannot be read as having been assumed.",
+
+  "data_contract": {
+    "agg_trades_source": "https://data.binance.vision/data/futures/um/daily/aggTrades",
+    "klines_source": "https://data.binance.vision/data/futures/um/daily/klines",
+    "schema_um_aggTrades": [
+      "agg_trade_id", "price", "quantity", "first_trade_id",
+      "last_trade_id", "transact_time", "is_buyer_maker"
+    ],
+    "timezone": "UTC",
+    "manifest": "sha256 per file, recorded before any edge computation",
+    "manifest_path": "research/crypto/manifests/binance_vision_widescap_v1.json",
+    "verified_reachable": true,
+    "reachability_verified_at": "2026-09-22T09:59:00Z"
+  },
+
+  "probe_register": {
+    "script": "research/crypto/c006_spread_probe.py",
+    "can_qualify": false,
+    "allowed_data": "in-sample months only; OOS partition never opened",
+    "outcome": "probe_gated_rejection",
+    "outcome_date": "2026-09-22",
+    "first_failed_gate": "G2b",
+    "gates_observed": {
+      "G1_spread_gt_fee_symbol_frac": 0.70,
+      "G2a_median_net_edge_bps": 0.157,
+      "G2b_lb95_positive_symbol_frac": 0.50,
+      "G3_capacity_symbol_frac": 1.00,
+      "G4_day_concentration_symbol_frac": 0.90,
+      "G5_execution_realism_pass": true
+    },
+    "confirmed": "CRYPTO-005 diagnosis transfers: harvestable spread is ~130x wider on ranks 51-150 than on BTCUSDT (2.39 vs 0.018 bps), so the 2bps VIP0 maker fee stops being mechanically binding. Mechanism not disproven.",
+    "reason_for_rejection": "corr(half_spread, net_edge)=0.967 with an instrument whose upward bias is proportional to spread width; apparent edge lives entirely in the illiquid half (median 90d volume $2.10B vs $3.81B for the negative half) where a reversal gap is price impact not reclaimable spread; every depth-capable name is net negative. G2b is a boundary failure (10/20 vs frozen threshold 12) and the threshold is not moved.",
+    "g3_caveat": "G3 passes but tests fill COUNT, which the proxy over-counts by ignoring cancel latency and queue position. Not evidence of capacity; do not cite as a passed feasibility result.",
+    "escalation_recommendation": "AGAINST paid L2 acquisition. L2 sharpens the gross-spread term the proxy already overstates, so its expected effect is to confirm rejection; it cannot repair G2b. Cost decision reserved to the human.",
+    "classification": "execution_constrained_rejection",
+    "qualifier": "measurement_limited",
+    "reached_oos": false,
+    "absorbing_negative_result": true,
+    "absorbing_scope": "CRYPTO-006 as registered: reversal proxy, ranks 51-150, VIP0 maker fee",
+    "legitimate_distinct_followups_not_endorsed": [
+      "fee-regime hypothesis on a maker-rebate tier (changes economics, not measurement)",
+      "queue-position-explicit L2 hypothesis with fills derived from book dynamics, not tape reversals (fixes the instrument)"
+    ],
+    "reproduction_check": "Re-measuring BTCUSDT with this probe gives mean net edge -2.07 bps against CRYPTO-005's sealed -2.04 bps.",
+    "portfolio_effect": "no change; qualified_variants unchanged; no capital deployed; promotion gate has now refused 41 candidates"
+  },
+
+  "authority": {
+    "live_capital": false,
+    "paper_trading": false,
+    "orders": false,
+    "credentials": false,
+    "broker_adapters": false,
+    "self_promotion_permitted": false,
+    "countersignature_required_from": "Architecture Council"
+  },
+
+  "terminal_outcomes": [
+    "probe_gated_rejection -> absorb under ADR-029 with AGENTS rule 8 classification",
+    "gate_pass -> separate proposal for paid historical L2 + shadow-only deployment, new ADR required"
+  ]
+}

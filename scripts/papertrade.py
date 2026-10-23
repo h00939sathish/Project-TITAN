@@ -47,15 +47,15 @@ def _build_engine() -> PaperTradingEngine:
 
     clock_skew = int(os.environ.get("PAPER_CLOCK_SKEW_TOLERANCE_MS", "100"))
     risk_config = RiskConfig(
-        instrument_list,
-        Money(max_notional, "USD"),
-        int(max_order_qty),
-        int(max_order_qty),
-        Money(daily_loss_limit, "USD"),
-        0.10,
-        Money("5000", "USD"),
-        5000,
-        clock_skew,
+        instrument_eligibility=instrument_list,
+        max_order_notional=Money(max_notional, "USD"),
+        max_order_quantity=int(max_order_qty),
+        max_position_size=int(max_order_qty),
+        max_gross_exposure=Money(starting_capital, "USD"),
+        max_drawdown_fraction=0.10,
+        max_daily_loss=Money(daily_loss_limit, "USD"),
+        data_freshness_threshold_ms=5000,
+        clock_skew_tolerance_ms=clock_skew,
     )
 
     config = PaperConfig(

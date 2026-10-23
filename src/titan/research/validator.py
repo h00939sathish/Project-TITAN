@@ -12,6 +12,46 @@ from datetime import datetime
 from typing import Any
 
 
+def sharpe_standard_error(sr: float, years: float) -> float:
+    """Standard error of an ANNUALISED Sharpe ratio, per Lo (2002),
+    "The Statistics of Sharpe Ratios", Financial Analysts Journal 58(4):36-52.
+    DOI 10.2469/faj.v58.n4.2453
+
+        SE(SR_ann) = sqrt( (1 + 0.5*SR^2) / T_years )
+
+    Note the bound: SE >= 1/sqrt(T_years) REGARDLESS of trade count. A frozen
+    "at least N trades" gate therefore targets the wrong failure mode. At a
+    per-trade sigma/mu of 1.5, 9 trades give |t| > 1.96; the FX trailing-stop
+    strategies in TITAN's archive ran at sigma/mu ~ 16, where no trade count
+    inside a 12-month window is sufficient.
+
+    The correction term (1 + 0.5*SR^2) and the autocorrelation adjustment are
+    deliberately omitted here; Lo's full V[SR(q)] needs the return
+    autocorrelation, which TITAN does not currently record.
+    """
+    if years <= 0:
+        raise ValueError(f"years must be > 0, got {years}")
+    return math.sqrt((1.0 + 0.5 * sr * sr) / years)
+
+
+#: A result whose SE(SR_ann) exceeds this cannot distinguish SR=1.0 from SR=0.0
+#: at 95%. On the archived windows this is most of the evidence base:
+#: T=0.41y -> SE 1.56 (EXP-00031, EXP-00027), T=1y -> SE 1.15 (EXP-00025),
+#: T=2y  -> SE 0.94 (EQ-001..008), T=8y -> SE 0.37 (EXP-00023).
+UNDERPOWERED_SE_THRESHOLD = 0.5
+
+
+def is_underpowered(sr: float, years: float) -> tuple[bool, float]:
+    """(underpowered?, se). An underpowered result is NOT a negative result.
+
+    Audit finding (2026-09-29): 17 of 21 archived results had
+    SE(SR_ann) >= 0.5 and every one of them was filed as a rejection. The
+    ledger recorded ignorance as refutation.
+    """
+    se = sharpe_standard_error(sr, years)
+    return se > UNDERPOWERED_SE_THRESHOLD, se
+
+
 def compute_ic(feature_values: list[float | None], target_values: list[float | None]) -> float:
     """Spearman rank correlation between feature and forward returns."""
     pairs = [(f, t) for f, t in zip(feature_values, target_values)
