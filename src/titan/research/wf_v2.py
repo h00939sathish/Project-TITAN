@@ -66,13 +66,15 @@ INTERPRETATION = {
     "aggregate_pass": "Window pass rate >= 0.70, mean Sharpe > 0 and mean IC > 0 "
                       "(undefined values count as 0).",
     "turnover": "Sum of |position change| x leverage over OOS bars, annualized "
-                "(one-way traded notional / NAV).",
+                "(one-way traded notional / NAV). Ratified in ADR-036.",
     "costs": "Screen engine: 0.8e-4 of price per round trip, charged as half per unit of "
              "leveraged notional traded on each bar where the position changes (a flip "
              "pays a full round trip), and that bar earns no return; 10% vol target at an "
-             "assumed 8% vol.",
-    "returns": "Shorts earn the negative of the bar return (fixed in the screen as well).",
-    "prices": "Bid OHLC resampled from 1m bars; the screen engine has no separate spread term.",
+             "assumed 8% vol. Ratified in ADR-036.",
+    "returns": "Shorts earn the negative of the bar return (fixed in the screen as well). "
+               "Ratified in ADR-036.",
+    "prices": "Bid OHLC resampled from 1m bars; the screen engine has no separate spread term. "
+              "Ratified in ADR-036.",
     "missing_ticks": "Expected minutes are all minutes except Fri 22:00 to Sun 22:00 UTC. DST "
                      "and holidays are not modelled, which overstates the missing rate.",
     "regime_pivot": "At least one CENTRAL_BANK_PIVOTS date inside the window.",
