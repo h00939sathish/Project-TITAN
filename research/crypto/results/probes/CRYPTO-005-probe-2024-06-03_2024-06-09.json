@@ -1,0 +1,36 @@
+{
+  "probe": "CRYPTO-005-feasibility",
+  "can_qualify": false,
+  "tier": "exploratory (ADR-031)",
+  "is_range": "2024-06-03..2024-06-09",
+  "symbols": {
+    "BTCUSDT": {
+      "symbol": "BTCUSDT",
+      "trades": 6204463,
+      "decomposition_mean_usd": {
+        "half_spread": 0.3341,
+        "fee": 14.0378,
+        "markout_60s": -0.43
+      },
+      "proxy_note": "half-spread proxy = |reversal price - touch|/2 conflates spread with drift; necessary-condition screen only (exploratory tier).",
+      "1s": {
+        "n": 1792129,
+        "mean_edge_usd_per_fill": -13.3515,
+        "block_bootstrap_lb95": -13.5279,
+        "win_frac": 0.0116
+      },
+      "5s": {
+        "n": 1792129,
+        "mean_edge_usd_per_fill": -13.336,
+        "block_bootstrap_lb95": -13.5253,
+        "win_frac": 0.0122
+      },
+      "60s": {
+        "n": 1792129,
+        "mean_edge_usd_per_fill": -13.2737,
+        "block_bootstrap_lb95": -13.4585,
+        "win_frac": 0.0144
+      }
+    }
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "hypothesis_id": "CRYPTO-004",
+  "manifest_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+  "is": {
+    "hypothesis_id": "CRYPTO-004",
+    "fill_model": "maker_post_only_with_15m_taker_fallback",
+    "can_qualify": true,
+    "partition": "IS",
+    "cost_model_digest": "123e6ac453968bac621230035846f10698aa902e3d715ee64e5414a59b8e1cbc",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "attribution": {
+      "price": "0",
+      "funding": "5117.9082287723000000",
+      "fees": "1156.293900000000",
+      "spread": "36.769267000",
+      "impact": "18.384633500",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "3906.4604282723000000"
+    },
+    "n_events": 2190,
+    "n_trades": 76,
+    "notes": [],
+    "extra": {
+      "maker_fill_rate": 0.8552631578947368,
+      "maker_fills": 65,
+      "taker_fallbacks": 11,
+      "mean_unhedged_duration_min": 4.942904721307585,
+      "annualized_net_return_pct": 32.6059111386302,
+      "net_sharpe": 9.485485102944937,
+      "max_drawdown_pct": 2.1050531165192234,
+      "span_days": 364.6666666666667,
+      "end_position_perp": "0.000000",
+      "end_position_spot": "0.000000"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "CRYPTO-004",
+    "fill_model": "maker_post_only_with_15m_taker_fallback",
+    "can_qualify": true,
+    "partition": "OOS",
+    "cost_model_digest": "123e6ac453968bac621230035846f10698aa902e3d715ee64e5414a59b8e1cbc",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "attribution": {
+      "price": "0",
+      "funding": "2324.2406770336000000",
+      "fees": "1127.847774000000",
+      "spread": "30.075468000",
+      "impact": "15.037734000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "1151.2797010336000000"
+    },
+    "n_events": 2190,
+    "n_trades": 90,
+    "notes": [],
+    "extra": {
+      "maker_fill_rate": 0.9,
+      "maker_fills": 81,
+      "taker_fallbacks": 9,
+      "mean_unhedged_duration_min": 4.415256528380004,
+      "annualized_net_return_pct": 9.609344397071954,
+      "net_sharpe": 0.5097881092529208,
+      "max_drawdown_pct": 1.3987620293217158,
+      "span_days": 364.6666666550926,
+      "end_position_perp": "0.000000",
+      "end_position_spot": "0.000000"
+    }
+  },
+  "taker_oos": {
+    "hypothesis_id": "CRYPTO-004",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS_TAKER_CONTROL",
+    "cost_model_digest": "123e6ac453968bac621230035846f10698aa902e3d715ee64e5414a59b8e1cbc",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "attribution": {
+      "price": "0",
+      "funding": "2324.2406770336000000",
+      "fees": "3112.864110000000",
+      "spread": "691.747580000",
+      "impact": "345.873790000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "-1826.2448029664000000"
+    },
+    "n_events": 2190,
+    "n_trades": 90,
+    "notes": [
+      "pure_taker_baseline_CRYPTO-001_path"
+    ],
+    "extra": {
+      "annualized_net_return_pct": -15.243051058150101,
+      "net_sharpe": -1.9661860506133992,
+      "max_drawdown_pct": 16.284034517368436,
+      "span_days": 364.6666666550926,
+      "end_position_perp": "0.000000",
+      "end_position_spot": "0.000000"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "gate_1_synchronized_fill_rate": true,
+      "gate_2_delta_neutral_integrity": true,
+      "gate_3_maker_vs_taker_superiority": true,
+      "gate_4_net_economic_carry_hurdle": false
+    },
+    "metrics": {
+      "maker_fill_rate": 0.9,
+      "mean_unhedged_duration_min": 4.415256528380004,
+      "maker_net_sharpe": 0.5097881092529208,
+      "taker_net_sharpe": -1.9661860506133992,
+      "sharpe_delta": 2.47597415986632,
+      "annualized_net_return_pct": 9.609344397071954,
+      "max_drawdown_pct": 1.3987620293217158
+    },
+    "failure_mode": "execution_constrained",
+    "failure_mode_basis": "Gross funding cashflow existed ($2324.24), and maker passive execution achieved net Sharpe 0.51 vs pure taker Sharpe -1.97 (delta +2.48). However, the strategy failed gate(s) ['gate_4_net_economic_carry_hurdle']: OOS annualized net return (9.61%) and net Sharpe (0.51) failed the Gate 4 hurdle (>=8.0% ann return, >=1.50 Sharpe) due to market-wide funding rate compression and friction.",
+    "failure_mode_confidence": "high"
+  },
+  "generated_at": "2026-09-01T10:45:02.958800+00:00"
+}

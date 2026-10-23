@@ -8,6 +8,7 @@ and adverse capacity gates.
 from __future__ import annotations
 
 import json
+from titan.research.bundle_io import write_bundle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -230,7 +231,7 @@ def run_factor_screen(
         except Exception:
             pass
 
-    out_file.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+    write_bundle(out_file, bundle)
 
     if gates_eval["verdict"] == "negative_result" and "failure_mode" not in gates_eval:
         import warnings

@@ -1,0 +1,102 @@
+{
+  "hypothesis_id": "CRYPTO-003",
+  "manifest_digest": "c9e508274e253516cfb710212d08fb0e093262d071e7fdc3a79ad5cd9ccd1fd2",
+  "is": {
+    "hypothesis_id": "CRYPTO-003",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "IS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "c9e508274e253516cfb710212d08fb0e093262d071e7fdc3a79ad5cd9ccd1fd2",
+    "parameter_digest": "c145b5c9d18613567cb4775235ccff34189f318c00f5a5bb79a593ea0e602208",
+    "attribution": {
+      "price": "0",
+      "funding": "0",
+      "fees": "0",
+      "spread": "0",
+      "impact": "0",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "0"
+    },
+    "n_events": 37,
+    "n_trades": 0,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "CRYPTO-003",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "c9e508274e253516cfb710212d08fb0e093262d071e7fdc3a79ad5cd9ccd1fd2",
+    "parameter_digest": "c145b5c9d18613567cb4775235ccff34189f318c00f5a5bb79a593ea0e602208",
+    "attribution": {
+      "price": "0",
+      "funding": "0",
+      "fees": "0",
+      "spread": "0",
+      "impact": "0",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "0"
+    },
+    "n_events": 3,
+    "n_trades": 0,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "CRYPTO-003",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS_ADVERSE",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "c9e508274e253516cfb710212d08fb0e093262d071e7fdc3a79ad5cd9ccd1fd2",
+    "parameter_digest": "c145b5c9d18613567cb4775235ccff34189f318c00f5a5bb79a593ea0e602208",
+    "attribution": {
+      "price": "0",
+      "funding": "0",
+      "fees": "0",
+      "spread": "0",
+      "impact": "0",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "0"
+    },
+    "n_events": 3,
+    "n_trades": 0,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_positive": false,
+      "ic_frac": false,
+      "concentration": true,
+      "adverse_capacity": false,
+      "replication": false
+    },
+    "ic_positive_frac": 0.0,
+    "concentration": 0.5,
+    "failure_mode": "execution_constrained",
+    "failure_mode_basis": "Latency-decay filter blocked execution after the modeled OFI edge decayed within 250ms-500ms under realistic execution latency; the 5 bps taker fee barrier could not be cleared without VIP/maker rebate status.",
+    "failure_mode_confidence": "medium",
+    "disambiguation": "Bundle records zero trades across all partitions (IS: 37 events processed, 0 trades; OOS: 3 events, 0 trades). Discovery report attributes this to latency-decay filtering rather than absence of OFI threshold crossings, but the evidence bundle alone does not prove which filter stage rejected the entries. Classification is execution_constrained based on the screen's latency-decay mechanism, not on observed profitable-then-eroded trades."
+  },
+  "generated_at": "2026-10-23T16:36:40.784807+00:00"
+}

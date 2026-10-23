@@ -1,0 +1,98 @@
+{
+  "hypothesis_id": "CRYPTO-001",
+  "manifest_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+  "is": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "IS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "1177.1317438178000000",
+      "fees": "5374.080885000000",
+      "spread": "716.544118000",
+      "impact": "358.272059000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "-5271.7653181822000000"
+    },
+    "n_events": 3294,
+    "n_trades": 78,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0.000000"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "15.2452549100000000",
+      "fees": "734.182080000000",
+      "spread": "97.890944000",
+      "impact": "48.945472000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "-865.7732410900000000"
+    },
+    "n_events": 1008,
+    "n_trades": 28,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0.000000"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS_ADVERSE",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "15.2452549100000000",
+      "fees": "1125.745856000000",
+      "spread": "293.672832000",
+      "impact": "48.945472000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "-1453.1189050900000000"
+    },
+    "n_events": 1008,
+    "n_trades": 28,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0.000000"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_positive": false,
+      "ic_frac": false,
+      "concentration": true,
+      "adverse_capacity": false,
+      "replication": false
+    },
+    "ic_positive_frac": 0.017857142857142856,
+    "concentration": 0.5
+  },
+  "generated_at": "2026-08-14T09:35:17.784268+00:00"
+}

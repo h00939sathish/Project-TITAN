@@ -10,6 +10,7 @@ Preserves deterministic boundaries: zero execution/broker/engine imports.
 from __future__ import annotations
 
 import json
+from titan.research.bundle_io import write_bundle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -625,6 +626,6 @@ def run_factor_screen_006(
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_file = RESULTS_DIR / f"{prereg.hypothesis_id}-evidence-bundle.json"
-    out_file.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+    write_bundle(out_file, bundle)
 
     return bundle

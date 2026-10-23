@@ -1,0 +1,101 @@
+{
+  "hypothesis_id": "CRYPTO-001",
+  "manifest_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+  "is": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "IS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "500.00000000",
+      "fees": "15.0000000000",
+      "spread": "2.0000000",
+      "impact": "1.0000000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "482.0000000000"
+    },
+    "n_events": 6,
+    "n_trades": 1,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "-1.000000"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "500.00000000",
+      "fees": "15.0000000000",
+      "spread": "2.0000000",
+      "impact": "1.0000000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "482.0000000000"
+    },
+    "n_events": 6,
+    "n_trades": 1,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "-1.000000"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "CRYPTO-001",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS_ADVERSE",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+    "parameter_digest": "4e72692d2ba6a84c5d2e54f82522b19665d438e937f9b9f56fa761329339e1d0",
+    "attribution": {
+      "price": "0",
+      "funding": "500.00000000",
+      "fees": "23.0000000000",
+      "spread": "6.0000000",
+      "impact": "1.0000000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "470.0000000000"
+    },
+    "n_events": 6,
+    "n_trades": 1,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "-1.000000"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_positive": true,
+      "ic_frac": true,
+      "concentration": true,
+      "adverse_capacity": true,
+      "replication": false
+    },
+    "ic_positive_frac": 1.0,
+    "concentration": 0.5,
+    "failure_mode": "execution_constrained",
+    "failure_mode_basis": "Positive IS and OOS net result ($482 after fees/spread/impact). Failed only replication gate; gross funding transfer existed but VIP0 taker economics (10 bps spot + 5 bps perp) made it unharvestable at scale across independent periods and venues.",
+    "failure_mode_confidence": "high"
+  },
+  "generated_at": "2026-10-23T16:36:40.555873+00:00"
+}

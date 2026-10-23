@@ -1,0 +1,101 @@
+{
+  "hypothesis_id": "CRYPTO-002",
+  "manifest_digest": "4a7c66dbd3970c4a9cbdb2bcacd300ef2d644378f036c95a7cd50899639b3fc7",
+  "is": {
+    "hypothesis_id": "CRYPTO-002",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "IS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "4a7c66dbd3970c4a9cbdb2bcacd300ef2d644378f036c95a7cd50899639b3fc7",
+    "parameter_digest": "bd597cd73811a638c31e3c479498d23f064730844d7dd0ea617cb12c8e554edb",
+    "attribution": {
+      "price": "0",
+      "funding": "0E-10",
+      "fees": "825.0000000000",
+      "spread": "110.0000000",
+      "impact": "55.0000000",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "-990.0000000000"
+    },
+    "n_events": 56,
+    "n_trades": 6,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "-1.000000"
+    }
+  },
+  "oos": {
+    "hypothesis_id": "CRYPTO-002",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "4a7c66dbd3970c4a9cbdb2bcacd300ef2d644378f036c95a7cd50899639b3fc7",
+    "parameter_digest": "bd597cd73811a638c31e3c479498d23f064730844d7dd0ea617cb12c8e554edb",
+    "attribution": {
+      "price": "0",
+      "funding": "0",
+      "fees": "0",
+      "spread": "0",
+      "impact": "0",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "0"
+    },
+    "n_events": 4,
+    "n_trades": 0,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0"
+    }
+  },
+  "adverse_oos": {
+    "hypothesis_id": "CRYPTO-002",
+    "fill_model": "taker_vs_mid_plus_spread",
+    "can_qualify": true,
+    "partition": "OOS_ADVERSE",
+    "cost_model_digest": "013de911a90eba41ddd9f44e89e0fa70e9c9d8efb384e3ae6d4e47e9e06ef629",
+    "data_digest": "4a7c66dbd3970c4a9cbdb2bcacd300ef2d644378f036c95a7cd50899639b3fc7",
+    "parameter_digest": "bd597cd73811a638c31e3c479498d23f064730844d7dd0ea617cb12c8e554edb",
+    "attribution": {
+      "price": "0",
+      "funding": "0",
+      "fees": "0",
+      "spread": "0",
+      "impact": "0",
+      "borrow": "0",
+      "partial_unfilled": "0",
+      "latency": "0",
+      "conversion": "0",
+      "net": "0"
+    },
+    "n_events": 4,
+    "n_trades": 0,
+    "notes": [],
+    "extra": {
+      "end_position_perp": "0"
+    }
+  },
+  "gates": {
+    "verdict": "negative_result",
+    "gates": {
+      "oos_net_positive": false,
+      "ic_frac": false,
+      "concentration": true,
+      "adverse_capacity": false,
+      "replication": false
+    },
+    "ic_positive_frac": 0.0,
+    "concentration": 0.5,
+    "failure_mode": "mechanism_failure",
+    "failure_mode_basis": "Six IS trades were triggered and lost (net -$990, fees $825); OOS produced zero trades. The hypothesized funding+OI deleveraging reversal mechanism did not survive even when it actually triggered. Adverse price momentum and liquidation tails overwhelmed mean-reversion entries before reversal materialized.",
+    "failure_mode_confidence": "high"
+  },
+  "generated_at": "2026-10-23T16:36:40.704274+00:00"
+}

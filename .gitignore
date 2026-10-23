@@ -139,9 +139,8 @@ dist_wheels/
 *.pyd.old
 *.pyd.bak2
 
-# Crypto Vision dumps (regenerable)
+# Crypto Vision dumps (regenerable); results/ stays tracked as sealed-verdict evidence
 research/crypto/data/
-research/crypto/results/
 
 # Temporary scrapers & local DBs
 .just-scrape/

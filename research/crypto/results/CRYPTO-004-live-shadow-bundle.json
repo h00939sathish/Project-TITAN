@@ -1,0 +1,225 @@
+{
+  "attribution": {
+    "borrow": "0",
+    "conversion": "0",
+    "fees": "0",
+    "funding": "0",
+    "impact": "0",
+    "latency": "0",
+    "net": "0",
+    "net_pnl": "0",
+    "partial_unfilled": "0",
+    "price": "0",
+    "realized_price_pnl": "0",
+    "spread": "0",
+    "unrealized_basis_pnl": "0"
+  },
+  "deployment_authority": "READ_ONLY_NON_CUSTODIAL",
+  "events_ingested": 2565776,
+  "events_processed": 2565776,
+  "execution_ban_verified": true,
+  "generated_at": "2026-09-01T13:42:24.557170+00:00",
+  "hypothesis_id": "CRYPTO-004",
+  "manifest_digest": "07937d196337cc312cb477e1e8a5a81d67cdcf80c19bf1ccdeb1b67ea80823d6",
+  "metrics": {
+    "annualized_net_return_pct": 0.0,
+    "cumulative_net_pnl": "0",
+    "maker_fill_rate": 1.0,
+    "maker_fills": 0,
+    "max_drawdown_pct": 0.0,
+    "mean_unhedged_duration_min": 0.0,
+    "net_sharpe": 0.0,
+    "taker_fallbacks": 0
+  },
+  "notes": [
+    "public_unauthenticated_streams",
+    "strictly_non_custodial",
+    "zero_broker_secrets",
+    "adr_032_compliant"
+  ],
+  "run_mode": "LIVE_SHADOW_PAPER",
+  "session_id": "crypto_004_live_shadow",
+  "shadow_evidence": {
+    "attribution": {
+      "borrow": "0",
+      "conversion": "0",
+      "fees": "0",
+      "funding": "0",
+      "impact": "0",
+      "latency": "0",
+      "net": "0",
+      "net_pnl": "0",
+      "partial_unfilled": "0",
+      "price": "0",
+      "realized_price_pnl": "0",
+      "spread": "0",
+      "unrealized_basis_pnl": "0"
+    },
+    "cost_schedule": {
+      "adverse_perp_taker": "0.0006",
+      "adverse_spot_taker": "0.0008",
+      "adverse_spread_bps": "3.0",
+      "assumed_spread_bps": "1.0",
+      "label": "binance_usdt_vip1_2026-08-14",
+      "latency_ms": 250,
+      "min_notional": "5",
+      "perp_maker": "0.0001",
+      "perp_taker": "0.0004",
+      "price_precision": 2,
+      "qty_precision": 6,
+      "slippage_bps": "0.5",
+      "spot_maker": "0.0002",
+      "spot_taker": "0.0005",
+      "venue_id": "binance-vision"
+    },
+    "deployment_authority": "READ_ONLY_NON_CUSTODIAL",
+    "events_processed": 2565776,
+    "execution_ban_verified": true,
+    "generated_at": "2026-09-01T13:42:24.556972+00:00",
+    "hypothesis_id": "CRYPTO-004",
+    "metrics": {
+      "annualized_net_return_pct": 0.0,
+      "cumulative_net_pnl": "0",
+      "maker_fill_rate": 1.0,
+      "maker_fills": 0,
+      "max_drawdown_pct": 0.0,
+      "mean_unhedged_duration_min": 0.0,
+      "net_sharpe": 0.0,
+      "taker_fallbacks": 0
+    },
+    "positions": {
+      "BTCUSDT": {
+        "matched_hedged_qty": "0",
+        "position_perp": "0",
+        "position_spot": "0",
+        "unrealized_basis_pnl": "0"
+      },
+      "ETHUSDT": {
+        "matched_hedged_qty": "0",
+        "position_perp": "0",
+        "position_spot": "0",
+        "unrealized_basis_pnl": "0"
+      }
+    },
+    "run_mode": "SHADOW_PAPER",
+    "session_id": "crypto_004_live_shadow",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "trades_count": 0
+  },
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "telemetry": {
+    "authority": "READ_ONLY_SHADOW_NON_CUSTODIAL",
+    "events_ingested": 2565776,
+    "execution_ban_verified": true,
+    "hypothesis_id": "CRYPTO-004",
+    "is_connected": true,
+    "microstructure": {
+      "maker_fill_rate": 1.0,
+      "maker_fills": 0,
+      "mean_unhedged_duration_min": 0.0,
+      "taker_fallbacks": 0
+    },
+    "portfolio": {
+      "annualized_net_return_pct": 0.0,
+      "cumulative_net_pnl": "0",
+      "initial_capital": "100000.0",
+      "max_drawdown_pct": 0.0,
+      "net_sharpe": 0.0,
+      "nominal_capital": "120000.00",
+      "realized_funding": "0",
+      "realized_price_pnl": "0",
+      "total_fees": "0",
+      "total_impact": "0",
+      "total_spread": "0",
+      "unrealized_basis_pnl": "0"
+    },
+    "runner_events_processed": 2565776,
+    "runner_status": {
+      "attribution": {
+        "fees": "0",
+        "funding": "0",
+        "impact": "0",
+        "net_pnl": "0",
+        "realized_price_pnl": "0",
+        "spread": "0",
+        "unrealized_basis_pnl": "0"
+      },
+      "authority": "READ_ONLY_SHADOW_NON_CUSTODIAL",
+      "capital": {
+        "cumulative_net_pnl": "0",
+        "initial": "100000.0",
+        "nominal": "120000.00"
+      },
+      "events_processed": 2565776,
+      "execution_ban_verified": true,
+      "hypothesis_id": "CRYPTO-004",
+      "last_event_ts": "2026-09-01T13:42:24.426467+00:00",
+      "microstructure": {
+        "maker_fill_rate": 1.0,
+        "maker_fills": 0,
+        "mean_unhedged_duration_min": 0.0,
+        "taker_fallbacks": 0
+      },
+      "positions": {
+        "BTCUSDT": {
+          "last_perp_mark": "77910.43339580",
+          "last_spot_mark": "77534.00500000",
+          "matched_hedged_qty": "0",
+          "perp_entry_price": null,
+          "position_perp": "0",
+          "position_spot": "0",
+          "spot_entry_price": null,
+          "unrealized_basis_pnl": "0"
+        },
+        "ETHUSDT": {
+          "last_perp_mark": "2449.17000000",
+          "last_spot_mark": "2432.59500000",
+          "matched_hedged_qty": "0",
+          "perp_entry_price": null,
+          "position_perp": "0",
+          "position_spot": "0",
+          "spot_entry_price": null,
+          "unrealized_basis_pnl": "0"
+        }
+      },
+      "session_id": "crypto_004_live_shadow",
+      "trades_count": 0
+    },
+    "session_id": "crypto_004_live_shadow",
+    "symbols": {
+      "BTCUSDT": {
+        "annualized_funding_pct": 9.46737,
+        "basis_spread_bps": 48.55010337722139,
+        "funding_rate_8h": "0.00008646",
+        "matched_hedged_qty": "0",
+        "perp_mark_price": "77910.43339580",
+        "position_perp": "0",
+        "position_spot": "0",
+        "realized_funding": "0",
+        "spot_price": "77534.00500000",
+        "unrealized_basis_pnl": "0"
+      },
+      "ETHUSDT": {
+        "annualized_funding_pct": 7.03647,
+        "basis_spread_bps": 68.1371128362921,
+        "funding_rate_8h": "0.00006426",
+        "matched_hedged_qty": "0",
+        "perp_mark_price": "2449.17000000",
+        "position_perp": "0",
+        "position_spot": "0",
+        "realized_funding": "0",
+        "spot_price": "2432.59500000",
+        "unrealized_basis_pnl": "0"
+      }
+    },
+    "timestamp": "2026-09-01T13:42:24.556571+00:00",
+    "trades_count": 0
+  },
+  "trades_count": 0
+}

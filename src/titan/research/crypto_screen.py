@@ -10,6 +10,7 @@ its signal function, its IC-proxy computation, and its hypothesis id.
 from __future__ import annotations
 
 import json
+from titan.research.bundle_io import write_bundle
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -231,7 +232,7 @@ def run_crypto_screen(
         except Exception:
             pass
 
-    out.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+    write_bundle(out, bundle)
     return bundle
 
 

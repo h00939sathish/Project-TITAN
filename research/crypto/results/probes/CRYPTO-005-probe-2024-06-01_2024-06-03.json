@@ -1,0 +1,33 @@
+{
+  "probe": "CRYPTO-005-feasibility",
+  "can_qualify": false,
+  "tier": "exploratory (ADR-031)",
+  "is_range": "2024-06-01..2024-06-03",
+  "symbols": {
+    "BTCUSDT": {
+      "symbol": "BTCUSDT",
+      "trades": 2077364,
+      "1s": {
+        "n": 583047,
+        "mean_edge_usd_per_fill": -13.1909,
+        "mean_edge_bps_of_price": -2.0294,
+        "block_bootstrap_lb95": -13.191,
+        "win_frac": 0.0096
+      },
+      "5s": {
+        "n": 583047,
+        "mean_edge_usd_per_fill": -13.1836,
+        "mean_edge_bps_of_price": -2.0283,
+        "block_bootstrap_lb95": -13.1837,
+        "win_frac": 0.0102
+      },
+      "60s": {
+        "n": 583047,
+        "mean_edge_usd_per_fill": -13.1381,
+        "mean_edge_bps_of_price": -2.0213,
+        "block_bootstrap_lb95": -13.1382,
+        "win_frac": 0.011
+      }
+    }
+  }
+}

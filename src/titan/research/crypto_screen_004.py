@@ -12,6 +12,7 @@ from __future__ import annotations
 import glob
 import hashlib
 import json
+from titan.research.bundle_io import write_bundle
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -688,7 +689,7 @@ def run_crypto_004(
 
     out = output_path or (RESULTS_DIR / "CRYPTO-004-evidence-bundle.json")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+    write_bundle(out, bundle)
     return bundle
 
 
