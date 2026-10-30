@@ -62,6 +62,73 @@ def day_paths(symbol: str, day: datetime, hours: range | list[int]) -> list[str]
     ]
 
 
+def candle_day_path(symbol: str, day: datetime, side: str) -> str:
+    """Path to one UTC day of vendor-aggregated 1m candles ('BID' or 'ASK').
+
+    One request covers a whole day (1440 bars) instead of 24 hourly tick files.
+    """
+    if side not in ("BID", "ASK"):
+        raise ValueError(f"side must be BID or ASK, got {side!r}")
+    return (f"https://datafeed.dukascopy.com/datafeed/{symbol}/{day.year:04d}/"
+            f"{day.month - 1:02d}/{day.day:02d}/{side}_candles_min_1.bi5")
+
+
+def load_candles(path: str) -> dict[int, dict]:
+    """Decode a daily 1m candle bi5 into {minute_of_day: OHLCV}.
+
+    24-byte big-endian records: int32 second-of-day, then open/close/low/high
+    as int32 scaled by POINT, then float32 volume. Bars with a non-positive
+    open are gaps the vendor padded and are dropped.
+    """
+    raw = lzma.decompress(open(path, "rb").read())
+    if len(raw) % 24:
+        raise ValueError(f"{path}: {len(raw)} bytes is not a multiple of 24")
+    out: dict[int, dict] = {}
+    for i in range(len(raw) // 24):
+        t, o, c, lo, h, vol = struct.unpack_from(">5if", raw, i * 24)
+        if o <= 0 or h <= 0 or lo <= 0 or c <= 0:
+            continue
+        out[t // 60] = {"open": o / POINT, "high": h / POINT,
+                        "low": lo / POINT, "close": c / POINT, "volume": vol}
+    return out
+
+
+def merge_candle_sides(bid: dict[int, dict], ask: dict[int, dict]) -> list[dict]:
+    """Join BID/ASK candle dicts into the o_bid/.../c_ask bar schema.
+
+    Only minutes present on both sides are kept, so no bar ever carries a
+    half-populated spread. `n` is the vendor's bid volume truncated to int --
+    NOT a tick count, so it is not comparable to the `n` the tick path writes.
+
+    The vendor pads every closed minute with a zero-volume bar whose price does
+    not move: all 1440 minutes of a Saturday, the Friday tail after the weekly
+    close, and the Sunday head before it. The tick path emits no bar for a
+    closed hour, so keeping these would give the candle dataset ~29% flat
+    zero-return bars that the tick dataset does not have -- enough to halve
+    realised volatility and inflate any Sharpe computed on it.
+    """
+    bars = []
+    for m in sorted(set(bid) & set(ask)):
+        b, a = bid[m], ask[m]
+        if a["close"] < b["close"]:
+            continue
+        # A minute that really traded has volume; padding never does. Requiring
+        # both sides flat as well keeps a genuine minute whose volume rounded
+        # to zero but whose price moved.
+        if (int(b["volume"]) == 0
+                and b["open"] == b["high"] == b["low"] == b["close"]
+                and a["open"] == a["high"] == a["low"] == a["close"]):
+            continue
+        bars.append({
+            "minute": m,
+            "o_ask": a["open"], "h_ask": a["high"], "l_ask": a["low"], "c_ask": a["close"],
+            "o_bid": b["open"], "h_bid": b["high"], "l_bid": b["low"], "c_bid": b["close"],
+            "n": int(b["volume"]),
+        })
+    return bars
+
+
+
 if __name__ == "__main__":
     # Smoke test on the two probed files
     for f in ("/tmp/eurusd_13.bi5", "/tmp/eurusd_14.bi5"):

@@ -1,0 +1,70 @@
+{
+  "diagnostic_only": true,
+  "can_qualify": false,
+  "report": "comparison-full-0714.json",
+  "report_sha256": "608d7a4bfc02494d279aac58b0af3122a898d35736b51fede8547720a16c00b0",
+  "verification": {
+    "method": "Independent offline decoding of all raw daily payloads, UTC four-hour grouping, math.fsum VWAP recomputation, unchanged strategy replay without diagnostic functions",
+    "daily_payloads": 626,
+    "buckets_checked": 3220,
+    "timestamps_closes_tick_sums_exact": true,
+    "vendor_sums_match_to_cents": true,
+    "postwarmup_vwap_values_checked": 5960,
+    "maximum_absolute_vwap_error": 4.44e-16,
+    "all_signals_and_positions_match": true,
+    "monthly_position_records_checked": 24,
+    "monthly_denominators_fractions_nulls_match": true,
+    "first_reported_index": 120,
+    "first_reported_timestamp": "2025-08-28T08:00:00Z"
+  },
+  "support": {
+    "EURUSD": {
+      "shared_minutes": 370001,
+      "tick_only_minutes": 1514,
+      "vendor_only_minutes": 1531,
+      "native_buckets": 1610,
+      "retained_buckets": 1610,
+      "partially_reduced_buckets": 350,
+      "fully_disappeared_buckets": 0,
+      "maximum_absolute_vendor_sum_error": 8.00e-11,
+      "monthly_tick_only_minutes_and_affected_buckets": {
+        "2025-08": [102, 26], "2025-09": [134, 28], "2025-10": [106, 28],
+        "2025-11": [131, 39], "2025-12": [232, 43], "2026-01": [88, 29],
+        "2026-02": [91, 23], "2026-03": [58, 22], "2026-04": [121, 28],
+        "2026-05": [145, 25], "2026-06": [150, 29], "2026-07": [156, 30]
+      }
+    },
+    "GBPUSD": {
+      "shared_minutes": 368776,
+      "tick_only_minutes": 2130,
+      "vendor_only_minutes": 2153,
+      "native_buckets": 1610,
+      "retained_buckets": 1610,
+      "partially_reduced_buckets": 374,
+      "fully_disappeared_buckets": 0,
+      "maximum_absolute_vendor_sum_error": 1.02e-10,
+      "monthly_tick_only_minutes_and_affected_buckets": {
+        "2025-08": [206, 34], "2025-09": [229, 35], "2025-10": [200, 35],
+        "2025-11": [173, 32], "2025-12": [306, 48], "2026-01": [129, 34],
+        "2026-02": [128, 28], "2026-03": [92, 24], "2026-04": [175, 29],
+        "2026-05": [187, 25], "2026-06": [142, 25], "2026-07": [163, 25]
+      }
+    }
+  },
+  "scope_limitations": [
+    "Comparison is conditional on common UTC minutes, not a comparison of complete native pipelines.",
+    "Native vendor and tick-derived BID OHLC differ on some matched minutes; both diagnostic arms deliberately use only tick-derived BID OHLC.",
+    "No PnL or qualification assessment, no inference that the sealed EXP-00033 outcome would change.",
+    "The reusable script retains an output check/publication race and does not authenticate provenance of preexisting cache entries. This measurement used one writer in a leased directory, a unique output, and 626 freshly fetched payloads with zero cache reuse."
+  ],
+  "main_verification": {
+    "research_tests_passed": 317,
+    "existing_deprecation_warnings": 18,
+    "ruff": "passed",
+    "protected_files_unchanged": 12,
+    "report_code_and_tick_hashes_verified": 6,
+    "fresh_payload_hashes_verified": 626,
+    "committed": false,
+    "pushed": false
+  }
+}

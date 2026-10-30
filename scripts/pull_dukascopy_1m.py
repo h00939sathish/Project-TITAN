@@ -23,59 +23,107 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
-from dukascopy_bi5 import aggregate_1m, day_paths, load_ticks  # noqa: E402
+from dukascopy_bi5 import (  # noqa: E402,I001
+    aggregate_1m, candle_day_path, day_paths, load_candles, load_ticks,
+    merge_candle_sides,
+)
 
 SYMBOLS = ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"]
 OUT_DIR = Path(__file__).resolve().parents[1] / "research" / "dukascopy_1m_ba"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-MAX_TIME_S = 10
+# Measured 2026-10-27: TTFB is 16-31s while the feed is cold and ~1.2s once warm,
+# so the old 10s ceiling killed every successful fetch and marked whole days
+# UNREACHABLE. That is why research/dukascopy_1m_ba_prior/ stayed empty.
+MAX_TIME_S = 45
+# The feed sheds load with HTTP 503 (107-byte body, sub-second) in bursts that
+# clear on their own, so a 503 means "retry later", never "no data".
+RETRY_BACKOFF_S = (2, 5, 12, 30)
 HOURS_PER_DAY = 24
 CONN_BUDGET = 8  # >=1/3 dead hours => treat day as unreachable (feed down), not closed
+
 # WINDOWS: when this script is spawned detached (no console), every console
 # child (curl.exe) would otherwise pop a NEW visible console window per call.
 # CREATE_NO_WINDOW suppresses that; harmless no-op elsewhere.
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
+def _curl(url: str, tmp_path: str) -> tuple[int | None, int]:
+    """Return (http_status, bytes_written); status None means no HTTP reply."""
+    try:
+        r = subprocess.run(
+            ["curl", "-s", "-o", tmp_path, "-w", "%{http_code}",
+             "--max-time", str(MAX_TIME_S), "-A", UA, url],
+            capture_output=True, text=True, timeout=MAX_TIME_S + 10,
+            creationflags=NO_WINDOW,
+        )
+        if r.returncode != 0:
+            return None, 0
+        status = int((r.stdout or "").strip() or 0)
+        size = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+        return status, size
+    except Exception:
+        return None, 0
+
+
 def fetch_hour(url: str, tmp_path: str):
     """Return ('ok', ticks) | ('closed', []) | ('conn', None).
 
-    'closed' = valid empty (size<40 => weekend/illiquid hour, NOT an error).
-    'conn'   = the datafeed itself was unreachable (curl rc!=0 / timeout).
+    'closed' requires HTTP 200 with a short body — an empty weekend/illiquid
+    hour. Error bodies are never treated as closed, however small: curl writes
+    them to the same file, so classifying on size alone would record missing
+    data as a legitimately quiet market.
     """
-    for attempt in range(2):
-        try:
-            rc = subprocess.run(
-                ["curl", "-s", "-o", tmp_path, "--max-time", str(MAX_TIME_S), "-A", UA, url],
-                capture_output=True, timeout=MAX_TIME_S + 5,
-                creationflags=NO_WINDOW,
-            ).returncode
-            if rc != 0:
-                raise RuntimeError(f"curl rc={rc}")
-            size = os.path.getsize(tmp_path)
-            if size < 40:  # valid empty hour (market closed / no ticks)
+    for delay in RETRY_BACKOFF_S + (None,):
+        status, size = _curl(url, tmp_path)
+        if status == 200:
+            if size < 40:
                 return ("closed", [])
-            return ("ok", load_ticks(tmp_path))
-        except Exception:
-            if attempt == 1:
-                return ("conn", None)  # two failures => feed unreachable
-            time.sleep(1.5)
-    return ("conn", None)  # unreachable
+            try:
+                return ("ok", load_ticks(tmp_path))
+            except Exception:
+                return ("conn", None)  # 200 but undecodable => treat as failure
+        if delay is None:
+            return ("conn", None)
+        time.sleep(delay)
+    return ("conn", None)
 
 
 def feed_healthy(probe_url: str) -> bool:
     """True if the datafeed answers a mid-session hour with real bytes."""
-    tmp = Path(os.environ.get("TEMP", ".")) / f"dk_probe_{os.getpid()}.bi5"
-    try:
-        rc = subprocess.run(["curl", "-s", "-o", str(tmp), "--max-time", "12",
-                             "-A", UA, probe_url],
-                            capture_output=True, timeout=18,
-                            creationflags=NO_WINDOW).returncode
-        if rc != 0:
-            return False
-        return os.path.getsize(tmp) > 40
-    except Exception:
-        return False
+    status, size = _curl(probe_url, str(Path(os.environ.get("TEMP", "."))
+                                        / f"dk_probe_{os.getpid()}.bi5"))
+    return status == 200 and size > 40
+
+
+
+def pull_candle_day(symbol: str, day: date, tmp_dir: Path) -> tuple[list[dict], bool]:
+    """One UTC day of 1m bid/ask bars from vendor candles. Returns (bars, ok).
+
+    Two requests per day instead of 24 hourly tick files. ok=False means the
+    feed failed; an empty list with ok=True is a genuinely closed day.
+    """
+    sides: dict[str, dict[int, dict]] = {}
+    for side in ("BID", "ASK"):
+        tmp = tmp_dir / f"{day.isoformat()}_{side}.bi5"
+        for delay in RETRY_BACKOFF_S + (None,):
+            status, size = _curl(candle_day_path(symbol, day, side), str(tmp))
+            if status == 200 and size < 40:
+                return [], True  # closed day (weekend / holiday)
+            if status == 200:
+                try:
+                    sides[side] = load_candles(str(tmp))
+                    break
+                except Exception:
+                    pass
+            if delay is None:
+                return [], False
+            time.sleep(delay)
+    bars = []
+    for bar in merge_candle_sides(sides["BID"], sides["ASK"]):
+        m = bar.pop("minute")
+        bars.append({"timestamp": f"{day.isoformat()}T{m // 60:02d}:{m % 60:02d}:00Z",
+                     **bar})
+    return bars, True
 
 
 def _pull_one_day(symbol: str, day: date, tmp_dir: Path):
@@ -108,8 +156,8 @@ def _pull_one_day(symbol: str, day: date, tmp_dir: Path):
             if kind == "conn":
                 conn_fail += 1
             elif ticks:
-                for m, bar in enumerate(aggregate_1m_ticks(ticks)):
-                    ts = f"{day.isoformat()}T{h:02d}:{m:02d}:00Z"
+                for bar in aggregate_1m_ticks(ticks):
+                    ts = f"{day.isoformat()}T{h:02d}:{bar['minute']:02d}:00Z"
                     day_bars.append({"timestamp": ts, **bar})
     return day_bars, conn_fail
 
@@ -117,7 +165,8 @@ def _pull_one_day(symbol: str, day: date, tmp_dir: Path):
 def download_symbol_missing(symbol: str, start: date, days: int,
                             parallel_days: int = 2,
                             only_days: set | None = None,
-                            checkpoint=None) -> tuple[list[dict], list[str]]:
+                            checkpoint=None,
+                            use_candles: bool = False) -> tuple[list[dict], list[str]]:
     """Pull `days` days from `start`; returns (bars, unreachable_iso_dates).
 
     parallel_days > 1 pulls multiple days concurrently (each day still uses
@@ -126,6 +175,9 @@ def download_symbol_missing(symbol: str, start: date, days: int,
     only_days: optional set of ISO dates ('YYYY-MM-DD') to restrict the fetch
     to. When given, days not in the set are skipped entirely (used by the
     prior-window launcher so already-fetched days are never re-pulled).
+
+    use_candles: fetch vendor-aggregated 1m candles (2 requests/day) instead of
+    24 hourly tick files. Same output schema; `n` becomes bid volume.
     """
     bars_all: list[dict] = []
     unreachable: list[str] = []
@@ -136,6 +188,15 @@ def download_symbol_missing(symbol: str, start: date, days: int,
         days_list = [d for d in days_list if d.isoformat() in only_days]
 
     def one(day):
+        if use_candles:
+            bars, ok = pull_candle_day(symbol, day, tmp_dir)
+            if not ok:
+                print(f"  {symbol} {day}: UNREACHABLE (candle feed down) - "
+                      f"skipped, will retry", flush=True)
+                return day.isoformat(), [], True
+            print(f"  {symbol} {day}: {len(bars)} 1m bars"
+                  if bars else f"  {symbol} {day}: closed/no ticks", flush=True)
+            return day.isoformat(), bars, False
         bars, conn_fail = _pull_one_day(symbol, day, tmp_dir)
         if conn_fail >= CONN_BUDGET:
             print(f"  {symbol} {day}: UNREACHABLE ({conn_fail}/{HOURS_PER_DAY}h feed down) - skipped, will retry", flush=True)
@@ -145,6 +206,7 @@ def download_symbol_missing(symbol: str, start: date, days: int,
         else:
             print(f"  {symbol} {day}: closed/no ticks", flush=True)
         return day.isoformat(), bars, False
+
 
     if parallel_days > 1:
         with ThreadPoolExecutor(max_workers=parallel_days) as pool:

@@ -1,0 +1,693 @@
+{
+  "experiment_id": "EXP-00033",
+  "experiment_fingerprint": "4ad20f90ea8f",
+  "question": "Does the registered traderdev-ema9-vwap candidate keep a positive, cost-surviving edge on data it was never tuned on? EXP-00025 found the F1 family net positive at 4h on EURUSD + GBPUSD (+408.3 pips pooled) but only over the 12 months the port was tuned on, and the promotion gate recorded walk_forward as UNMET for that reason. The 2D surface has no compact plateau and the two pairs favour different corners. WF-v2 runs the frozen parameters over 2022-08..2025-07.",
+  "protocol": "research/protocol_WF_v2_PRE_FROZEN.md",
+  "protocol_sha256": "a524427b2e8b70402b7d5985a403dfc49bcb0327dc3ccbc1a2d743df66c39fbf",
+  "interpretation": {
+    "folds": "Test month k for every k >= 6; train = months [0, k). Parameters are frozen, so train is indicator warm-up only; signals are computed causally in one pass, which equals re-running on each expanding train.",
+    "window_pass": "Sharpe > 0.0 and Spearman IC(position at bar close, next-bar return) > 0.02; an undefined Sharpe or IC fails the window.",
+    "aggregate_pass": "Window pass rate >= 0.70, mean Sharpe > 0 and mean IC > 0 (undefined values count as 0).",
+    "turnover": "Sum of |position change| x leverage over OOS bars, annualized (one-way traded notional / NAV). Ratified in ADR-036.",
+    "costs": "Screen engine: 0.8e-4 of price per round trip, charged as half per unit of leveraged notional traded on each bar where the position changes (a flip pays a full round trip), and that bar earns no return; 10% vol target at an assumed 8% vol. Ratified in ADR-036.",
+    "returns": "Shorts earn the negative of the bar return (fixed in the screen as well). Ratified in ADR-036.",
+    "prices": "Bid OHLC resampled from 1m bars; the screen engine has no separate spread term. Ratified in ADR-036.",
+    "missing_ticks": "Expected minutes are all minutes except Fri 22:00 to Sun 22:00 UTC. DST and holidays are not modelled, which overstates the missing rate.",
+    "positions": "Position after each bar close. A strategy that reports its own held position (signal_fn.position()) is read directly, so BUY/SELL used as exits stay exits; otherwise BUY = long and SELL = short (long_short) or flat (long_flat). long_flat floors a reported short at flat. Stops act at bar-close granularity. ADR-038.",
+    "regime_pivot": "At least one CENTRAL_BANK_PIVOTS date inside the window.",
+    "multi_instrument": "Every instrument must pass on its own.",
+    "verdict": "PASS only if every instrument passes every criterion; anything else is FAIL."
+  },
+  "spec": {
+    "strategy_id": "traderdev-ema9-vwap",
+    "strategy_params": {
+      "ema_period": 9,
+      "vwap_period": 120,
+      "atr_period": 14,
+      "trail_mult": 2.0
+    },
+    "instruments": [
+      "EURUSD",
+      "GBPUSD"
+    ],
+    "timeframe_minutes": 240,
+    "window": [
+      "2022-08",
+      "2025-07"
+    ],
+    "position_mode": "long_short",
+    "evidence_record": "research/evidence/EXP-00033.json",
+    "mechanism_id": null
+  },
+  "dataset_id": "dukascopy_1m_ba_prior",
+  "data": {
+    "EURUSD": {
+      "path": "research/dukascopy_1m_ba_prior/EURUSD.json",
+      "sha256": "48f719fc2dda65dc32c7a0206da24bd5201f8cac8c354848de54504a915ee43a",
+      "bars": 4818,
+      "coverage": {
+        "months_in_window": 36,
+        "months_with_data": 36,
+        "months_without_data": [],
+        "expected_minutes": 1128960,
+        "present_minutes": 1106010,
+        "missing_rate": 0.020328
+      }
+    },
+    "GBPUSD": {
+      "path": "research/dukascopy_1m_ba_prior/GBPUSD.json",
+      "sha256": "396a611bad6c45d36855741e73ba3f886544554b3af2a22c1f059353931bc6df",
+      "bars": 4842,
+      "coverage": {
+        "months_in_window": 36,
+        "months_with_data": 36,
+        "months_without_data": [],
+        "expected_minutes": 1128960,
+        "present_minutes": 1113040,
+        "missing_rate": 0.014101
+      }
+    }
+  },
+  "instruments": {
+    "EURUSD": {
+      "windows": [
+        {
+          "test_month": "2023-02",
+          "train_months": 6,
+          "bars": 124,
+          "sharpe": 4.563305256055113,
+          "ic": 0.10137853561767048,
+          "net_return": 0.006953675490655553,
+          "passed": true
+        },
+        {
+          "test_month": "2023-03",
+          "train_months": 7,
+          "bars": 142,
+          "sharpe": -0.008646642540547502,
+          "ic": -0.017906378171777673,
+          "net_return": -4.948417132116758e-05,
+          "passed": false
+        },
+        {
+          "test_month": "2023-04",
+          "train_months": 8,
+          "bars": 125,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-05",
+          "train_months": 9,
+          "bars": 142,
+          "sharpe": -1.765193668250024,
+          "ic": -0.04171424210770433,
+          "net_return": -0.0015189152649513038,
+          "passed": false
+        },
+        {
+          "test_month": "2023-06",
+          "train_months": 10,
+          "bars": 136,
+          "sharpe": 2.8441034126898246,
+          "ic": -0.008916982801091228,
+          "net_return": 0.006058395235852021,
+          "passed": false
+        },
+        {
+          "test_month": "2023-07",
+          "train_months": 11,
+          "bars": 131,
+          "sharpe": 4.036347200196303,
+          "ic": 0.1155192982112253,
+          "net_return": 0.018214973241108982,
+          "passed": true
+        },
+        {
+          "test_month": "2023-08",
+          "train_months": 12,
+          "bars": 142,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-09",
+          "train_months": 13,
+          "bars": 130,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-10",
+          "train_months": 14,
+          "bars": 137,
+          "sharpe": -3.0991622382727932,
+          "ic": -0.07665679864049653,
+          "net_return": -0.01579230583886259,
+          "passed": false
+        },
+        {
+          "test_month": "2023-11",
+          "train_months": 15,
+          "bars": 136,
+          "sharpe": 2.3571091825222967,
+          "ic": -0.035552809289606566,
+          "net_return": 0.006633261356760578,
+          "passed": false
+        },
+        {
+          "test_month": "2023-12",
+          "train_months": 16,
+          "bars": 127,
+          "sharpe": -1.865040335191204,
+          "ic": -0.03699633642519742,
+          "net_return": -0.0043790550966384895,
+          "passed": false
+        },
+        {
+          "test_month": "2024-01",
+          "train_months": 17,
+          "bars": 137,
+          "sharpe": -2.952182035792025,
+          "ic": -0.13096831690542302,
+          "net_return": -0.004738599259792087,
+          "passed": false
+        },
+        {
+          "test_month": "2024-02",
+          "train_months": 18,
+          "bars": 130,
+          "sharpe": -0.08603346582577188,
+          "ic": 0.03840607646456104,
+          "net_return": -0.00014006607646309112,
+          "passed": false
+        },
+        {
+          "test_month": "2024-03",
+          "train_months": 19,
+          "bars": 131,
+          "sharpe": -4.872785530572339,
+          "ic": -0.08558283040532781,
+          "net_return": -0.010906281567563658,
+          "passed": false
+        },
+        {
+          "test_month": "2024-04",
+          "train_months": 20,
+          "bars": 136,
+          "sharpe": -1.3547716136583545,
+          "ic": 0.07057619220030276,
+          "net_return": -0.005493696786634882,
+          "passed": false
+        },
+        {
+          "test_month": "2024-05",
+          "train_months": 21,
+          "bars": 142,
+          "sharpe": -2.4636450218175345,
+          "ic": -0.07613815692704587,
+          "net_return": -0.0034821936166553047,
+          "passed": false
+        },
+        {
+          "test_month": "2024-06",
+          "train_months": 22,
+          "bars": 125,
+          "sharpe": -2.1240820074236684,
+          "ic": -0.03164301376911919,
+          "net_return": -0.006546176284260651,
+          "passed": false
+        },
+        {
+          "test_month": "2024-07",
+          "train_months": 23,
+          "bars": 142,
+          "sharpe": 3.5285063483645795,
+          "ic": 0.04059798549190084,
+          "net_return": 0.005727968947092499,
+          "passed": true
+        },
+        {
+          "test_month": "2024-08",
+          "train_months": 24,
+          "bars": 136,
+          "sharpe": -1.540251623251938,
+          "ic": -0.001029316021592571,
+          "net_return": -0.002091083049883574,
+          "passed": false
+        },
+        {
+          "test_month": "2024-09",
+          "train_months": 25,
+          "bars": 131,
+          "sharpe": -2.3871760095046497,
+          "ic": 0.017551985000777353,
+          "net_return": -0.0038393767422891132,
+          "passed": false
+        },
+        {
+          "test_month": "2024-10",
+          "train_months": 26,
+          "bars": 142,
+          "sharpe": 7.308862119233658,
+          "ic": 0.025322408960319117,
+          "net_return": 0.023211952879471465,
+          "passed": true
+        },
+        {
+          "test_month": "2024-11",
+          "train_months": 27,
+          "bars": 130,
+          "sharpe": -5.070765183913562,
+          "ic": -0.06312338840748782,
+          "net_return": -0.028719884772574,
+          "passed": false
+        },
+        {
+          "test_month": "2024-12",
+          "train_months": 28,
+          "bars": 109,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2025-01",
+          "train_months": 29,
+          "bars": 137,
+          "sharpe": -4.098087743975879,
+          "ic": -0.0918011390400501,
+          "net_return": -0.004106410256410104,
+          "passed": false
+        },
+        {
+          "test_month": "2025-02",
+          "train_months": 30,
+          "bars": 124,
+          "sharpe": -6.096500961341453,
+          "ic": -0.10391215098729843,
+          "net_return": -0.019694030740916683,
+          "passed": false
+        },
+        {
+          "test_month": "2025-03",
+          "train_months": 31,
+          "bars": 131,
+          "sharpe": 6.727194175973184,
+          "ic": 0.09153163146280079,
+          "net_return": 0.0358560880231912,
+          "passed": true
+        },
+        {
+          "test_month": "2025-04",
+          "train_months": 32,
+          "bars": 136,
+          "sharpe": 2.1010174334322396,
+          "ic": 0.0829199707811115,
+          "net_return": 0.010207291732445934,
+          "passed": true
+        },
+        {
+          "test_month": "2025-05",
+          "train_months": 33,
+          "bars": 136,
+          "sharpe": 3.049453258091331,
+          "ic": 0.008558531415565219,
+          "net_return": 0.015221596958819212,
+          "passed": false
+        },
+        {
+          "test_month": "2025-06",
+          "train_months": 34,
+          "bars": 131,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2025-07",
+          "train_months": 35,
+          "bars": 142,
+          "sharpe": 4.396779895795252,
+          "ic": 0.05367210852762384,
+          "net_return": 0.014024846394235763,
+          "passed": true
+        }
+      ],
+      "oos_bars": 4000,
+      "criteria": {
+        "window_pass_rate": {
+          "value": 0.23333333333333334,
+          "threshold": ">= 0.7",
+          "passed": false
+        },
+        "mean_sharpe": {
+          "value": 0.03761180670073458,
+          "threshold": "> 0",
+          "passed": true
+        },
+        "mean_ic": {
+          "value": -0.005196904525512011,
+          "threshold": "> 0",
+          "passed": false
+        },
+        "annual_turnover": {
+          "value": 97.865625,
+          "threshold": "<= 60.0",
+          "passed": false
+        },
+        "net_oos_return": {
+          "value": 0.03061249073441651,
+          "threshold": "> 0",
+          "passed": true
+        }
+      },
+      "passed": false
+    },
+    "GBPUSD": {
+      "windows": [
+        {
+          "test_month": "2023-02",
+          "train_months": 6,
+          "bars": 124,
+          "sharpe": 5.316453745009316,
+          "ic": 0.0034034391421670853,
+          "net_return": 0.02300477421325563,
+          "passed": false
+        },
+        {
+          "test_month": "2023-03",
+          "train_months": 7,
+          "bars": 142,
+          "sharpe": -0.9963797789486797,
+          "ic": -0.08681660990215449,
+          "net_return": -0.0037078905224525002,
+          "passed": false
+        },
+        {
+          "test_month": "2023-04",
+          "train_months": 8,
+          "bars": 125,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-05",
+          "train_months": 9,
+          "bars": 142,
+          "sharpe": -6.880389644748131,
+          "ic": -0.13849857703575125,
+          "net_return": -0.006788366795613299,
+          "passed": false
+        },
+        {
+          "test_month": "2023-06",
+          "train_months": 10,
+          "bars": 136,
+          "sharpe": -3.410761998950975,
+          "ic": -0.08646618141534608,
+          "net_return": -0.012542881539816081,
+          "passed": false
+        },
+        {
+          "test_month": "2023-07",
+          "train_months": 11,
+          "bars": 131,
+          "sharpe": -3.130703246027173,
+          "ic": 0.016454467212902522,
+          "net_return": -0.013983548289934672,
+          "passed": false
+        },
+        {
+          "test_month": "2023-08",
+          "train_months": 12,
+          "bars": 142,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-09",
+          "train_months": 13,
+          "bars": 130,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2023-10",
+          "train_months": 14,
+          "bars": 137,
+          "sharpe": -6.087313589183847,
+          "ic": -0.06893898317296954,
+          "net_return": -0.022241723948649723,
+          "passed": false
+        },
+        {
+          "test_month": "2023-11",
+          "train_months": 15,
+          "bars": 136,
+          "sharpe": 3.5633037001670664,
+          "ic": 0.018701809214659564,
+          "net_return": 0.014677081453157399,
+          "passed": false
+        },
+        {
+          "test_month": "2023-12",
+          "train_months": 16,
+          "bars": 126,
+          "sharpe": 0.5415347400501269,
+          "ic": 0.03242866468179717,
+          "net_return": 0.0018033458315867058,
+          "passed": true
+        },
+        {
+          "test_month": "2024-01",
+          "train_months": 17,
+          "bars": 137,
+          "sharpe": -4.9266047816549134,
+          "ic": -0.1573195013265629,
+          "net_return": -0.019765921959792255,
+          "passed": false
+        },
+        {
+          "test_month": "2024-02",
+          "train_months": 18,
+          "bars": 130,
+          "sharpe": -3.705362399583836,
+          "ic": -0.05189046309473633,
+          "net_return": -0.012696200927923123,
+          "passed": false
+        },
+        {
+          "test_month": "2024-03",
+          "train_months": 19,
+          "bars": 131,
+          "sharpe": -2.872534070349536,
+          "ic": -0.10691171711169191,
+          "net_return": -0.005278532101689026,
+          "passed": false
+        },
+        {
+          "test_month": "2024-04",
+          "train_months": 20,
+          "bars": 136,
+          "sharpe": -1.261599980421219,
+          "ic": 0.05975329782816241,
+          "net_return": -0.0064926798254376136,
+          "passed": false
+        },
+        {
+          "test_month": "2024-05",
+          "train_months": 21,
+          "bars": 142,
+          "sharpe": -7.462642073929476,
+          "ic": -0.12923753986297273,
+          "net_return": -0.003216960880332792,
+          "passed": false
+        },
+        {
+          "test_month": "2024-06",
+          "train_months": 22,
+          "bars": 125,
+          "sharpe": -0.921230669170584,
+          "ic": -0.0792262260509638,
+          "net_return": -0.0022549836274990184,
+          "passed": false
+        },
+        {
+          "test_month": "2024-07",
+          "train_months": 23,
+          "bars": 142,
+          "sharpe": 2.973841728937057,
+          "ic": 0.059907672799074795,
+          "net_return": 0.005884259145980547,
+          "passed": true
+        },
+        {
+          "test_month": "2024-08",
+          "train_months": 24,
+          "bars": 136,
+          "sharpe": 3.0525579751567267,
+          "ic": 0.0895352560158576,
+          "net_return": 0.0075323238373043505,
+          "passed": true
+        },
+        {
+          "test_month": "2024-09",
+          "train_months": 25,
+          "bars": 131,
+          "sharpe": -1.4901310060221453,
+          "ic": 0.005650944515872345,
+          "net_return": -0.004240316317851233,
+          "passed": false
+        },
+        {
+          "test_month": "2024-10",
+          "train_months": 26,
+          "bars": 142,
+          "sharpe": 1.2988783691982206,
+          "ic": -0.06745109966675113,
+          "net_return": 0.0033902602431899356,
+          "passed": false
+        },
+        {
+          "test_month": "2024-11",
+          "train_months": 27,
+          "bars": 130,
+          "sharpe": -5.393379582565237,
+          "ic": -0.1503675299696309,
+          "net_return": -0.01378282129237387,
+          "passed": false
+        },
+        {
+          "test_month": "2024-12",
+          "train_months": 28,
+          "bars": 134,
+          "sharpe": -5.482860793708757,
+          "ic": -0.10415833293906711,
+          "net_return": -0.01952342287519131,
+          "passed": false
+        },
+        {
+          "test_month": "2025-01",
+          "train_months": 29,
+          "bars": 137,
+          "sharpe": 0.6086063450716048,
+          "ic": 0.0007774923896623249,
+          "net_return": 0.0018285743361249774,
+          "passed": false
+        },
+        {
+          "test_month": "2025-02",
+          "train_months": 30,
+          "bars": 124,
+          "sharpe": -5.400106754005817,
+          "ic": -0.10353419813226568,
+          "net_return": -0.005837809038830515,
+          "passed": false
+        },
+        {
+          "test_month": "2025-03",
+          "train_months": 31,
+          "bars": 131,
+          "sharpe": null,
+          "ic": null,
+          "net_return": 0.0,
+          "passed": false
+        },
+        {
+          "test_month": "2025-04",
+          "train_months": 32,
+          "bars": 136,
+          "sharpe": 1.984740504512654,
+          "ic": 0.043517677388965316,
+          "net_return": 0.010706395963696309,
+          "passed": true
+        },
+        {
+          "test_month": "2025-05",
+          "train_months": 33,
+          "bars": 136,
+          "sharpe": 2.0958985892698765,
+          "ic": 0.018255146904651864,
+          "net_return": 0.00956857762730987,
+          "passed": false
+        },
+        {
+          "test_month": "2025-06",
+          "train_months": 34,
+          "bars": 131,
+          "sharpe": 1.7018984722224397,
+          "ic": -0.0022352680809404253,
+          "net_return": 0.0050126150747062505,
+          "passed": false
+        },
+        {
+          "test_month": "2025-07",
+          "train_months": 35,
+          "bars": 142,
+          "sharpe": 5.1387080011792365,
+          "ic": 0.008949179494660323,
+          "net_return": 0.013499632673693506,
+          "passed": false
+        }
+      ],
+      "oos_bars": 4024,
+      "criteria": {
+        "window_pass_rate": {
+          "value": 0.13333333333333333,
+          "threshold": ">= 0.7",
+          "passed": false
+        },
+        "mean_sharpe": {
+          "value": -1.0381859399498667,
+          "threshold": "> 0",
+          "passed": false
+        },
+        "mean_ic": {
+          "value": -0.03252390600577903,
+          "threshold": "> 0",
+          "passed": false
+        },
+        "annual_turnover": {
+          "value": 91.8395874751491,
+          "threshold": "<= 60.0",
+          "passed": false
+        },
+        "net_oos_return": {
+          "value": -0.055446219543381546,
+          "threshold": "> 0",
+          "passed": false
+        }
+      },
+      "passed": false
+    }
+  },
+  "execution_check": {
+    "EURUSD": {
+      "trades": 149,
+      "rejected_intents": 0,
+      "bars_processed": 4818
+    },
+    "GBPUSD": {
+      "trades": 147,
+      "rejected_intents": 0,
+      "bars_processed": 4842
+    }
+  },
+  "verdict": "FAIL",
+  "generated_at": "2026-10-29T06:49:46Z"
+}

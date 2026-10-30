@@ -32,6 +32,10 @@ def main():
                     help="concurrent days to pull (default 1 = sequential); "
                          "NOTE: >1 measured SLOWER on this feed (server throttle), "
                          "kept as opt-in only")
+    ap.add_argument("--candles", action="store_true",
+                    help="pull vendor-aggregated 1m candles (2 requests/day) "
+                         "instead of 24 hourly tick files; same output schema, "
+                         "n becomes bid volume")
     args = ap.parse_args()
     symbols = args.symbol or dk.SYMBOLS
     if not args.symbol:
@@ -53,8 +57,14 @@ def main():
                 existing = json.loads(out.read_text(encoding="utf-8"))
             except Exception:
                 existing = []
-        # skip if we already span most of the requested range (resume-friendly)
-        req = {(args.start + timedelta(days=step)).isoformat() for step in range(days)}
+        # skip if we already span most of the requested range (resume-friendly).
+        # Saturdays are excluded: both paths write no bars for them (the tick
+        # path has none, the candle path pads them and merge_candle_sides drops
+        # the padding), so counting them would make every Saturday look missing
+        # and re-pull ~157 dead days per symbol on every resume.
+        req = {(args.start + timedelta(days=step)).isoformat()
+               for step in range(days)
+               if (args.start + timedelta(days=step)).weekday() != 5}
         have = {b["timestamp"][:10] for b in existing}
         missing = req - have
         print(f"\n{sym}: existing {len(existing)} bars, {len(missing)} prior-days missing", flush=True)
@@ -96,7 +106,8 @@ def main():
         bars, unreachable = dk.download_symbol_missing(sym, args.start, days,
                                               parallel_days=args.parallel,
                                               only_days=missing,
-                                              checkpoint=checkpoint)
+                                              checkpoint=checkpoint,
+                                              use_candles=args.candles)
         # in-run retry: feed flaps recover in minutes, so re-pull the days that
         # failed before giving up (up to 3 passes). Drop partial pass-1 bars for
         # retried days so the fuller pass-2 bars win (dedup keeps first occurrence).
@@ -110,7 +121,8 @@ def main():
             bars2, unreachable = dk.download_symbol_missing(
                 sym, args.start, days,
                 parallel_days=args.parallel,
-                only_days=bad_days)
+                only_days=bad_days,
+                use_candles=args.candles)
             bars = bars + bars2
         merged = existing + bars
         # idempotent merge: sort by timestamp, then drop exact-duplicate

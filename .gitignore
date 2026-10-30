@@ -98,8 +98,11 @@ UNDERENGINEERING.md
 *.secret.json
 
 # Local-only research data (large, regenerable; not for git)
+.scratch/
 research/dukascopy_1m_ba/
+research/dukascopy_1m_ba_corrected/
 research/dukascopy_1m_ba_prior/
+research/dukascopy_1m_ba_prior_bi5_partial/
 research_data/dukascopy_prior_window/
 research/tws_daily/
 research/tws_history/
