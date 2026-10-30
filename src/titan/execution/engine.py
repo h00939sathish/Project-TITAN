@@ -50,10 +50,19 @@ from titan.risk.session_initialization import (
 from titan.research.promotion_certificate import PromotionCertificateRegistry, Certificate
 from titan.risk.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
+# Broker status -> terminal order state. Cancellation, rejection and expiry are
+# three different outcomes and must stay distinguishable in the audit trail;
+# the dead-status set is derived from this map so the two cannot drift.
+_TERMINAL_TARGETS = {
+    "Expired": OrderState.Expired,
+    "Cancelled": OrderState.Cancelled,
+    "ApiCancelled": OrderState.Cancelled,
+    "Rejected": OrderState.Rejected,
+    "ApiRejected": OrderState.Rejected,
+    "Inactive": OrderState.Rejected,
+}
 # Terminal statuses where the broker will take no further action.
-_DEAD_ORDER_STATUSES = frozenset({
-    "Filled", "Rejected", "Cancelled", "Inactive", "ApiCancelled", "ApiRejected",
-})
+_DEAD_ORDER_STATUSES = frozenset(_TERMINAL_TARGETS) | {"Filled"}
 # Canonicalization: brokers report statuses in different vocabularies (TWS
 # "Filled"/"PreSubmitted", Alpaca "filled"/"canceled", sim "partially_filled").
 # Everything is normalized HERE so engine logic compares one vocabulary only.
@@ -827,7 +836,7 @@ class PaperTradingEngine:
             # Dead without further fills possible (Cancelled/Rejected/...):
             # preserve any partial fill FIRST, then take the terminal state.
             self._absorb_broker_fill(order_id, sm, cumulative, price, update_sm=False)
-            target = OrderState.Cancelled if status == "Cancelled" else OrderState.Rejected
+            target = _TERMINAL_TARGETS[status]
             from_state = sm.current
             try:
                 sm.transition(target)
@@ -1356,8 +1365,7 @@ class PaperTradingEngine:
                     if cumulative > already_filled:
                         self._absorb_broker_fill(order_id, sm, cumulative, price,
                                                  update_sm=False)
-                    target = (OrderState.Cancelled if status == "Cancelled"
-                              else OrderState.Rejected)
+                    target = _TERMINAL_TARGETS[status]
                     try:
                         sm.transition(target)
                         sm.persist_transition(self._event_store, order_id, from_current,

@@ -593,3 +593,146 @@ def test_working_order_stays_pending():
     pos = engine.portfolio.get_position("AAPL")
     assert pos is not None and pos.quantity == 100
     engine.stop()
+
+
+# ── 7. Broker-reported expiry is terminal and is not a rejection ────────────
+
+def _acknowledged_order(engine, adapter, fill_quantity=None):
+    """Submit an order the broker accepts with no (or a partial) fill."""
+    adapter.ack_override = BrokerOrderAcknowledgement(
+        accepted=True,
+        broker_order_id=BrokerOrderId(id="b-exp"),
+        fill_quantity=fill_quantity,
+        fill_price="150.0" if fill_quantity else None,
+        order_status="PartiallyFilled" if fill_quantity else "Acknowledged",
+    )
+    result = engine.submit_intent(_make_intent())
+    assert result.accepted
+    return next(iter(engine.order_states))
+
+
+def _tracked_polls(adapter):
+    """Wrap adapter.tick so the test can count how often an order is polled."""
+    calls = []
+    tick = adapter.tick
+
+    def counting(order_id):
+        calls.append(order_id)
+        return tick(order_id)
+
+    adapter.tick = counting
+    return calls
+
+
+def _last_transition(engine, client_id):
+    events = [json.loads(e.payload)
+              for e in engine._event_store.replay_by_type("OrderTransition")]
+    return [e for e in events if e["order_id"] == client_id][-1]
+
+
+def test_expired_working_order_drains_from_polling():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter)
+    assert engine.order_states[client_id].current == OrderState.Acknowledged
+
+    adapter.tick_status[client_id] = _status("b-exp", status="Expired", filled="0")
+    polls = _tracked_polls(adapter)
+
+    engine.poll_fills()
+
+    assert engine.order_states[client_id].current == OrderState.Expired
+    assert client_id not in engine._order_metadata
+    assert polls == [client_id]
+    # A terminal order must not be polled again, however many polls run.
+    engine.poll_fills()
+    engine.poll_fills()
+    assert polls == [client_id]
+    engine.stop()
+
+
+def test_expired_with_partial_fill_preserves_position():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter, fill_quantity="60")
+    pos = engine.portfolio.get_position("AAPL")
+    assert pos is not None and pos.quantity == 60
+
+    # The broker expires the DAY order with the same cumulative fill.
+    adapter.tick_status[client_id] = _status(
+        "b-exp", status="Expired", filled="60", price="150.0")
+    engine.poll_fills()
+
+    pos = engine.portfolio.get_position("AAPL")
+    assert pos is not None and pos.quantity == 60
+    assert engine.order_states[client_id].current == OrderState.Expired
+    assert client_id not in engine._order_metadata
+    engine.stop()
+
+
+def test_expired_transition_persists_as_expired():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter)
+
+    adapter.tick_status[client_id] = _status("b-exp", status="Expired", filled="0")
+    engine.poll_fills()
+
+    transition = _last_transition(engine, client_id)
+    assert transition["to_state"] == "Expired"
+    assert transition["reason"] == "broker_expired"
+    engine.stop()
+
+
+def test_done_for_day_expires_the_order():
+    # Alpaca ends a DAY order with "done_for_day", which canonicalizes to Expired.
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter)
+
+    adapter.tick_status[client_id] = _status(
+        "b-exp", status="done_for_day", filled="0")
+    engine.poll_fills()
+
+    assert engine.order_states[client_id].current == OrderState.Expired
+    assert _last_transition(engine, client_id)["to_state"] == "Expired"
+    assert client_id not in engine._order_metadata
+    engine.stop()
+
+
+def test_expired_order_is_not_resurrected_on_restart():
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = str(Path(tmp) / "state.json")
+        adapter = FakeAdapter()
+        engine = _engine(adapter, state_path)
+        initialize_fresh(engine)
+        engine.start(sync_from_broker=False)
+        client_id = _acknowledged_order(engine, adapter)
+        adapter.tick_status[client_id] = _status("b-exp", status="Expired", filled="0")
+        engine.poll_fills()
+        engine.stop()
+
+        adapter2 = FakeAdapter()
+        engine2 = _engine(adapter2, state_path)
+        engine2.start(sync_from_broker=False)
+        try:
+            # Replay restores the terminal state, and polling never picks it up.
+            # (Startup reconstruction rebuilds metadata for every historical
+            # submit, terminal orders included; that structure is not the
+            # open-order contract — poll_fills is.)
+            assert engine2.order_states[client_id].current == OrderState.Expired
+            polls = _tracked_polls(adapter2)
+            engine2.poll_fills()
+            assert engine2.order_states[client_id].current == OrderState.Expired
+            assert polls == []
+            assert adapter2.placed == []
+        finally:
+            engine2.stop()

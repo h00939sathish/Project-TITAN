@@ -393,6 +393,27 @@ class TestUncertainOutcome:
         assert engine.order_states[coid].current == OrderState.Unknown
         assert engine.risk_gate.kill_switch.blocks_routing()
 
+    def test_t3_unknown_resolves_to_expiry(self, tmp_path):
+        """The broker expired the order while the response was lost: the
+        Unknown order becomes Expired (terminal), not Rejected, and leaves
+        tracking."""
+        broker = StubBroker()
+
+        def lost_response(intent):
+            broker_created(broker, intent, status="expired", filled=0)
+            raise ConnectionError("response dropped")
+
+        broker.place_behavior = lost_response
+        engine = make_engine(tmp_path, broker)
+
+        engine.submit_intent(make_intent())
+
+        coid = broker.place_calls[0]
+        assert len(broker.place_calls) == 1          # NEVER resent
+        assert engine.order_states[coid].current == OrderState.Expired
+        assert coid not in engine._order_metadata
+        assert open_client_ids(engine) == []
+
 
 # ---------------------------------------------------------------------------
 # Test 4 — reconnect gap: order invisible, then reconciled when visible again
