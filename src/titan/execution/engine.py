@@ -387,12 +387,19 @@ class PaperTradingEngine:
                     "side": payload.get("side", ""),
                     "quantity": int(payload.get("quantity", 0)),
                 }
-            elif ev.message_type == "OrderFilled":
+            elif ev.message_type in ("OrderFilled", "OrderPartiallyFilled"):
                 coid = payload.get("client_order_id", "")
                 instr = payload.get("instrument_id", "")
                 price = payload.get("fill_price", "")
                 if coid:
-                    self._order_filled_quantity[coid] = int(payload.get("filled_quantity", 0))
+                    # filled_quantity is the applied delta under both event
+                    # types (pre-split logs labelled partials "OrderFilled").
+                    # Sum the deltas; assigning the last one understates the
+                    # ledger and makes a restarted order re-book quantity.
+                    self._order_filled_quantity[coid] = (
+                        self._order_filled_quantity.get(coid, 0)
+                        + int(payload.get("filled_quantity", 0))
+                    )
                 if instr and price:
                     self._last_prices[instr] = price
                     try:
@@ -750,8 +757,14 @@ class PaperTradingEngine:
                 "price": price,
             }),
         ))
+        # One event type per fill outcome (Order.spec.md:28): a delta that
+        # reaches the ordered quantity completes the order, anything less is a
+        # partial. Both payloads carry the applied delta in filled_quantity.
+        total_qty = int(meta.get("quantity", 0))
+        fill_complete = total_qty > 0 and cumulative >= total_qty
         self._event_store.append(EventEnvelope(
-            "OrderFilled", "Execution", order_id, "titan_python",
+            "OrderFilled" if fill_complete else "OrderPartiallyFilled",
+            "Execution", order_id, "titan_python",
             json.dumps({
                 "client_order_id": order_id,
                 "instrument_id": instrument_id,
@@ -765,10 +778,9 @@ class PaperTradingEngine:
         self._order_filled_quantity[order_id] = cumulative
 
         if update_sm and not sm.current.is_terminal():
-            total_qty = int(meta.get("quantity", 0))
             from_state = sm.current
             try:
-                if total_qty > 0 and cumulative >= total_qty:
+                if fill_complete:
                     sm.transition(OrderState.Filled)
                     sm.persist_transition(self._event_store, order_id,
                                           from_state, OrderState.Filled, "full_fill")

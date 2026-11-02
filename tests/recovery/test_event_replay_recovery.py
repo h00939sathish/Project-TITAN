@@ -84,3 +84,26 @@ def test_recover_from_event_store_and_boot_reconciliation(temp_store_path):
     assert status.startswith("HALTED (kill switch held")
 
 
+def test_replay_portfolio_events_includes_partial_fills(temp_store_path):
+    store = EventStore(temp_store_path)
+    for message_type, qty in (("OrderPartiallyFilled", 30), ("OrderFilled", 20)):
+        store.append(EventEnvelope(
+            message_type, "Execution", "client-part-1", "test_python",
+            json.dumps({
+                "client_order_id": "client-part-1",
+                "instrument_id": "SPY",
+                "side": "BUY",
+                "filled_quantity": qty,
+                "fill_price": "450.00",
+            }),
+        ))
+
+    portfolio = PortfolioEngine("USD", Money("100000", "USD"))
+    replayed_count = replay_portfolio_events(store, portfolio)
+
+    assert replayed_count == 2
+    pos = portfolio.get_position("SPY")
+    assert pos is not None
+    assert pos.quantity == 50
+
+

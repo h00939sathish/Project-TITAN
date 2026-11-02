@@ -15,11 +15,17 @@ import json
 
 
 def replay_portfolio_events(store: EventStore, portfolio: PortfolioEngine) -> int:
-    """Replay OrderFilled events from EventStore to rebuild portfolio state.
+    """Replay persisted fill events to rebuild portfolio state.
+
+    Both ``OrderPartiallyFilled`` and ``OrderFilled`` carry one applied delta;
+    they are merged in the store's deterministic order because a partial and
+    its completing fill interleave by time.
 
     Returns the number of replayed fill events.
     """
-    events = store.replay_by_type("OrderFilled")
+    events = (store.replay_by_type("OrderFilled")
+              + store.replay_by_type("OrderPartiallyFilled"))
+    events.sort(key=lambda e: (e.occurred_at, e.message_id))
     replayed_count = 0
 
     for envelope in events:

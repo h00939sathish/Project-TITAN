@@ -20,6 +20,7 @@ from fixtures.session_init import initialize_fresh
 from titan._core import (
     BrokerPosition,
     ContractType,
+    EventEnvelope,
     EventStore,
     Instrument,
     InstrumentId,
@@ -736,3 +737,110 @@ def test_expired_order_is_not_resurrected_on_restart():
             assert adapter2.placed == []
         finally:
             engine2.stop()
+
+
+# ── Fill event vocabulary: partial vs complete ──────────────────────────────
+
+def _fill_events(engine, message_type):
+    return [json.loads(e.payload)
+            for e in engine._event_store.replay_by_type(message_type)]
+
+
+def test_partial_ack_emits_order_partially_filled():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter, fill_quantity="60")
+
+    partials = _fill_events(engine, "OrderPartiallyFilled")
+    assert [p["filled_quantity"] for p in partials] == [60]
+    assert partials[0]["client_order_id"] == client_id
+    assert _fill_events(engine, "OrderFilled") == []
+    engine.stop()
+
+
+def test_final_delta_emits_order_filled():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    client_id = _acknowledged_order(engine, adapter, fill_quantity="60")
+
+    adapter.tick_status[client_id] = _status(
+        "b-exp", status="Filled", filled="100", price="150.5")
+    engine.poll_fills()
+
+    assert engine.order_states[client_id].current == OrderState.Filled
+    assert [p["filled_quantity"]
+            for p in _fill_events(engine, "OrderPartiallyFilled")] == [60]
+    assert [f["filled_quantity"] for f in _fill_events(engine, "OrderFilled")] == [40]
+    engine.stop()
+
+
+def test_complete_ack_emits_only_order_filled():
+    adapter = FakeAdapter()
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    assert engine.submit_intent(_make_intent()).accepted
+
+    assert [f["filled_quantity"] for f in _fill_events(engine, "OrderFilled")] == [100]
+    assert _fill_events(engine, "OrderPartiallyFilled") == []
+    engine.stop()
+
+
+def test_restart_rebuilds_cumulative_filled_quantity():
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = str(Path(tmp) / "state.json")
+        adapter = FakeAdapter()
+        engine = _engine(adapter, state_path)
+        initialize_fresh(engine)
+        engine.start(sync_from_broker=False)
+        client_id = _acknowledged_order(engine, adapter, fill_quantity="40")
+        adapter.tick_status[client_id] = _status(
+            "b-exp", status="PartiallyFilled", filled="70", price="150.5")
+        engine.poll_fills()
+        assert engine._order_filled_quantity[client_id] == 70
+        engine.stop()
+
+        adapter2 = FakeAdapter()
+        engine2 = _engine(adapter2, state_path)
+        engine2.start(sync_from_broker=False)
+        try:
+            assert engine2._order_filled_quantity[client_id] == 70
+            adapter2.tick_status[client_id] = _status(
+                "b-exp", status="Filled", filled="100", price="150.5")
+            engine2.poll_fills()
+            pos = engine2.portfolio.get_position("AAPL")
+            assert pos is not None and pos.quantity == 100
+        finally:
+            engine2.stop()
+
+
+def test_legacy_order_filled_deltas_accumulate_on_replay():
+    # Logs written before the vocabulary split contain one OrderFilled row per
+    # applied delta. Replay must sum them, not keep the last one.
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = str(Path(tmp) / "state.json")
+        db_path = state_path.replace(".json", ".db")
+        store = EventStore(db_path)
+        for delta in (30, 40):
+            store.append(EventEnvelope(
+                "OrderFilled", "Execution", "legacy-1", "test_python",
+                json.dumps({
+                    "client_order_id": "legacy-1",
+                    "instrument_id": "AAPL",
+                    "side": "BUY",
+                    "filled_quantity": delta,
+                    "fill_price": "150.0",
+                }),
+            ))
+        store.close()
+
+        engine = _engine(FakeAdapter(), state_path)
+        engine.start(sync_from_broker=False)
+        try:
+            assert engine._order_filled_quantity["legacy-1"] == 70
+        finally:
+            engine.stop()
