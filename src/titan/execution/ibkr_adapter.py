@@ -312,6 +312,8 @@ class IBKRPaperAdapter(BrokerAdapter):
                     fill_price=str(avg_price) if avg_price and float(avg_price) > 0 else None,
                     fill_quantity=str(int(filled)) if filled and int(filled) > 0 else None,
                     order_status=status,
+                    # TWS avgFillPrice is the average over all fills so far.
+                    fill_price_is_cumulative_avg=True,
                 )
             return BrokerOrderAcknowledgement(
                 accepted=True,
@@ -412,6 +414,8 @@ class IBKRPaperAdapter(BrokerAdapter):
             status=status,
             created_at="",
             updated_at=datetime.now(timezone.utc).isoformat(),
+            # TWS avgFillPrice is the average over all fills so far.
+            price_is_cumulative_avg=True,
         )
 
     def ensure_connected(self, force: bool = False) -> bool:

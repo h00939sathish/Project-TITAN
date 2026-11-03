@@ -12,6 +12,7 @@ import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from titan._core import (
     KillSwitchState,
     Money,
     OrderState,
+    OrderStateMachine,
     ReconciliationConfig,
     ReconciliationDriftSeverity,
     RiskConfig,
@@ -160,7 +162,11 @@ class FakeAdapter(BrokerAdapter):
         return self.tick_status.get(order_id)
 
 
-def _status(order_id, status="Filled", filled="100", price="150.0", instrument="AAPL", side="BUY"):
+def _status(order_id, status="Filled", filled="100", price="150.0", instrument="AAPL",
+            side="BUY", price_is_cumulative_avg=False):
+    kwargs = {}
+    if price_is_cumulative_avg:
+        kwargs["price_is_cumulative_avg"] = True
     return BrokerOrderStatus(
         order_id=BrokerOrderId(id=order_id),
         instrument_id=instrument,
@@ -171,6 +177,7 @@ def _status(order_id, status="Filled", filled="100", price="150.0", instrument="
         status=status,
         created_at="",
         updated_at=datetime.now(timezone.utc).isoformat(),
+        **kwargs,
     )
 
 
@@ -842,5 +849,179 @@ def test_legacy_order_filled_deltas_accumulate_on_replay():
         engine.start(sync_from_broker=False)
         try:
             assert engine._order_filled_quantity["legacy-1"] == 70
+        finally:
+            engine.stop()
+
+
+# ── Broker cumulative-average price -> incremental delta price ──────────────
+
+def _cumulative_ack(order_id, quantity, price):
+    return BrokerOrderAcknowledgement(
+        accepted=True,
+        broker_order_id=BrokerOrderId(id=order_id),
+        fill_quantity=quantity,
+        fill_price=price,
+        order_status="PartiallyFilled",
+        fill_price_is_cumulative_avg=True,
+    )
+
+
+def _fill_payloads(engine):
+    return (_fill_events(engine, "OrderPartiallyFilled")
+            + _fill_events(engine, "OrderFilled"))
+
+
+def test_cumulative_avg_second_fill_derives_incremental_price():
+    adapter = FakeAdapter()
+    adapter.ack_override = _cumulative_ack("b-cum", "60", "150.0")
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    try:
+        assert engine.submit_intent(_make_intent()).accepted
+        client_id = next(iter(engine.order_states))
+
+        adapter.tick_status[client_id] = _status(
+            "b-cum", status="Filled", filled="100", price="156.0",
+            price_is_cumulative_avg=True)
+        engine.poll_fills()
+
+        pos = engine.portfolio.get_position("AAPL")
+        assert pos is not None and pos.quantity == 100
+        # 60 @ 150 + 40 @ 165 == 100 @ 156; booking the 40 at 156 would
+        # give 152.4 and understate cost basis by 3.6/share.
+        assert float(pos.cost_basis.amount) == pytest.approx(156.0, abs=1e-9)
+
+        fills = _fill_payloads(engine)
+        assert [f["filled_quantity"] for f in fills] == [60, 40]
+        assert float(fills[0]["fill_price"]) == pytest.approx(150.0, abs=1e-9)
+        assert float(fills[1]["fill_price"]) == pytest.approx(165.0, abs=1e-9)
+        assert float(engine._order_filled_notional[client_id]) == pytest.approx(
+            15600.0, abs=1e-6)
+    finally:
+        engine.stop()
+
+
+def test_cumulative_avg_three_polls_reconverge_to_broker_vwap():
+    adapter = FakeAdapter()
+    adapter.ack_override = _cumulative_ack("b-cum3", "40", "150.0")
+    engine = _engine(adapter)
+    initialize_fresh(engine)
+    engine.start(sync_from_broker=False)
+    try:
+        assert engine.submit_intent(_make_intent()).accepted
+        client_id = next(iter(engine.order_states))
+
+        adapter.tick_status[client_id] = _status(
+            "b-cum3", status="PartiallyFilled", filled="70", price="152.0",
+            price_is_cumulative_avg=True)
+        engine.poll_fills()
+        adapter.tick_status[client_id] = _status(
+            "b-cum3", status="Filled", filled="100", price="155.0",
+            price_is_cumulative_avg=True)
+        engine.poll_fills()
+
+        pos = engine.portfolio.get_position("AAPL")
+        assert pos is not None and pos.quantity == 100
+        assert float(pos.cost_basis.amount) == pytest.approx(155.0, abs=1e-9)
+
+        fills = _fill_payloads(engine)
+        assert [f["filled_quantity"] for f in fills] == [40, 30, 30]
+        prices = [Decimal(str(f["fill_price"])) for f in fills]
+        assert prices[0] == Decimal("150.0")
+        assert abs(prices[1] - Decimal("4640") / Decimal("30")) < Decimal("1e-20")
+        assert abs(prices[2] - Decimal("162")) < Decimal("1e-20")
+    finally:
+        engine.stop()
+
+
+def test_cumulative_avg_restart_preserves_incremental_derivation():
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = str(Path(tmp) / "state.json")
+        adapter = FakeAdapter()
+        adapter.ack_override = _cumulative_ack("b-restart", "40", "150.0")
+        engine = _engine(adapter, state_path)
+        initialize_fresh(engine)
+        engine.start(sync_from_broker=False)
+        try:
+            assert engine.submit_intent(_make_intent()).accepted
+            client_id = next(iter(engine.order_states))
+            adapter.tick_status[client_id] = _status(
+                "b-restart", status="PartiallyFilled", filled="70", price="152.0",
+                price_is_cumulative_avg=True)
+            engine.poll_fills()
+            assert engine._order_filled_quantity[client_id] == 70
+            assert float(engine._order_filled_notional[client_id]) == pytest.approx(
+                10640.0, abs=1e-6)
+        finally:
+            engine.stop()
+
+        adapter2 = FakeAdapter()
+        engine2 = _engine(adapter2, state_path)
+        engine2.start(sync_from_broker=False)
+        try:
+            assert engine2._order_filled_quantity[client_id] == 70
+            assert float(engine2._order_filled_notional[client_id]) == pytest.approx(
+                10640.0, abs=1e-6)
+            adapter2.tick_status[client_id] = _status(
+                "b-restart", status="Filled", filled="100", price="155.0",
+                price_is_cumulative_avg=True)
+            engine2.poll_fills()
+
+            pos = engine2.portfolio.get_position("AAPL")
+            assert pos is not None and pos.quantity == 100
+            assert float(pos.cost_basis.amount) == pytest.approx(155.0, abs=1e-9)
+            final = _fill_events(engine2, "OrderFilled")[-1]
+            assert final["filled_quantity"] == 30
+            assert float(final["fill_price"]) == pytest.approx(162.0, abs=1e-9)
+        finally:
+            engine2.stop()
+
+
+def test_legacy_fill_events_rebuild_applied_notional():
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = str(Path(tmp) / "state.json")
+        db_path = state_path.replace(".json", ".db")
+        store = EventStore(db_path)
+        store.append(EventEnvelope(
+            "OrderSubmitted", "Execution", "legacy-cum", "test_python",
+            json.dumps({
+                "client_order_id": "legacy-cum",
+                "instrument_id": "AAPL",
+                "side": "BUY",
+                "quantity": "100",
+                "price": "0",
+            }),
+        ))
+        for delta, px in ((40, "150.0"), (30, "152.0")):
+            store.append(EventEnvelope(
+                "OrderFilled", "Execution", "legacy-cum", "test_python",
+                json.dumps({
+                    "client_order_id": "legacy-cum",
+                    "instrument_id": "AAPL",
+                    "side": "BUY",
+                    "filled_quantity": delta,
+                    "fill_price": px,
+                }),
+            ))
+        store.close()
+
+        engine = _engine(FakeAdapter(), state_path)
+        engine.start(sync_from_broker=False)
+        try:
+            assert engine._order_filled_quantity["legacy-cum"] == 70
+            # Legacy fill prices were cumulative averages; replay reproduces
+            # the notional the portfolio actually booked.
+            assert float(engine._order_filled_notional["legacy-cum"]) == pytest.approx(
+                10560.0, abs=1e-6)
+
+            with engine._lock:
+                fill = engine._absorb_broker_fill(
+                    "legacy-cum", OrderStateMachine(), 100, "155",
+                    update_sm=False, price_is_cumulative_avg=True)
+            assert fill is not None
+            assert float(fill.price) == pytest.approx(4940 / 30, abs=1e-9)
+            assert float(engine._order_filled_notional["legacy-cum"]) == pytest.approx(
+                15500.0, abs=1e-6)
         finally:
             engine.stop()

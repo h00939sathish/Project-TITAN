@@ -30,6 +30,7 @@ orders_rejected = _REGISTRY.counter("orders_rejected")
 orders_cancelled = _REGISTRY.counter("orders_cancelled")
 orders_unknown = _REGISTRY.counter("orders_unknown")
 order_latency_seconds = _REGISTRY.histogram("order_latency_seconds")
+fill_price_basis_fallbacks = _REGISTRY.counter("fill_price_basis_fallbacks")
 
 
 # Reconciliation metrics

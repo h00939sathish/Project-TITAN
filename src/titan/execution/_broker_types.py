@@ -27,6 +27,11 @@ class BrokerOrderAcknowledgement:
     fill_price: Optional[str] = None
     fill_quantity: Optional[str] = None
     order_status: Optional[str] = None
+    # True when fill_price is the broker's average across ALL fills so far
+    # (IBKR avgFillPrice, Alpaca filled_avg_price), not the price of this fill.
+    # The engine derives the incremental delta price from the change in
+    # cumulative notional. Default False preserves per-fill price semantics.
+    fill_price_is_cumulative_avg: bool = False
 
 
 @dataclass
@@ -62,7 +67,9 @@ class BrokerOrderStatus:
 
     ``filled_quantity`` is CUMULATIVE for the order (all fills to date), never
     incremental. ``price`` carries the price reported with this status; adapters
-    that expose only a cumulative average report that average.
+    that expose only a cumulative average report that average and MUST set
+    ``price_is_cumulative_avg`` so the engine derives the incremental delta
+    price instead of booking the average against the new delta.
     """
 
     order_id: BrokerOrderId
@@ -74,6 +81,7 @@ class BrokerOrderStatus:
     status: str
     created_at: str
     updated_at: str
+    price_is_cumulative_avg: bool = False
 
 
 @dataclass

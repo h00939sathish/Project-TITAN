@@ -191,6 +191,21 @@ class TestAlpacaAdapterPlaceOrder:
         call_kwargs = mock_alpaca_client.submit_order.call_args[0][0]
         assert call_kwargs.client_order_id == "co-1"
 
+    def test_partial_fill_marks_average_price_as_cumulative(self, mock_alpaca_client):
+        order = MagicMock()
+        order.id = "uuid-1234"
+        order.filled_qty = "60"
+        order.filled_avg_price = "150.00"
+        order.status = MagicMock(value="partially_filled")
+        mock_alpaca_client.submit_order.return_value = order
+
+        result = self.adapter.place_order(self._make_intent())
+
+        assert result.accepted is True
+        assert result.fill_quantity == "60"
+        assert result.fill_price == "150.00"
+        assert result.fill_price_is_cumulative_avg is True
+
 
 class TestAlpacaAdapterCancelModify:
     """Tests for cancel and modify operations."""
@@ -306,6 +321,27 @@ class TestAlpacaAdapterQueries:
         assert len(snapshot.orders) == 1
         assert snapshot.orders[0].instrument_id == "AAPL"
         assert snapshot.orders[0].status == "partially_filled"
+
+    def test_query_order_marks_average_price_as_cumulative(self, mock_alpaca_client):
+        self.adapter._client = mock_alpaca_client
+        mock_order = MagicMock()
+        mock_order.id = "ord-1"
+        mock_order.symbol = "AAPL"
+        mock_order.side = "buy"
+        mock_order.qty = "100"
+        mock_order.filled_qty = "60"
+        mock_order.filled_avg_price = "150.00"
+        mock_order.status = MagicMock(value="partially_filled")
+        mock_order.created_at = "2026-07-14T00:00:00Z"
+        mock_order.updated_at = "2026-07-14T01:00:00Z"
+        mock_alpaca_client.get_order_by_client_id.return_value = mock_order
+
+        status = self.adapter.query_order("co-1")
+
+        assert status is not None
+        assert status.filled_quantity == "60"
+        assert status.price == "150.00"
+        assert status.price_is_cumulative_avg is True
 
     def test_fills(self, mock_alpaca_client):
         mock_activity = MagicMock()

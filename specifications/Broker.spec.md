@@ -2,7 +2,7 @@
 
 > **Owner:** Execution Platform
 > **Status:** Active — Phase -1
-> **Last Review:** 2026-07-13
+> **Last Review:** 2026-11-03
 > **Supersedes:** None
 > **Implemented in:** Phase C (core/src/adapters.rs), Phase E (platform/adapters/)
 
@@ -68,6 +68,40 @@ fn reconcile(account: AccountId, cursor: ReconciliationCursor) -> Result<BrokerT
 ```
 
 Adapter SDK types never escape the adapter boundary. All return types are TITAN canonical types.
+
+## Fill reporting contract
+
+Broker status reports carry CUMULATIVE filled quantity per order, never an
+incremental amount. The engine computes `delta = cumulative − already_applied`
+and applies that delta exactly once (single authoritative path).
+
+The price attached to a cumulative report has one of two bases, declared
+explicitly by the adapter:
+
+| Basis | Flag | Meaning |
+|---|---|---|
+| Per-fill | `price_is_cumulative_avg = False` (default) | `price` is the price of the newly reported quantity; book the delta at `price`. |
+| Cumulative average | `price_is_cumulative_avg = True` | `price` averages ALL fills to date (IBKR `avgFillPrice`, Alpaca `filled_avg_price`); booking it against the delta would corrupt cost basis and PnL. |
+
+For the cumulative-average basis the engine derives the incremental price from
+the change in cumulative notional, where `applied_notional` is the sum of
+`delta × incremental price` for fills already booked:
+
+```
+broker_notional = cumulative × average_price
+incremental     = (broker_notional − applied_notional) / delta
+```
+
+`OrderFilled` / `OrderPartiallyFilled` events and the emitted `BrokerFill`
+always carry the APPLIED delta and the INCREMENTAL price, regardless of the
+broker's reporting basis. `applied_notional` is reconstructed on restart from
+those events; if a legacy event recorded a cumulative average, the next
+cumulative report absorbs the difference so the final cost basis converges to
+the broker's volume-weighted average.
+
+If the derivation yields a non-positive price (inconsistent or corrected
+broker data), the engine books the reported price unchanged and increments
+`fill_price_basis_fallbacks` for operator review.
 
 ## Dependencies
 

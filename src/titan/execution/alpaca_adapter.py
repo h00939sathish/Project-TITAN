@@ -300,6 +300,8 @@ class AlpacaAdapter(BrokerAdapter):
                 fill_price=fill_price,
                 fill_quantity=fill_qty,
                 order_status=order_status,
+                # Alpaca filled_avg_price averages all fills to date.
+                fill_price_is_cumulative_avg=True,
             )
 
         except APIError as e:
@@ -315,6 +317,7 @@ class AlpacaAdapter(BrokerAdapter):
                             fill_price=str(existing.filled_avg_price) if getattr(existing, 'filled_avg_price', None) else None,
                             fill_quantity=str(existing.filled_qty) if getattr(existing, 'filled_qty', None) else None,
                             order_status=str(existing.status.value) if getattr(existing, 'status', None) else None,
+                            fill_price_is_cumulative_avg=True,
                         )
                 except Exception:
                     pass
@@ -522,6 +525,8 @@ class AlpacaAdapter(BrokerAdapter):
             status=str(o.status.value) if o.status else "",
             created_at=str(o.created_at) if o.created_at else "",
             updated_at=str(o.updated_at) if o.updated_at else "",
+            # Alpaca filled_avg_price averages all fills to date.
+            price_is_cumulative_avg=True,
         )
 
     def query_order(self, client_order_id: str) -> Optional[BrokerOrderStatus]:

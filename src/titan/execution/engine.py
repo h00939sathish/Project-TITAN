@@ -112,6 +112,7 @@ from titan.operations._metrics_integration import (
     cash_balance,
     gross_exposure,
     drawdown_fraction,
+    fill_price_basis_fallbacks,
 )
 from titan.operations._logging_integration import log_risk_decision, log_adapter_event
 
@@ -226,6 +227,9 @@ class PaperTradingEngine:
         self._price_history: dict[str, deque[float]] = {}
         self._order_metadata: dict[str, dict] = {}
         self._order_filled_quantity: dict[str, int] = {}
+        # Applied cost notional per order: Σ(delta × incremental price). Fed by
+        # cumulative-average broker reports to derive the next delta's price.
+        self._order_filled_notional: dict[str, Decimal] = {}
         self._decision_traces: dict[str, list[dict]] = {}
         self.intents_by_instrument: Counter = Counter()
         self.fills_by_instrument: Counter = Counter()
@@ -391,15 +395,27 @@ class PaperTradingEngine:
                 coid = payload.get("client_order_id", "")
                 instr = payload.get("instrument_id", "")
                 price = payload.get("fill_price", "")
+                qty = int(payload.get("filled_quantity", 0))
                 if coid:
                     # filled_quantity is the applied delta under both event
                     # types (pre-split logs labelled partials "OrderFilled").
                     # Sum the deltas; assigning the last one understates the
                     # ledger and makes a restarted order re-book quantity.
                     self._order_filled_quantity[coid] = (
-                        self._order_filled_quantity.get(coid, 0)
-                        + int(payload.get("filled_quantity", 0))
+                        self._order_filled_quantity.get(coid, 0) + qty
                     )
+                    # Rebuild applied notional exactly as the portfolio booked
+                    # it. Legacy events priced at a cumulative average replay
+                    # at that average, and the next cumulative report absorbs
+                    # the resulting difference.
+                    if price:
+                        try:
+                            self._order_filled_notional[coid] = (
+                                self._order_filled_notional.get(coid, Decimal(0))
+                                + Decimal(str(price)) * Decimal(qty)
+                            )
+                        except (ArithmeticError, ValueError):
+                            pass
                 if instr and price:
                     self._last_prices[instr] = price
                     try:
@@ -703,6 +719,7 @@ class PaperTradingEngine:
         cumulative_filled: int,
         fill_price: Optional[str],
         update_sm: bool = True,
+        price_is_cumulative_avg: bool = False,
     ) -> Optional[BrokerFill]:
         """Apply (cumulative_filled - already_applied) to the portfolio.
 
@@ -710,6 +727,18 @@ class PaperTradingEngine:
         when the delta is zero/non-positive or tracking metadata is absent.
         update_sm=False lets a caller absorb a fill before moving the order to
         a terminal state it computes itself (e.g. Cancelled-with-partial-fill).
+
+        price_is_cumulative_avg=True means fill_price is the broker's average
+        over ALL fills so far (IBKR/Alpaca), not this fill's price. Booking that
+        average against the delta would corrupt cost basis and PnL, so the
+        incremental price is derived from the change in cumulative notional:
+
+            (cumulative × avg) − previously_applied_notional
+            ─────────────────────────────────────────────────
+                              delta
+
+        If the derivation is unusable (non-positive), the reported price is
+        booked as-is and fill_price_basis_fallbacks counts the event.
         """
         meta = self._order_metadata.get(order_id)
         if meta is None:
@@ -722,8 +751,31 @@ class PaperTradingEngine:
 
         instrument_id = meta["instrument_id"]
         side = str(meta["side"])
-        price = str(fill_price) if fill_price not in (None, "") else (
+        reported = str(fill_price) if fill_price not in (None, "") else (
             self._last_prices.get(instrument_id, "0"))
+        price = reported
+        prev_notional = self._order_filled_notional.get(order_id)
+        if prev_notional is None:
+            prev_notional = Decimal(already) * Decimal(reported)
+        applied_notional = prev_notional + Decimal(delta) * Decimal(price)
+
+        if price_is_cumulative_avg:
+            reported_price = Decimal(reported)
+            if reported_price > 0 and cumulative > 0:
+                broker_notional = Decimal(cumulative) * reported_price
+                incremental = (broker_notional - prev_notional) / Decimal(delta)
+                if incremental > 0:
+                    price = str(incremental)
+                    applied_notional = broker_notional
+                else:
+                    fill_price_basis_fallbacks.inc()
+                    if self.logger:
+                        self.logger.warning(
+                            "engine",
+                            f"Cumulative-average fill price unusable for {order_id} "
+                            f"(avg={reported}, cumulative={cumulative}, "
+                            f"applied_notional={prev_notional}); booking reported price",
+                        )
 
         old_pos = self.portfolio.get_position(instrument_id)
         old_side = str(old_pos.side) if old_pos else "None"
@@ -776,6 +828,7 @@ class PaperTradingEngine:
 
         # Ledger updated AFTER successful application — it IS the applied qty.
         self._order_filled_quantity[order_id] = cumulative
+        self._order_filled_notional[order_id] = applied_notional
 
         if update_sm and not sm.current.is_terminal():
             from_state = sm.current
@@ -827,6 +880,7 @@ class PaperTradingEngine:
         status = _canonical_status(str(getattr(result, "status", "") or ""))
         cumulative = _parse_qty(getattr(result, "filled_quantity", 0))
         price = getattr(result, "price", None)
+        price_is_cum_avg = bool(getattr(result, "price_is_cumulative_avg", False))
 
         with self._lock:
             sm = self.order_states.get(order_id)
@@ -843,11 +897,13 @@ class PaperTradingEngine:
                                           "broker_outcome_resolved")
                 except ValueError:
                     return False
-                self._absorb_broker_fill(order_id, sm, cumulative, price)
+                self._absorb_broker_fill(order_id, sm, cumulative, price,
+                                         price_is_cumulative_avg=price_is_cum_avg)
                 return True
             # Dead without further fills possible (Cancelled/Rejected/...):
             # preserve any partial fill FIRST, then take the terminal state.
-            self._absorb_broker_fill(order_id, sm, cumulative, price, update_sm=False)
+            self._absorb_broker_fill(order_id, sm, cumulative, price, update_sm=False,
+                                     price_is_cumulative_avg=price_is_cum_avg)
             target = _TERMINAL_TARGETS[status]
             from_state = sm.current
             try:
@@ -860,6 +916,7 @@ class PaperTradingEngine:
                 return False
             self._order_metadata.pop(order_id, None)
             self._order_filled_quantity.pop(order_id, None)
+            self._order_filled_notional.pop(order_id, None)
         if self.logger:
             log_adapter_event(self.logger, "unknown_resolved", order_id,
                               payload={"status": status, "filled": cumulative})
@@ -1288,7 +1345,8 @@ class PaperTradingEngine:
                 applied = self._absorb_broker_fill(
                     client_order_id, sm,
                     acknowledgement.fill_quantity,
-                    acknowledgement.fill_price or approved.price)
+                    acknowledgement.fill_price or approved.price,
+                    price_is_cumulative_avg=acknowledgement.fill_price_is_cumulative_avg)
                 if applied is not None:
                     fills.append(applied)
 
@@ -1361,6 +1419,7 @@ class PaperTradingEngine:
             status = _canonical_status(str(getattr(result, "status", "") or ""))
             cumulative = _parse_qty(getattr(result, "filled_quantity", 0))
             price = getattr(result, "price", None)
+            price_is_cum_avg = bool(getattr(result, "price_is_cumulative_avg", False))
 
             dead_no_fill = status in (_DEAD_ORDER_STATUSES - {"Filled"})
 
@@ -1376,7 +1435,8 @@ class PaperTradingEngine:
                     # BEFORE taking the terminal state, then drop tracking.
                     if cumulative > already_filled:
                         self._absorb_broker_fill(order_id, sm, cumulative, price,
-                                                 update_sm=False)
+                                                 update_sm=False,
+                                                 price_is_cumulative_avg=price_is_cum_avg)
                     target = _TERMINAL_TARGETS[status]
                     try:
                         sm.transition(target)
@@ -1388,6 +1448,7 @@ class PaperTradingEngine:
                                               f"Dead-order transition failed for {order_id}: {e}")
                     self._order_metadata.pop(order_id, None)
                     self._order_filled_quantity.pop(order_id, None)
+                    self._order_filled_notional.pop(order_id, None)
                     log_adapter_event(self.logger, "broker_dead_order", order_id,
                                       payload={"status": status,
                                                "instrument_id": result.instrument_id,
@@ -1401,7 +1462,8 @@ class PaperTradingEngine:
                 # working window. _absorb_broker_fill is a no-op when the delta
                 # is zero/negative and derives PartiallyFilled/Filled from the
                 # cumulative quantity, not from the status label.
-                self._absorb_broker_fill(order_id, sm, cumulative, price)
+                self._absorb_broker_fill(order_id, sm, cumulative, price,
+                                         price_is_cumulative_avg=price_is_cum_avg)
 
     def reconcile(self) -> ReconciliationResult:
         with self._lock:
