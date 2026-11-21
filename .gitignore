@@ -32,9 +32,11 @@ opencode.json
 # TITAN runtime artifacts
 .titan_state.db
 .titan_state.json
+.titan_india_state.json
 .titan_paper_pid
 .titan_paper_monitor.log
 session_config.json
+.qoder/
 
 # Dashboard
 dashboard/
