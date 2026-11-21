@@ -37,6 +37,7 @@ opencode.json
 .titan_paper_monitor.log
 session_config.json
 .qoder/
+.agents/
 
 # Dashboard
 dashboard/
